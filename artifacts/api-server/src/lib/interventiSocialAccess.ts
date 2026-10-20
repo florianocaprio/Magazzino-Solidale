@@ -10,7 +10,7 @@ export type SocialActor = M5bRequestActor & {
   zonaAreaOperativaId?: number | null;
 };
 
-/** Social policy only: never widen M4/UDS/Emporio by changing centroScope. */
+/** Il profilo sociale opera sui Centri della propria Area; UDS resta separato. */
 export function socialTerritory(actor: SocialActor | undefined) {
   if (!actor || !(actor.isAdmin || actor.aree?.includes("sociale")))
     return "none";
@@ -33,9 +33,7 @@ export function socialTerritory(actor: SocialActor | undefined) {
       actor.zonaAreaOperativaId !== actor.areaOperativaId)
   )
     return "none";
-  // An explicitly assigned Area was already a supported social scope. It is
-  // not global, and an existing Centro assignment can never be ignored.
-  return actor.centroAscoltoId == null ? "area" : "centro";
+  return "area";
 }
 
 export function canReadSocialSubject(
@@ -52,8 +50,6 @@ export function canReadSocialSubject(
   return (
     subject.areaOperativaId === actor!.areaOperativaId &&
     subject.centroAscoltoId != null &&
-    (actor!.centroAscoltoId == null ||
-      subject.centroAscoltoId === actor!.centroAscoltoId) &&
     (actor!.zonaUdsId == null || subject.zonaUdsId === actor!.zonaUdsId)
   );
 }
@@ -65,9 +61,6 @@ export function socialSubjectPredicate(actor: SocialActor | undefined): SQL {
   return and(
     eq(beneficiariTable.areaOperativaId, actor!.areaOperativaId!),
     sql`${beneficiariTable.centroAscoltoId} is not null`,
-    actor!.centroAscoltoId == null
-      ? undefined
-      : eq(beneficiariTable.centroAscoltoId, actor!.centroAscoltoId),
     actor!.zonaUdsId == null
       ? undefined
       : eq(beneficiariTable.zonaUdsId, actor!.zonaUdsId),

@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import { RequiredField } from "./ui/required-field";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,7 +34,7 @@ export function EmporioStatusBadge({
   );
 }
 
-export function useBeneficiarioEmporio(beneficiarioId: number) {
+export function useBeneficiarioEmporio(beneficiarioId: number, enabled = true) {
   const security = useEmporioSecurity();
   const { emporioAbilitato } = useModuloFlags();
   return useGetEmporioAbilitazione(beneficiarioId, {
@@ -41,14 +42,16 @@ export function useBeneficiarioEmporio(beneficiarioId: number) {
       ...security.readOptions(
         getGetEmporioAbilitazioneQueryKey(beneficiarioId),
       ),
-      enabled: emporioAbilitato,
+      enabled: emporioAbilitato && enabled,
     },
   });
 }
 
 export function BeneficiarioEmporioSection({
   beneficiario,
+  readOnly = false,
 }: {
+  readOnly?: boolean;
   beneficiario: {
     id: number;
     attivo: boolean;
@@ -68,11 +71,12 @@ export function BeneficiarioEmporioSection({
   const [submitted, setSubmitted] = useState(false);
   if (!emporioAbilitato) return null;
   const canManage =
+    !readOnly &&
     hasPermission("emporio.eligibility.manage") &&
     (user?.isAdmin ||
       (hasArea("sociale") &&
-        (user?.centroAscoltoId == null ||
-          user.centroAscoltoId === beneficiario.centroAscoltoId)));
+        (operationalCentroId(user) == null ||
+          operationalCentroId(user) === beneficiario.centroAscoltoId)));
   const change = async (stato: EmporioAbilitazioneInputStato) => {
     setError("");
     setSubmitted(true);

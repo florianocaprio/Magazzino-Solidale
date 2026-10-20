@@ -13,4 +13,9 @@ export interface BeneficiariFseImportResolution {
   azione: BeneficiariFseImportResolutionAzione;
   /** @minimum 1 */
   beneficiarioId?: number;
+  aggiornaAnagrafica?: boolean;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
 }

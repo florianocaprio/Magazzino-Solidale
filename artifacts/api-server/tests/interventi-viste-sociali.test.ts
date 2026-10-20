@@ -399,7 +399,7 @@ describe("viste operative degli interventi Sociali", () => {
   it.each([
     ["da_pianificare", 2, ["da_pianificare"]],
     ["pianificati", 1, ["pianificato"]],
-    ["oggi", 2, ["pianificato", "in_corso"]],
+    ["oggi", 3, ["pianificato", "in_corso"]],
     ["in_corso", 1, ["in_corso"]],
     ["conclusi", 2, ["concluso"]],
     ["annullati", 2, ["annullato", "mancata_presentazione"]],
@@ -470,7 +470,7 @@ describe("viste operative degli interventi Sociali", () => {
       a: today,
     });
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(2);
+    expect(response.body).toHaveLength(3);
     const tooWide = await request(makeApp()).get("/interventi").query({
       ambito: "sociale",
       includiStorici: true,
@@ -503,7 +503,7 @@ describe("viste operative degli interventi Sociali", () => {
     expect(response.body).toMatchObject({
       daPianificare: 2,
       pianificati: 2,
-      oggi: 2,
+      oggi: 3,
       inCorso: 1,
       conclusi: 2,
       annullati: 2,
@@ -565,7 +565,7 @@ describe("viste operative degli interventi Sociali", () => {
       centroAscoltoId: altroCentroRoma,
       priorita: "normale",
     });
-    expect(classified.body).toHaveLength(1); // il centro inviato viene ignorato per l'operatore territorialmente bloccato
+    expect(classified.body).toHaveLength(0); // il Centro è un filtro facoltativo nell’Area.
   });
 
   it("uno scope Area esplicito filtra senza vedere Milano o UDS (null non è globale)", async () => {
@@ -588,14 +588,14 @@ describe("viste operative degli interventi Sociali", () => {
     ).toBe(true);
   });
 
-  it("rispetta lo scope del Centro e nega il dettaglio diretto", async () => {
+  it("il Centro del profilo non limita l’Area e il dettaglio è accessibile", async () => {
     const other = await request(makeApp({ centroId: altroCentroRoma }))
       .get("/interventi")
       .query({ ambito: "sociale", includiStorici: true, vista: "oggi" });
-    expect(other.body).toHaveLength(1);
+    expect(other.body).toHaveLength(3);
     const forbiddenId = other.body[0].id;
     const detail = await request(makeApp()).get(`/interventi/${forbiddenId}`);
-    expect(detail.status).toBe(403);
+    expect(detail.status).toBe(200);
   });
 
   it("arricchisce la lista in modo costante senza richieste per singola riga", async () => {

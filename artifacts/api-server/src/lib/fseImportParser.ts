@@ -413,7 +413,9 @@ function selectRecognizedSheet(
     throw new AgeaParserError(
       "FOGLIO_AMBIGUO",
       recognized.length === 0
-        ? "Nessun foglio contiene il tracciato richiesto"
+        ? (profile === "REGISTRO"
+          ? "Seleziona il Registro carichi e scarichi FSE+, non il file Giacenze."
+          : "Seleziona il file Giacenze FSE+, non il Registro carichi e scarichi.")
         : "Più fogli contengono il tracciato: scegliere esplicitamente il foglio",
     );
   return recognized[0];

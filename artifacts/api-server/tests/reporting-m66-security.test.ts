@@ -72,6 +72,7 @@ let area: number,
   m2: number,
   z1: number,
   z2: number,
+  foreignZone: number,
   streetUser: number,
   canteenUser: number;
 const sentinel = `PRIVATE-Z2-${randomUUID()}`;
@@ -200,6 +201,8 @@ beforeAll(async () => {
     .values({ utenteId: canteenUser, mensaId: m1, assegnataDa: canteenUser });
   z1 = (await createZona(scope, area)).id;
   z2 = (await createZona(scope, area)).id;
+  const foreignArea = await createAreaOperativa(scope);
+  foreignZone = (await createZona(scope, foreignArea)).id;
   const streetLogin = await login(["analisi", "uds"], area, z1);
   street = streetLogin.agent;
   streetUser = streetLogin.id;
@@ -208,6 +211,22 @@ beforeAll(async () => {
     zonaUdsId: z1,
     uds: true,
   });
+  const foreignBeneficiary = await createBeneficiario(scope, null, {
+    areaOperativaId: foreignArea,
+    zonaUdsId: foreignZone,
+    uds: true,
+  });
+  await db
+    .insert(interventiTable)
+    .values({
+      beneficiarioId: foreignBeneficiary,
+      tipoIntervento: "Contatto",
+      ambito: "uds",
+      dataIntervento: "2026-01-15",
+      areaOperativaIdSnapshot: foreignArea,
+      zonaUdsIdSnapshot: foreignZone,
+      noteUds: "PRIVATE-FOREIGN-AREA",
+    });
   await db.insert(interventiTable).values([
     {
       beneficiarioId: beneficiary,
@@ -262,24 +281,26 @@ it("SEC-01 explicit administrative global access remains available", async () =>
     200,
   );
 });
-it("SEC-02 assigned M1 only: integrated, general and filter options cannot include M2", async () => {
+it("Area: report e filtri includono tutte le mense dell’Area", async () => {
   const report = await canteen.get("/api/report/mensa").query(period);
   expect(report.status).toBe(200);
-  expect(value(report.body, "pastiErogati")).toBe(1);
+  expect(value(report.body, "pastiErogati")).toBe(2);
   const general = await canteen.get("/api/report/dashboard").query(period);
   expect(general.status).toBe(200);
-  expect(value(general.body, "pastiErogati")).toBe(1);
+  expect(value(general.body, "pastiErogati")).toBe(2);
   const options = await canteen
     .get("/api/report/filter-options")
     .query({ section: "mensa" });
   expect(options.status).toBe(200);
-  expect(options.body.mense.map((m: { id: number }) => m.id)).toEqual([m1]);
+  expect(options.body.mense.map((m: { id: number }) => m.id)).toEqual(
+    expect.arrayContaining([m1, m2]),
+  );
 });
-it("SEC-02 explicit M2 and its detail are forbidden", async () => {
+it("Area: M2 e il relativo dettaglio sono accessibili", async () => {
   expect(
     (await canteen.get("/api/report/mensa").query({ ...period, mensaId: m2 }))
       .status,
-  ).toBe(403);
+  ).toBe(200);
   expect(
     (
       await canteen.get("/api/report/drilldown").query({
@@ -289,9 +310,9 @@ it("SEC-02 explicit M2 and its detail are forbidden", async () => {
         mensaId: m2,
       })
     ).status,
-  ).toBe(403);
+  ).toBe(200);
 });
-it("SEC-02 FSE filter options do not disclose the unassigned Mensa warehouse", async () => {
+it("Area: FSE include i magazzini delle mense dell’Area", async () => {
   const options = await canteen
     .get("/api/report/filter-options")
     .query({ section: "fse-plus" });
@@ -306,26 +327,30 @@ it("SEC-02 FSE filter options do not disclose the unassigned Mensa warehouse", a
   ).toContain(own.magazzinoId);
   expect(
     options.body.warehouses.map((row: { id: number }) => row.id),
-  ).not.toContain(other.magazzinoId);
+  ).toContain(other.magazzinoId);
 });
-it("SEC-03 assigned zone applies without query; first contact remains absolute historical", async () => {
+it("SEC-03 tutte le Zone dell’Area sono autorizzate; filtri Zona restano disponibili", async () => {
   const result = await street.get("/api/report/uds").query(period);
   expect(result.status).toBe(200);
-  expect(value(result.body, "interventi")).toBe(1);
-  expect(value(result.body, "primiContatti")).toBe(0);
+  expect(value(result.body, "interventi")).toBe(2);
+  expect(value(result.body, "primiContatti")).toBe(1);
   expect(
     (await street.get("/api/report/uds").query({ ...period, zonaUdsId: z2 }))
       .status,
-  ).toBe(403);
+  ).toBe(200);
 });
-it("SEC-04 legacy daily report must not disclose other-zone notes or events", async () => {
+it("SEC-04 il giornaliero include altre Zone dell’Area ed esclude altre Aree", async () => {
   const result = await street
     .get("/api/report/uds/interventi-giornalieri")
     .query(period);
   expect(result.status).toBe(200);
-  expect(JSON.stringify(result.body)).not.toContain(sentinel);
-  expect(result.body).toHaveLength(1);
-  expect(result.body[0].primoIntervento).toBe(false);
+  expect(JSON.stringify(result.body)).toContain(sentinel);
+  expect(JSON.stringify(result.body)).not.toContain("PRIVATE-FOREIGN-AREA");
+  expect(result.body).toHaveLength(2);
+  expect(
+    result.body.find((r: { zonaUdsId: number }) => r.zonaUdsId === z1)
+      .primoIntervento,
+  ).toBe(false);
 });
 it("SEC-06 disabled BOLLE denies both dashboard and direct pacchi drilldown", async () => {
   await updateModuloAmbiente("BOLLE", false, null);
@@ -344,18 +369,32 @@ it("SEC-06 disabled BOLLE denies both dashboard and direct pacchi drilldown", as
     await updateModuloAmbiente("BOLLE", true, null);
   }
 });
-it("SEC-02 revocation takes effect on the same real session", async () => {
+it("Area: assegnazioni storiche ignorate, revoca del ruolo efficace nella stessa sessione", async () => {
   const prepared = await canteen
     .post("/api/report/prepare")
     .query({ ...period, section: "mensa" });
   expect(prepared.status).toBe(200);
-  expect(value(prepared.body.report, "pastiErogati")).toBe(1);
+  expect(value(prepared.body.report, "pastiErogati")).toBe(2);
   expect(prepared.body.datasetId).toMatch(/^[a-f0-9-]{36}$/);
   expect(prepared.headers["cache-control"]).toContain("no-store");
   await db
     .update(utentiMenseTable)
     .set({ attiva: false, revocataDa: canteenUser, revocataAt: new Date() })
     .where(eq(utentiMenseTable.utenteId, canteenUser));
+  expect(
+    value(
+      (await canteen.get("/api/report/mensa").query(period)).body,
+      "pastiErogati",
+    ),
+  ).toBe(2);
+  const [user] = await db
+    .select()
+    .from(utentiTable)
+    .where(eq(utentiTable.id, canteenUser));
+  await db
+    .update(ruoliTable)
+    .set({ aree: ["analisi"] })
+    .where(eq(ruoliTable.id, user.ruoloId!));
   const result = await canteen.get("/api/report/mensa").query(period);
   expect(result.status).toBe(403);
   expect(
@@ -365,21 +404,24 @@ it("SEC-02 revocation takes effect on the same real session", async () => {
         .query({ ...period, section: "mensa" })
     ).status,
   ).toBe(403);
+  await db
+    .update(ruoliTable)
+    .set({ aree: ["analisi", "mensa"] })
+    .where(eq(ruoliTable.id, user.ruoloId!));
 });
 
-it("SEC-03/04 UDS identifiers, options, detail and preparation enforce the current zone and PII allowlist", async () => {
+it("SEC-03/04 UDS applica il confine Area, mantiene filtri Zona e allowlist PII", async () => {
   for (const path of [
     "/api/report/uds",
     "/api/report/dashboard",
     "/api/report/drilldown",
     "/api/report/filter-options",
-    "/api/report/uds/interventi-giornalieri",
   ]) {
     const denied = await street.get(path).query({
       ...period,
       section: "uds",
       metric: "interventi",
-      zonaUdsId: z2,
+      zonaUdsId: foreignZone,
     });
     expect(denied.status, path).toBe(403);
   }
@@ -387,19 +429,29 @@ it("SEC-03/04 UDS identifiers, options, detail and preparation enforce the curre
     (
       await street
         .post("/api/report/prepare")
-        .query({ ...period, section: "uds", zonaUdsId: z2 })
+        .query({ ...period, section: "uds", zonaUdsId: foreignZone })
     ).status,
   ).toBe(403);
+  const foreignDaily = await street
+    .get("/api/report/uds/interventi-giornalieri")
+    .query({ ...period, zonaUdsId: foreignZone });
+  expect(foreignDaily.status).toBe(200);
+  expect(foreignDaily.body).toEqual([]);
   const options = await street
     .get("/api/report/filter-options")
     .query({ section: "uds" });
   expect(options.status).toBe(200);
-  expect(options.body.zones.map((z: { id: number }) => z.id)).toEqual([z1]);
+  expect(options.body.zones.map((z: { id: number }) => z.id)).toEqual(
+    expect.arrayContaining([z1, z2]),
+  );
+  expect(options.body.zones.map((z: { id: number }) => z.id)).not.toContain(
+    foreignZone,
+  );
   const prepared = await street
     .post("/api/report/prepare")
     .query({ ...period, section: "uds" });
   expect(prepared.status).toBe(200);
-  expect(value(prepared.body.report, "interventi")).toBe(1);
+  expect(value(prepared.body.report, "interventi")).toBe(2);
   expect(prepared.body.detail).toBeNull();
   expect(JSON.stringify(prepared.body)).not.toContain(sentinel);
   expect(JSON.stringify(prepared.body)).not.toContain("Nota lecita");
@@ -407,7 +459,8 @@ it("SEC-03/04 UDS identifiers, options, detail and preparation enforce the curre
     .get("/api/report/uds/interventi-giornalieri")
     .query(period);
   expect(daily.status).toBe(200);
-  expect(daily.body).toHaveLength(1);
+  expect(daily.body).toHaveLength(2);
+  expect(JSON.stringify(daily.body)).not.toContain("PRIVATE-FOREIGN-AREA");
   expect(Object.keys(daily.body[0]).sort()).toEqual(
     [
       "id",
@@ -426,7 +479,9 @@ it("SEC-03/04 UDS identifiers, options, detail and preparation enforce the curre
       "primoIntervento",
     ].sort(),
   );
-  expect(daily.body[0]).toMatchObject({
+  expect(
+    daily.body.find((r: { zonaUdsId: number }) => r.zonaUdsId === z1),
+  ).toMatchObject({
     zonaUdsId: z1,
     noteUds: "Nota lecita",
     primoIntervento: false,
@@ -543,7 +598,7 @@ it("D08 page beyond the last keeps the true authorized total", async () => {
   });
   expect(result.status).toBe(200);
   expect(result.body.rows).toEqual([]);
-  expect(result.body.total).toBe(1);
+  expect(result.body.total).toBe(2);
 });
 it("D08 each transfer state card opens exactly its own canonical group", async () => {
   const origin = await createMagazzino(scope, null, { areaOperativaId: area });
@@ -971,7 +1026,7 @@ it("PDF-13 real prepare rejects the UTF-8 8 MiB bound without returning a trunca
   }
 }, 120000);
 
-it("SEC-02 FSE movement controls cannot reveal distributions belonging to unassigned M2", async () => {
+it("Area: FSE include le distribuzioni delle due mense dell’Area senza accesso inventario", async () => {
   const product = await createProdotto(scope);
   for (const mensaId of [m1, m2]) {
     const [m] = await db
@@ -1028,7 +1083,7 @@ it("SEC-02 FSE movement controls cannot reveal distributions belonging to unassi
       .get("/api/report/fse-plus/integrato")
       .query(period);
     expect(report.status, JSON.stringify(report.body)).toBe(200);
-    expect(value(report.body, "eventiDistribuzione")).toBe(1);
+    expect(value(report.body, "eventiDistribuzione")).toBe(2);
     // This actor can inspect its distributions, not warehouse-wide inventories.
     expect(
       report.body.kpi.find(
@@ -1039,7 +1094,7 @@ it("SEC-02 FSE movement controls cannot reveal distributions belonging to unassi
       .get("/api/report/drilldown")
       .query({ ...period, section: "fse-plus", metric: "prodottiFse" });
     expect(detail.status).toBe(200);
-    expect(detail.body.total).toBe(1);
+    expect(detail.body.total).toBe(2);
     // The same live session must lose this source on the detail route too.
     await updateModuloAmbiente("MENSA", false, null);
     const disabledDetail = await canteen
@@ -1318,10 +1373,10 @@ it("AC-06 Mensa preference A is distinct from actual origin B, without interpret
 });
 
 it("SEC-07 revocation during a genuinely blocked preparation prevents delivery of the old snapshot", async () => {
-  await db
-    .update(utentiMenseTable)
-    .set({ attiva: true, revocataAt: null, revocataDa: null })
-    .where(eq(utentiMenseTable.utenteId, canteenUser));
+  const [actor] = await db
+    .select()
+    .from(utentiTable)
+    .where(eq(utentiTable.id, canteenUser));
   const lock = await pool.connect();
   let pending: Promise<request.Response> | undefined;
   try {
@@ -1348,9 +1403,9 @@ it("SEC-07 revocation during a genuinely blocked preparation prevents delivery o
       "PostgreSQL must observe the in-flight reader; no assumed timing",
     ).toBe(true);
     await db
-      .update(utentiMenseTable)
-      .set({ attiva: false, revocataAt: new Date(), revocataDa: canteenUser })
-      .where(eq(utentiMenseTable.utenteId, canteenUser));
+      .update(utentiTable)
+      .set({ areaOperativaId: null })
+      .where(eq(utentiTable.id, canteenUser));
     await lock.query("ROLLBACK");
     const response = await pending;
     expect(response.status).toBe(403);
@@ -1360,9 +1415,9 @@ it("SEC-07 revocation during a genuinely blocked preparation prevents delivery o
     lock.release();
     if (pending) await pending;
     await db
-      .update(utentiMenseTable)
-      .set({ attiva: false, revocataAt: new Date(), revocataDa: canteenUser })
-      .where(eq(utentiMenseTable.utenteId, canteenUser));
+      .update(utentiTable)
+      .set({ areaOperativaId: actor.areaOperativaId })
+      .where(eq(utentiTable.id, canteenUser));
   }
 });
 

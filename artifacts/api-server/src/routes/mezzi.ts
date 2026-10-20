@@ -1,3 +1,4 @@
+import { canAccessPersonalVehicle } from "../lib/volontariArea";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import {
@@ -63,6 +64,7 @@ type MezzoJoinRow = {
   volNome: string | null;
   volCognome: string | null;
   volCentroId: number | null;
+  volAreaId: number | null;
 };
 
 /**
@@ -81,6 +83,7 @@ const baseSelect = () =>
       volNome: volontariTable.nome,
       volCognome: volontariTable.cognome,
       volCentroId: volontariTable.centroAscoltoId,
+      volAreaId: volontariTable.areaOperativaId,
     })
     .from(mezziTable)
     .leftJoin(volontariTable, eq(mezziTable.volontarioId, volontariTable.id));
@@ -98,6 +101,7 @@ const fmt = (r: MezzoJoinRow, centroNome: string | null) => {
     volontarioNome: r.volNome ? `${r.volNome} ${r.volCognome ?? ""}`.trim() : null,
     centroAscoltoId: r.m.centroAscoltoId ?? null,
     effectiveCentroId,
+    areaOperativaId: r.volAreaId,
     effectiveCentroNome: centroNome,
     capacitaColli: r.m.capacitaColli ?? null,
     capacitaKg: r.m.capacitaKg ? parseFloat(r.m.capacitaKg) : null,
@@ -144,7 +148,7 @@ router.get("/mezzi", requirePermission("logistica.mezzi.view"), async (req, res)
     .where(
       andScoped(
         effectiveCentroFilter(caller),
-        effectiveAreaOperativaFilter(areaOperativaCentroIds),
+        effectiveAreaOperativaFilter(areaOperativaCentroIds, callerAreaOperativaId(req)),
       ),
     )
     .orderBy(desc(mezziTable.id));
@@ -166,6 +170,7 @@ router.get("/mezzi", requirePermission("logistica.mezzi.view"), async (req, res)
  * or a 403 error message string.
  */
 async function resolveCentro(
+  req: Request,
   body: { volontarioId?: number | null; centroAscoltoId?: number | null },
   caller: number | null,
   areaOperativaCentroIds: number[] | null,
@@ -180,11 +185,12 @@ async function resolveCentro(
   }
   const owner = body.volontarioId != null ? await volontarioCentroId(body.volontarioId) : null;
   if (owner && !owner.exists) return { error: "Volontario proprietario non trovato", status: 400 };
+  if (!(await canAccessPersonalVehicle(req, { volontarioId: body.volontarioId ?? null }))) return { status: 403, error: "Proprietario non accessibile per Area" };
   const effective = effectiveCentroFromMezzo(
     { volontarioId: body.volontarioId ?? null, centroAscoltoId: ownCentro },
     owner?.centroId ?? null,
   );
-  if (caller == null && areaOperativaCentroIds != null && effective == null) {
+  if (body.volontarioId == null && caller == null && areaOperativaCentroIds != null && effective == null) {
     return { error: "Seleziona un Centro della tua Area Operativa", status: 400 };
   }
   if (!canAccessCentro(effective, caller)) {
@@ -205,7 +211,7 @@ async function createMezzoOne(
   if (capacitaError) return { error: capacitaError, status: 400 };
   const caller = callerCentroId(req);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
-  const resolved = await resolveCentro(b, caller, areaOperativaCentroIds);
+  const resolved = await resolveCentro(req, b, caller, areaOperativaCentroIds);
   if ("error" in resolved) return { error: resolved.error, status: resolved.status };
   const baseValues = {
     ...(b as typeof mezziTable.$inferInsert),
@@ -231,10 +237,10 @@ async function createMezzoOne(
       { volontarioId: requestedOwnerId, centroAscoltoId: resolved.ownCentro },
       owner?.centroAscoltoId ?? null,
     );
-    if (caller == null && areaOperativaCentroIds != null && effectiveCentroId == null) {
+    if (requestedOwnerId == null && caller == null && areaOperativaCentroIds != null && effectiveCentroId == null) {
       throw new LogisticaPolicyError(400, "Seleziona un Centro della tua Area Operativa");
     }
-    if (!canAccessCentro(effectiveCentroId, caller) || !inVisibleCentroSet(effectiveCentroId, areaOperativaCentroIds)) {
+    if (!(await canAccessPersonalVehicle(req, { volontarioId: requestedOwnerId }, tx)) || !canAccessCentro(effectiveCentroId, caller) || !inVisibleCentroSet(effectiveCentroId, areaOperativaCentroIds)) {
       throw new LogisticaPolicyError(403, "Mezzo non accessibile per il tuo perimetro");
     }
     const [row] = await tx
@@ -322,7 +328,7 @@ router.post("/mezzi/bulk", requirePermission("logistica.mezzi.manage"), async (r
 router.get("/mezzi/:id", requirePermission("logistica.mezzi.view"), async (req, res) => {
   const [r] = await baseSelect().where(eq(mezziTable.id, parseInt(String(req.params.id))));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(effectiveCentroOf(r), callerCentroId(req))) {
+  if (!(await canAccessPersonalVehicle(req, r.m)) || !canAccessCentro(effectiveCentroOf(r), callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -339,7 +345,7 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const [existing] = await baseSelect().where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(effectiveCentroOf(existing), caller)) {
+  if (!(await canAccessPersonalVehicle(req, existing.m)) || !canAccessCentro(effectiveCentroOf(existing), caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -360,6 +366,7 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
   const volontarioId =
     body.volontarioId !== undefined ? body.volontarioId : existing.m.volontarioId;
   const resolved = await resolveCentro(
+    req,
     {
       volontarioId,
       centroAscoltoId:
@@ -392,7 +399,7 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
     [changed] = await db.transaction(async (tx) => {
     const requestedOwnerId = volontarioId != null ? Number(volontarioId) : null;
     const locked = await loadAndLockEffectiveMezzoTx(tx, id, requestedOwnerId != null ? [requestedOwnerId] : []);
-    if (!canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, areaOperativaCentroIds)) {
+    if (!(await canAccessPersonalVehicle(req, locked.mezzo, tx)) || !canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, areaOperativaCentroIds)) {
       throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
     }
     if (requestedOwnerId != null && !locked.owners.has(requestedOwnerId)) throw new LogisticaPolicyError(400, "Volontario proprietario non trovato");
@@ -400,7 +407,7 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
       { volontarioId: requestedOwnerId, centroAscoltoId: resolved.ownCentro },
       requestedOwnerId == null ? null : locked.owners.get(requestedOwnerId)!.centroAscoltoId,
     );
-    if (!canAccessCentro(effectiveNext, caller) || !inVisibleCentroSet(effectiveNext, areaOperativaCentroIds)) {
+    if (!(await canAccessPersonalVehicle(req, { volontarioId }, tx)) || !canAccessCentro(effectiveNext, caller) || !inVisibleCentroSet(effectiveNext, areaOperativaCentroIds)) {
       throw new LogisticaPolicyError(403, "Mezzo non accessibile per il tuo perimetro");
     }
     if (body.stato === "disponibile" && locked.mezzo.statoApprovazione !== "approvato") throw new LogisticaPolicyError(409, "Il mezzo deve essere approvato prima di diventare disponibile");
@@ -436,7 +443,7 @@ router.delete("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (
       let locked;
       try { locked = await loadAndLockEffectiveMezzoTx(tx, id); }
       catch (error) { if (error instanceof LogisticaPolicyError && error.status === 404) return null; throw error; }
-      if (!canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, visibleIds)) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+      if (!(await canAccessPersonalVehicle(req, locked.mezzo, tx)) || !canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, visibleIds)) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
       const versione = parseRequiredVersion(req.body?.versione);
       if (versione == null) throw new LogisticaPolicyError(400, "versione obbligatoria e valida");
       const [row] = await tx.update(mezziTable).set({ stato: "ritirato", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() })

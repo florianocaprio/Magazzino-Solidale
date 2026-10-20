@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { m67aMensaFixture } from "../../api-server/tests/helpers/m67a-mensa-fixture";
 import {
+  createAreaOperativa,
   createZona,
   createBeneficiario,
   insertIntervento,
@@ -20,16 +21,17 @@ test.afterEach(async ({ page }, info) => {
     });
 });
 
-test("M67-31: two real UDS sessions separate minimal directory, territorial dossier and Reporting, then revoke the same session", async ({
+test("M67-31: two real UDS Area sessions separate minimal directory, territorial dossier and Reporting, then revoke the same session", async ({
   page,
   browser,
 }) => {
   const f = await m67aMensaFixture(),
     scope = newScope();
   await updateModuloAmbiente("UDS", true, null);
+  const areas = [f.area, await createAreaOperativa(scope)];
   const zones = [
-    await createZona(scope, f.area),
-    await createZona(scope, f.area),
+    await createZona(scope, areas[0]),
+    await createZona(scope, areas[1]),
   ];
   const actors = [f.users.requester, f.users.receiver];
   const people: Array<{
@@ -49,13 +51,13 @@ test("M67-31: two real UDS sessions separate minimal directory, territorial doss
       ]),
       actors[i].roleId,
     ]);
-    await pool.query("update utenti set zona_uds_id=$1 where id=$2", [
-      zones[i].id,
-      actors[i].id,
-    ]);
+    await pool.query(
+      "update utenti set area_operativa_id=$1,zona_uds_id=null,centro_ascolto_id=null where id=$2",
+      [areas[i], actors[i].id],
+    );
     const id = await createBeneficiario(scope, null, {
       uds: true,
-      areaOperativaId: f.area,
+      areaOperativaId: areas[i],
       zonaUdsId: zones[i].id,
     });
     const person = (
@@ -70,7 +72,7 @@ test("M67-31: two real UDS sessions separate minimal directory, territorial doss
       ambito: "uds",
       tipoIntervento: `P4 type ${zones[i].id}`,
       dataIntervento: "2026-10-17",
-      areaOperativaIdSnapshot: f.area,
+      areaOperativaIdSnapshot: areas[i],
       zonaUdsIdSnapshot: zones[i].id,
     });
   }
@@ -89,6 +91,11 @@ test("M67-31: two real UDS sessions separate minimal directory, territorial doss
       await p.getByLabel(/^password$/i).fill(actors[i].password);
       await p.getByRole("button", { name: /accedi|login/i }).click();
       await expect(p).toHaveURL(/\/$/);
+      expect(await (await p.request.get("/api/auth/me")).json()).toMatchObject({
+        areaOperativaId: areas[i],
+        zonaUdsId: null,
+        centroAscoltoId: null,
+      });
       const directoryResponse = p.waitForResponse(
         (r) => new URL(r.url()).pathname === "/api/uds/directory",
       );
@@ -101,12 +108,12 @@ test("M67-31: two real UDS sessions separate minimal directory, territorial doss
       });
       expect(
         index.find((r: { id: number }) => r.id === foreign.id),
-      ).toMatchObject({ accessoCompleto: false });
+      ).toBeUndefined();
       expect(JSON.stringify(index)).not.toContain("PRIVATE-P4-ZONE-");
       await expect(
         p.getByRole("link", { name: own.cognome, exact: true }),
       ).toBeVisible();
-      await expect(p.getByText(foreign.cognome, { exact: true })).toBeVisible();
+      await expect(p.getByText(foreign.cognome, { exact: true })).toHaveCount(0);
       await expect(
         p.getByRole("link", { name: foreign.cognome, exact: true }),
       ).toHaveCount(0);
@@ -115,7 +122,9 @@ test("M67-31: two real UDS sessions separate minimal directory, territorial doss
       );
       await p.getByRole("link", { name: own.cognome, exact: true }).click();
       expect((await dossier).status()).toBe(200);
-      await expect(p).toHaveURL(new RegExp(`/beneficiari/${own.id}$`));
+      await expect(p).toHaveURL(
+        new RegExp(`/uds/anagrafica/${own.id}\\?ritorno=`),
+      );
       const denied = await p.request.get(`/api/beneficiari/${foreign.id}`);
       expect(denied.status()).toBe(403);
       expect(await denied.text()).not.toContain(

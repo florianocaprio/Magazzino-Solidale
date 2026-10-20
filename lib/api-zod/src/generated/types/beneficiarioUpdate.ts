@@ -11,6 +11,17 @@ import type { BeneficiarioUpdateSesso } from "./beneficiarioUpdateSesso";
 import type { BeneficiarioUpdateStatoAnagrafica } from "./beneficiarioUpdateStatoAnagrafica";
 
 export interface BeneficiarioUpdate {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   /** @nullable */
   codiceFiscale?: string | null;
   /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */

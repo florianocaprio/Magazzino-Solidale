@@ -7,6 +7,8 @@
  */
 
 export interface ApprovazioneVolontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;

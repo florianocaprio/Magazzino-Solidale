@@ -4,6 +4,7 @@ import {
   useListScarichi,
   useCreateScarico,
   useListMagazzini,
+  useListAreeOperative,
   useListCentriAscolto,
   useListGiacenze,
   useListProdotti,
@@ -37,6 +38,7 @@ import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 import { loadAllPages } from "@/lib/paged-export";
 import { todayEuropeRome } from "@/lib/europe-rome";
+import { operationalWarehousesForArea } from "@/lib/carico-merce";
 
 const CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
 
@@ -221,28 +223,27 @@ function NuovoScaricoForm({
   onCreated: (s: Scarico) => void;
 }) {
   const { user } = useAuth();
-  const lockedCentroId = user?.centroAscoltoId ?? null;
-  const isCentroLocked = lockedCentroId != null;
+  const [areaId, setAreaId] = useState(String(user?.areaOperativaId ?? ""));
   const [magazzinoId, setMagazzinoId] = useState("");
-  const [centroAscoltoId, setCentroAscoltoId] = useState("");
   const [causale, setCausale] = useState("");
   const [causaleAltro, setCausaleAltro] = useState("");
   const [note, setNote] = useState("");
   const [righe, setRighe] = useState<RigaDraft[]>([newRiga()]);
   useEffect(() => {
-    if (isCentroLocked && lockedCentroId != null) {
-      setCentroAscoltoId(String(lockedCentroId));
-    }
-  }, [isCentroLocked, lockedCentroId]);
+    setAreaId(String(user?.areaOperativaId ?? ""));
+    setMagazzinoId("");
+    setRighe([newRiga()]);
+  }, [user?.areaOperativaId]);
 
   const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
-  const { data: centri } = useListCentriAscolto();
+  const { data: areas } = useListAreeOperative();
+  const operational = operationalWarehousesForArea(magazzini ?? [], areaId ? Number(areaId) : null);
   const createScarico = useCreateScarico();
   const { toast } = useToast();
 
   const magazzinoIdNum = magazzinoId ? parseInt(magazzinoId) : 0;
-  const magazzinoAreaId = magazzini?.find((m) => m.id === magazzinoIdNum)?.areaOperativaId ?? 0;
+  const magazzinoAreaId = areaId && operational.some((m) => m.id === magazzinoIdNum) ? Number(areaId) : 0;
   const giacenzeParams = { areaOperativaId: magazzinoAreaId, magazzinoId: magazzinoIdNum };
   const { data: giacenze } = useListGiacenze(
     giacenzeParams,
@@ -251,7 +252,7 @@ function NuovoScaricoForm({
 
   const reset = () => {
     setMagazzinoId("");
-    setCentroAscoltoId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
+    setAreaId(String(user?.areaOperativaId ?? ""));
     setCausale("");
     setCausaleAltro("");
     setNote("");
@@ -278,7 +279,6 @@ function NuovoScaricoForm({
       {
         data: {
           magazzinoId: parseInt(magazzinoId),
-          centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
           dataScarico: todayEuropeRome(),
           causale: causale as "deteriorata" | "rubata" | "scaduta" | "altro",
           causaleAltro: causale === "altro" ? causaleAltro.trim() : undefined,
@@ -314,26 +314,20 @@ function NuovoScaricoForm({
 
         <div className="space-y-5 py-5">
           <div className="space-y-2">
-            <Label>{t("scarichi.magazzino")}</Label>
-            <Select value={magazzinoId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
-              <SelectTrigger aria-label={t("scarichi.magazzino")}><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
+            <Label>Area</Label>
+            <Select value={areaId} disabled={user?.areaOperativaId != null} onValueChange={(value) => { setAreaId(value); setMagazzinoId(""); setRighe([newRiga()]); }}>
+              <SelectTrigger aria-label="Area"><SelectValue placeholder="Area" /></SelectTrigger>
               <SelectContent>
-                {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                ))}
+                {areas?.filter((area) => area.attivo && (user?.areaOperativaId == null || area.id === user.areaOperativaId)).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-
           <div className="space-y-2">
-            <Label>{t("scarichi.centro")}</Label>
-            <Select value={centroAscoltoId || "none"} onValueChange={(v) => setCentroAscoltoId(v === "none" ? "" : v)} disabled={isCentroLocked}>
-              <SelectTrigger aria-label={t("scarichi.centro")}><SelectValue placeholder={t("scarichi.selectCentro")} /></SelectTrigger>
+            <Label>{t("scarichi.magazzino")}</Label>
+            <Select value={magazzinoId} disabled={!areaId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
+              <SelectTrigger aria-label={t("scarichi.magazzino")}><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t("scarichi.nessunCentro")}</SelectItem>
-                {centri?.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                ))}
+                {operational.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -359,7 +353,7 @@ function NuovoScaricoForm({
 
           <div className="space-y-2">
             <Label>{t("scarichi.prodottiDaScaricare")}</Label>
-            {magazzinoId ? (
+            {magazzinoAreaId > 0 ? (
               <RigheEditor magazzinoId={parseInt(magazzinoId)} areaOperativaId={magazzinoAreaId} righe={righe} setRighe={setRighe} />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">

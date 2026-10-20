@@ -15,7 +15,7 @@ describe("hardening UI Logistica", () => {
     expect(volontari).toContain('hasPermission("logistica.volontari.export")');
     expect(mezzi).toContain('hasPermission("logistica.mezzi.manage")');
     expect(mezzi).toContain('hasPermission("logistica.mezzi.export")');
-    expect(volontari).not.toContain("useDeleteVolontario");
+    expect(volontari).toContain("removeIfUnused: true");
     expect(mezzi).not.toContain("useDeleteMezzo");
   });
 

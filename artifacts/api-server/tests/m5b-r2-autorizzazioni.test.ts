@@ -285,23 +285,23 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
         );
       }
       const requestList = await agent.get("/api/richieste-magazzino");
-      expect(requestList.status, requestList.text).toBe(200);
-      expect(requestList.body.total).toBe(0);
+      expect(requestList.status, requestList.text).toBe(403);
+      expect(requestList.body).not.toHaveProperty("items");
       const search = await agent
         .get("/api/richieste-magazzino")
         .query({ ricerca: row.codice });
-      expect(search.body.total).toBe(0);
+      expect(search.status).toBe(403);
       const bollaList = await agent.get("/api/bolle");
       expect(bollaList.status, bollaList.text).toBe(403);
       expect(bollaList.body.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(bollaList.body).not.toHaveProperty("items");
       expect(bollaList.text).not.toContain(created.body.codiceDocumento);
       const documentsList = await agent.get("/api/documenti-operativi");
       expect(documentsList.status, documentsList.text).toBe(403);
       expect(documentsList.body.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(documentsList.body).not.toHaveProperty("items");
       expect(documentsList.text).not.toContain(created.body.codiceDocumento);
@@ -310,7 +310,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
       );
       expect(exportResponse.status).toBe(403);
       expect(exportResponse.body.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(exportResponse.headers["content-type"]).toContain(
         "application/json",
@@ -385,7 +385,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
       const newAgent = await login();
       expect(
         (await newAgent.get(`/api/richieste-magazzino/${row.id}`)).status,
-      ).toBe(404);
+      ).toBe(403);
       expect(
         (
           await newAgent
@@ -396,7 +396,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
               magazzinoId: originA1,
             })
         ).status,
-      ).toBe(404);
+      ).toBe(403);
       expect(
         await Promise.all([requestDigest(row.id), requestDigest(pending.id)]),
       ).toEqual(before);
@@ -422,7 +422,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
     const otherCentre = await fixture("beneficiario", "A2");
     expect(
       (await agent.get(`/api/richieste-magazzino/${otherCentre.id}`)).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (await agent.get(`/api/richieste-magazzino/${transfer.id}`)).status,
     ).toBe(200);
@@ -468,7 +468,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
       const transferList = await agent.get("/api/trasferimenti");
       expect(transferList.status, transferList.text).toBe(403);
       expect(transferList.body.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(transferList.body).not.toHaveProperty("items");
       expect(transferList.text).not.toContain(
@@ -507,7 +507,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
     ).toBe(200);
     expect(
       (await centreAgent.get(`/api/richieste-magazzino/${rowA2.id}`)).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (await centreAgent.get(`/api/richieste-magazzino/${rowB.id}`)).status,
     ).toBe(404);
@@ -536,14 +536,14 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
         .where(eq(utentiTable.id, operatorId));
       expect(
         (await centreAgent.get(`/api/richieste-magazzino/${rowA1.id}`)).status,
-      ).toBe(404);
+      ).toBe(403);
       await db
         .update(utentiTable)
         .set({ areaOperativaId: areaA, centroAscoltoId: centreB })
         .where(eq(utentiTable.id, operatorId));
       expect(
         (await centreAgent.get(`/api/richieste-magazzino/${rowA1.id}`)).status,
-      ).toBe(404);
+      ).toBe(200);
       expect(
         (await centreAgent.get(`/api/richieste-magazzino/${rowB.id}`)).status,
       ).toBe(404);
@@ -590,7 +590,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
     ).toBe(200);
     expect(
       (await admin.get(`/api/richieste-magazzino/${rowA2.id}`)).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (await admin.get(`/api/richieste-magazzino/${rowB.id}`)).status,
     ).toBe(404);
@@ -652,8 +652,8 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
         .where(eq(utentiTable.id, operatorId));
       expect(
         (await agent.get(`/api/richieste-magazzino/${row.id}`)).status,
-      ).toBe(404);
-      expect((await agent.get("/api/richieste-magazzino")).body.total).toBe(0);
+      ).toBe(403);
+      expect((await agent.get("/api/richieste-magazzino")).status).toBe(403);
       await db
         .update(utentiTable)
         .set({ areaOperativaId: areaA, centroAscoltoId: centreA1 })
@@ -772,33 +772,20 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
       .where(eq(utentiTable.id, customId));
     expect(
       (await custom.get(`/api/richieste-magazzino/${first.id}`)).status,
-    ).toBe(404);
-    expect((await custom.get("/api/richieste-magazzino")).body.total).toBe(0);
+    ).toBe(403);
+    expect((await custom.get("/api/richieste-magazzino")).status).toBe(403);
   }, 30_000);
 
-  it("R2-12: assegnazioni ad Area o Centro inattivi non riaprono la richiesta", async () => {
+  it("R2-12: Area inattiva nega; il Centro storico non limita l’account", async () => {
     const row = await fixture();
     const agent = await login();
     expect((await agent.get(`/api/richieste-magazzino/${row.id}`)).status).toBe(
       200,
     );
     try {
-      await db
-        .update(centriAscoltoTable)
-        .set({ attivo: false })
-        .where(eq(centriAscoltoTable.id, centreA1));
-      expect([403, 404]).toContain(
-        (await agent.get(`/api/richieste-magazzino/${row.id}`)).status,
-      );
-      expect((await agent.get("/api/richieste-magazzino")).body.total).toBe(0);
-      const deniedCentre = await agent
-        .post(`/api/richieste-magazzino/${row.id}/documento`)
-        .send({
-          idempotencyKey: randomUUID(),
-          versione: 1,
-          magazzinoId: originA1,
-        });
-      expect([403, 404], deniedCentre.text).toContain(deniedCentre.status);
+      await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centreA1));
+      expect((await agent.get(`/api/richieste-magazzino/${row.id}`)).status).toBe(200);
+      expect((await agent.get("/api/richieste-magazzino")).body.items.some((item: { id: number }) => item.id === row.id)).toBe(true);
       await db
         .update(centriAscoltoTable)
         .set({ attivo: true })
@@ -895,7 +882,7 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
       const me = await agent.get("/api/auth/me");
       expect(me.body.user ?? me.body).toMatchObject({
         areaOperativaId: areaA,
-        centroAscoltoId: centreA1,
+        centroAscoltoId: null,
       });
     } finally {
       if (blockerOpen) await blocker.query("ROLLBACK");

@@ -1,4 +1,10 @@
 import {
+  lockProducerLotRegistry,
+  resolveProducerLot,
+  linkProducerLot,
+  type VerifiedFseLotOrigin,
+} from "./producerLots";
+import {
   carichiMagazzinoRigheTable,
   carichiMagazzinoTable,
   FONDI_ORIGINE,
@@ -123,6 +129,7 @@ export async function lockInventoryPartyBusinessKeys(
   tx: InventoryTransaction,
   keys: string[],
 ): Promise<void> {
+  await lockProducerLotRegistry(tx);
   for (const key of [...new Set(keys)].sort()) {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
@@ -190,6 +197,9 @@ function requestHash(value: unknown): string {
 }
 
 export interface WarehouseLoadLineInput {
+  lottoProduttoreId?: number | null;
+  produttore?: string | null;
+  trustedImport?: VerifiedFseLotOrigin;
   prodottoId: number;
   fondoOrigine: FondoOrigine;
   quantitaOperativa: string | number;
@@ -550,6 +560,12 @@ export async function createWarehouseLoad(
     fornitoreId,
     note: optionalText(input.note, 4000),
     righe: normalizedLines.map((line) => ({
+      ...(line.input.lottoProduttoreId == null
+        ? {}
+        : { lottoProduttoreId: line.input.lottoProduttoreId }),
+      ...(line.input.produttore?.trim()
+        ? { produttore: line.input.produttore.trim() }
+        : {}),
       numeroRiga: line.numeroRiga,
       prodottoId: line.prodotto.id,
       fondoOrigine: line.input.fondoOrigine,
@@ -648,6 +664,39 @@ export async function createWarehouseLoad(
     let lotto =
       (line.partyKey ? resolvedParties.get(line.partyKey) : undefined) ??
       line.existingLotto;
+    const master =
+      magazzino.areaOperativaId == null
+        ? null
+        : (
+            await resolveProducerLot(tx, {
+              areaOperativaId: magazzino.areaOperativaId,
+              prodottoId: line.prodotto.id,
+              codiceLotto: line.lotto.original,
+              dataScadenza: line.dataScadenza,
+              lottoProduttoreId:
+                line.input.lottoProduttoreId ?? lotto?.lottoProduttoreId,
+              produttore: line.input.produttore,
+              actorId: input.creatoDa,
+              audit: input.audit,
+              trustedImport: line.input.trustedImport,
+              legacy: Boolean(lotto && !lotto.lottoProduttoreId),
+            })
+          ).master;
+    if (line.input.lottoProduttoreId != null && !master)
+      throw new InventoryLedgerError(
+        400,
+        "Area del Magazzino richiesta per l'anagrafica lotto",
+      );
+    if (
+      lotto &&
+      master &&
+      lotto.lottoProduttoreId != null &&
+      lotto.lottoProduttoreId !== master.id
+    )
+      throw new InventoryLedgerError(
+        409,
+        "Partita già collegata a un'anagrafica diversa",
+      );
     if (lotto) {
       const caricata = InventoryDecimal.parse(lotto.quantitaCaricata).add(
         line.quantita!,
@@ -699,6 +748,14 @@ export async function createWarehouseLoad(
         .returning();
     }
 
+    if (master)
+      lotto = await linkProducerLot(
+        tx,
+        lotto,
+        master.id,
+        input.audit,
+        input.creatoDa,
+      );
     const [riga] = await tx
       .insert(carichiMagazzinoRigheTable)
       .values({
@@ -780,6 +837,7 @@ export async function createWarehouseLoad(
 }
 
 export interface CaricoInventarialeInput {
+  lottoProduttoreId?: number | null;
   prodottoId: number;
   lottoLogicoId?: number | null;
   codiceLotto?: string | null;
@@ -819,6 +877,7 @@ export async function creaCaricoInventariale(
     audit: input.audit,
     righe: [
       {
+        lottoProduttoreId: input.lottoProduttoreId,
         prodottoId: input.prodottoId,
         fondoOrigine: input.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
         quantitaOperativa: input.quantita,

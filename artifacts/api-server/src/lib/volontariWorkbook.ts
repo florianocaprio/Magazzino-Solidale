@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { isDateOnly } from "./volontariDomain";
+import { isDateOnly, todayRome } from "./volontariDomain";
 
 export const VOLONTARI_XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -64,7 +64,8 @@ function dateFromUnknown(value: unknown): string | null {
   if (typeof value === "number") {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (parsed) {
-      return `${String(parsed.y).padStart(4, "0")}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+      const result = `${String(parsed.y).padStart(4, "0")}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+      return isDateOnly(result) ? result : null;
     }
   }
   const text = String(value).trim();
@@ -155,6 +156,7 @@ export function parseVolontariWorkbook(buffer: Buffer): {
     const dataServizio = dateFromUnknown(servizioRaw);
     const errori: string[] = [];
     if (hasCellValue(dataNascitaRaw) && !dataNascita) errori.push("Data di nascita non valida");
+    if (dataNascita && dataNascita > todayRome()) errori.push("La data di nascita non può essere futura");
     if (hasCellValue(dataInizioRaw) && !dataInizioImportata) errori.push("Da Data non valida");
     if (hasCellValue(scadenzaRaw) && !scadenzaAssicurazione) errori.push("A Data/scadenza assicurativa non valida");
     if (hasCellValue(servizioRaw) && !dataServizio) errori.push("Data servizio non valida");

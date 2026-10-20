@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, ne, desc, ilike, or, type SQL } from "drizzle-orm";
+import { and, eq, ne, desc, ilike, or, sql, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
-import { CreateUtenteBody, UpdateUtenteBody } from "@workspace/api-zod";
+import { CreateUtenteBody, UpdateUtenteBody, SetUtenteTemporaryPasswordBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { callerCentroId, callerAreaOperativaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
 import { isBootstrapMode } from "../lib/bootstrap";
@@ -12,6 +12,8 @@ import { isValidUserEmail, normalizeEmail } from "../lib/userEmail";
 import { sendPasswordResetEmail } from "../lib/emailService";
 import { ADMIN_RESET_EMAIL_INVALID_MESSAGE, ADMIN_RESET_LINK_SENT_MESSAGE, createPasswordResetLinkForUser, invalidateActivePasswordResetTokens } from "../lib/passwordReset";
 import { validatePassword } from "../lib/passwordPolicy";
+import { revokeUserAccess } from "../lib/userAccess";
+import { removeUser } from "../lib/removeUser";
 
 const router: IRouter = Router();
 
@@ -52,12 +54,12 @@ const fmt = (r: UtenteRow) => ({
   matricola: r.matricola ?? null,
   ruoloId: r.ruoloId ?? null,
   ruoloNome: r.ruoloNome ?? null,
-  centroAscoltoId: r.centroAscoltoId ?? null,
-  centroAscoltoNome: r.centroAscoltoNome ?? null,
+  centroAscoltoId: null,
+  centroAscoltoNome: null,
   areaOperativaId: r.areaOperativaId ?? null,
   areaOperativaNome: r.areaOperativaNome ?? null,
-  zonaUdsId: r.zonaUdsId ?? null,
-  zonaUdsNome: r.zonaUdsNome ?? null,
+  zonaUdsId: null,
+  zonaUdsNome: null,
   isSuperAdmin: r.isSuperAdmin || r.ruoloNome === SUPER_ADMIN_ROLE_NAME,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
@@ -221,31 +223,6 @@ async function validateUserTerritorialAssignment(params: { areaOperativaId: numb
   if (!(await areaIsAvailable(params.areaOperativaId))) {
     return "L'Area Operativa selezionata non è disponibile";
   }
-  if (params.centroAscoltoId != null) {
-    const [centro] = await db
-      .select({
-        areaOperativaId: centriAscoltoTable.areaOperativaId,
-        attivo: centriAscoltoTable.attivo,
-      })
-      .from(centriAscoltoTable)
-      .where(eq(centriAscoltoTable.id, params.centroAscoltoId));
-    if (!centro || !centro.attivo) {
-      return "Il Centro di Ascolto selezionato non è disponibile";
-    }
-    if (centro.areaOperativaId !== params.areaOperativaId) {
-      return "Il Centro di Ascolto deve appartenere alla stessa Area Operativa dell'utente";
-    }
-  }
-
-  if (params.zonaUdsId != null) {
-    const [zona] = await db.select({ areaOperativaId: zoneUdsTable.areaOperativaId, attivo: zoneUdsTable.attivo }).from(zoneUdsTable).where(eq(zoneUdsTable.id, params.zonaUdsId));
-    if (!zona || !zona.attivo) {
-      return "La Zona UDS selezionata non è disponibile";
-    }
-    if (zona.areaOperativaId !== params.areaOperativaId) {
-      return "La Zona UDS deve appartenere alla stessa Area Operativa dell'utente";
-    }
-  }
 
   return null;
 }
@@ -323,14 +300,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     }
   }
 
-  // A centro-bound admin can only create users inside their own centro; the
-  // caller's centro is auto-assigned and locked (any body value is ignored).
-  const caller = callerCentroId(req);
-  if (caller != null && centroAscoltoId != null && centroAscoltoId !== caller) {
-    res.status(403).json({ error: "Centro non accessibile per il tuo profilo" });
-    return;
-  }
-  const finalCentroId = bootstrap || finalIsSuperAdmin ? null : caller != null ? caller : (centroAscoltoId ?? null);
+  const finalCentroId = null; // Campo legacy non più assegnabile.
   // Likewise a area operativa-bound admin can only create users inside their own area operativa;
   // the caller's area operativa is auto-assigned and locked (any body value is ignored).
   const areaOperativaCaller = callerAreaOperativaId(req);
@@ -339,8 +309,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
   const finalAreaOperativaId = bootstrap || finalIsSuperAdmin ? null : areaOperativaCaller != null ? areaOperativaCaller : (areaOperativaId ?? null);
-  const zonaCaller = callerZonaUdsId(req);
-  const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalAreaOperativaId == null ? null : (zonaUdsId ?? null);
+  const finalZonaUdsId = null; // Campo legacy non più assegnabile.
   if (!(await areaIsAvailable(finalAreaOperativaId))) {
     res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
@@ -441,6 +410,10 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
   const body = parsed.data;
+  if (req.user!.id === id && body.attivo === false) {
+    res.status(400).json({ error: "Non puoi disattivare il tuo account" });
+    return;
+  }
   if (body.areaOperativaId !== undefined && !(await areaIsAvailable(body.areaOperativaId))) {
     res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
@@ -475,18 +448,6 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   const zonaCaller = callerZonaUdsId(req);
   if (zonaCaller != null && target.zonaUdsId !== zonaCaller) {
     res.status(403).json({ error: "Utente non accessibile per la tua zona" });
-    return;
-  }
-  if (zonaCaller != null && body.zonaUdsId !== undefined && body.zonaUdsId !== target.zonaUdsId) {
-    res.status(403).json({
-      error: "Non sei autorizzato a modificare la zona assegnata al tuo profilo.",
-    });
-    return;
-  }
-  if (caller != null && body.centroAscoltoId !== undefined && body.centroAscoltoId !== target.centroAscoltoId) {
-    res.status(403).json({
-      error: "Non sei autorizzato a modificare il centro assegnato al tuo profilo.",
-    });
     return;
   }
 
@@ -548,27 +509,15 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   if (body.matricola !== undefined) updates.matricola = normalizeMatricola(body.matricola);
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;
-  // A centro-bound admin cannot move users to another centro; only a global
-  // admin may (re)assign the centro.
-  if (caller == null && body.centroAscoltoId !== undefined && updates.isSuperAdmin !== true) {
-    updates.centroAscoltoId = body.centroAscoltoId;
-  }
   // A area operativa-bound admin cannot move users to another area operativa; only a area operativa-global
   // admin may (re)assign the area operativa.
   if (areaOperativaCaller == null && body.areaOperativaId !== undefined && updates.isSuperAdmin !== true) {
     updates.areaOperativaId = body.areaOperativaId;
-  }
-  // A zona-bound admin cannot move users to another zona; only a zona-global
-  // admin may (re)assign the UDS zona. A user without area operativa cannot keep a zona.
-  if (zonaCaller == null && body.zonaUdsId !== undefined && updates.isSuperAdmin !== true) {
-    const effectiveAreaOperativaId = updates.areaOperativaId !== undefined ? (updates.areaOperativaId ?? null) : target.areaOperativaId;
-    updates.zonaUdsId = effectiveAreaOperativaId == null ? null : body.zonaUdsId;
-  }
-  if (zonaCaller != null) {
-    updates.zonaUdsId = zonaCaller;
-  }
-  if (updates.areaOperativaId === null) {
-    updates.zonaUdsId = null;
+    // Retire legacy bindings on an Area change, including the composite Zona/Area FK.
+    if (body.areaOperativaId !== target.areaOperativaId) {
+      updates.centroAscoltoId = null;
+      updates.zonaUdsId = null;
+    }
   }
   const effectiveIsSuperAdmin = updates.isSuperAdmin ?? target.isSuperAdmin;
   if (effectiveIsSuperAdmin) {
@@ -616,7 +565,10 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   }
 
   if (Object.keys(updates).length > 0) {
-    await db.update(utentiTable).set(updates).where(eq(utentiTable.id, id));
+    await db.transaction(async (tx) => {
+      await tx.update(utentiTable).set(updates).where(eq(utentiTable.id, id));
+      if (updates.attivo === false) await revokeUserAccess(id, tx);
+    });
   }
 
   const [row] = await selectUtente().where(eq(utentiTable.id, id));
@@ -646,6 +598,10 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
 
 router.delete("/utenti/:id", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  if (req.query.removeIfUnused != null && !["true", "false"].includes(String(req.query.removeIfUnused))) {
+    res.status(400).json({ error: "Modalità di rimozione non valida" });
+    return;
+  }
 
   if (req.user!.id === id) {
     res.status(400).json({ error: "Non puoi eliminare il tuo account" });
@@ -690,26 +646,30 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.update(utentiTable).set({ attivo: false }).where(eq(utentiTable.id, id));
-  await invalidateActivePasswordResetTokens(id);
+  const deleted = await removeUser(id, req.query.removeIfUnused === "true", target);
+  if (deleted === null) {
+    res.status(409).json({ error: "Il profilo è cambiato. Aggiorna l'elenco." });
+    return;
+  }
   await logSystemEvent({
-    evento: "USER_DISABLED",
+    evento: deleted ? "USER_DELETED" : "USER_DISABLED",
     esito: "SUCCESS",
-    targetUserId: id,
+    targetUserId: deleted ? null : id,
     userEmail: target.email,
     username: target.username,
     ...systemLogMetaFromRequest(req),
-    details: { source: "delete_endpoint", preservedForHistory: true },
+    details: { source: "delete_endpoint", preservedForHistory: !deleted, removedUserId: id },
   });
   res.status(204).send();
 });
 
-router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
+router.post(["/utenti/:id/reset-password", "/utenti/:id/temporary-password"], async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
 
   const [target] = await db
     .select({
       id: utentiTable.id,
+      ruoloId: utentiTable.ruoloId,
       centroAscoltoId: utentiTable.centroAscoltoId,
       areaOperativaId: utentiTable.areaOperativaId,
       zonaUdsId: utentiTable.zonaUdsId,
@@ -749,6 +709,68 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
 
   if (!target.attivo) {
     res.status(400).json({ error: "L'utente non è attivo" });
+    return;
+  }
+
+  if (req.path.endsWith("/temporary-password")) {
+    const parsed = SetUtenteTemporaryPasswordBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Password temporanea non valida" });
+      return;
+    }
+    const passwordError = validatePassword(parsed.data.newPassword);
+    if (passwordError) {
+      res.status(400).json({ error: passwordError });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
+    const now = new Date();
+    const changed = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(utentiTable)
+        .set({
+          passwordHash,
+          mustChangePassword: true,
+          lastPasswordChangeAt: now,
+        })
+        .where(and(eq(utentiTable.id, id), eq(utentiTable.attivo, true),
+          eq(utentiTable.isSuperAdmin, target.isSuperAdmin),
+          sql`${utentiTable.ruoloId} IS NOT DISTINCT FROM ${target.ruoloId}`,
+          sql`${utentiTable.areaOperativaId} IS NOT DISTINCT FROM ${target.areaOperativaId}`,
+          sql`${utentiTable.centroAscoltoId} IS NOT DISTINCT FROM ${target.centroAscoltoId}`,
+          sql`${utentiTable.zonaUdsId} IS NOT DISTINCT FROM ${target.zonaUdsId}`))
+        .returning({ id: utentiTable.id });
+      if (!updated) return false;
+      await revokeUserAccess(id, tx, now);
+      return true;
+    }).catch(() => {
+      req.log.error({ userId: id }, "Temporary password assignment failed");
+      return null;
+    });
+    if (changed === null) {
+      res.status(500).json({ error: "Assegnazione password non riuscita. Riprova." });
+      return;
+    }
+    if (!changed) {
+      res
+        .status(409)
+        .json({ error: "L'utente non è più attivo. Aggiorna l'elenco." });
+      return;
+    }
+    await logSystemEvent({
+      evento: "PASSWORD_CHANGED_BY_ADMIN",
+      esito: "SUCCESS",
+      targetUserId: id,
+      userEmail: target.email,
+      username: target.username,
+      ...systemLogMetaFromRequest(req),
+      details: {
+        source: "temporary_credential",
+        forcedChange: true,
+        accessRevoked: true,
+      },
+    });
+    res.status(204).send();
     return;
   }
 

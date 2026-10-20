@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
+import { selectOption } from "./helpers";
 
 const password = process.env.E2E_PASSWORD;
 if (!password)
@@ -168,9 +169,14 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       warehousePage.getByText(first.documentoCorrente.codice).first(),
     ).toBeVisible();
     await warehousePage
-      .getByRole("link", { name: new RegExp(request.codice) })
+      .getByRole("button", { name: "Ritorna alle Richieste", exact: true })
+      .first()
       .click();
     await expect(warehousePage).toHaveURL(/\/richieste-magazzino/);
+    await expect(warehousePage).not.toHaveURL(/richiestaId=/);
+    await warehousePage
+      .getByRole("button", { name: new RegExp(request.codice) })
+      .click();
     await warehousePage
       .getByTestId("richiesta-sheet")
       .getByRole("button", { name: "Apri documento", exact: true })
@@ -256,20 +262,76 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
   }
 });
 
-test("M5B-R1: il selettore Beneficiario legacy resta disponibile su una Bolla libera", async ({
+test("M5B-R1: il selettore Beneficiario resta disponibile nel contesto Area/Centro di una Bolla libera", async ({
   page,
 }) => {
   await loginAs(page, "sadmin");
-  await page.goto("/bolle");
-  const directoryResponse = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === "/api/beneficiari" &&
-      response.request().method() === "GET" &&
-      response.status() === 200,
+  const beneficiaryResponse = await page.request.get(
+    "/api/beneficiari?search=TEST-M5B-B1",
   );
+  expect(beneficiaryResponse.status()).toBe(200);
+  const beneficiary = (await beneficiaryResponse.json()).find(
+    (item: { codice: string }) => item.codice === "TEST-M5B-B1",
+  );
+  expect(beneficiary?.id).toBeTruthy();
+  const [areasResponse, centresResponse] = await Promise.all([
+    page.request.get("/api/aree-operative"),
+    page.request.get("/api/centri-ascolto"),
+  ]);
+  expect(areasResponse.status()).toBe(200);
+  expect(centresResponse.status()).toBe(200);
+  const area = (await areasResponse.json()).find(
+    (item: { id: number }) => item.id === beneficiary.areaOperativaId,
+  );
+  const centre = (await centresResponse.json()).find(
+    (item: { id: number }) => item.id === beneficiary.centroAscoltoId,
+  );
+  expect(centre.areaOperativaId).toBe(area.id);
+  const browserRequests: string[] = [];
+  page.on("request", (request) =>
+    browserRequests.push(new URL(request.url()).pathname),
+  );
+  await page.goto("/bolle");
   await page.getByRole("button", { name: /^nuovo$/i }).click();
   await page.getByRole("button", { name: /nuova bolla/i }).click();
-  await directoryResponse;
+  const form = page.getByRole("dialog", { name: /nuova bolla di consegna/i });
+  const picker = form.getByRole("combobox", {
+    name: /seleziona beneficiario/i,
+  });
+  await expect(picker).toBeDisabled();
+  await selectOption(
+    page,
+    form.getByRole("combobox", { name: "Area destinatario" }),
+    area.nome,
+  );
+  await expect(picker).toBeDisabled();
+  await selectOption(
+    page,
+    form.getByRole("combobox", { name: /centro di ascolto/i }),
+    centre.nome,
+  );
+  await picker.click();
+  const candidateResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname === "/api/bolle/beneficiari-candidati" &&
+      url.searchParams.get("search") === "TEST-M5B-B1" &&
+      response.status() === 200
+    );
+  });
+  await page
+    .getByPlaceholder("Cerca per nome o codice...", { exact: true })
+    .fill("TEST-M5B-B1");
+  expect(await (await candidateResponse).json()).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: beneficiary.id })]),
+  );
+  await page.getByRole("option", { name: /TEST-M5B-B1/ }).click();
+  await expect(picker).toContainText(
+    `${beneficiary.cognome} ${beneficiary.nome}`,
+  );
+  expect(
+    browserRequests.filter((path) => /^\/api\/beneficiari(?:\/|$)/.test(path)),
+  ).toEqual([]);
   await expect(
     page.getByText("Beneficiario", { exact: true }).first(),
   ).toBeVisible();
@@ -419,7 +481,10 @@ test("M5B: richieste operative Ente e Magazzino creano documenti M4 distinti", a
       await expect(
         transferDialog.getByText(createdDocument.codiceDocumento),
       ).toBeVisible();
-      await transferDialog.getByRole("button", { name: "Chiudi" }).click();
+      await transferDialog
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/bolle\?/);
       const documentRow = page
         .getByRole("row")
         .filter({ hasText: createdDocument.codiceDocumento });
@@ -445,7 +510,7 @@ test("M5B: richieste operative Ente e Magazzino creano documenti M4 distinti", a
   await adminContext.close();
 });
 
-test("M5B: scope Area/Centro e grant preparazione con sessioni reali", async ({
+test("M5B: tutti i Centri della stessa Area, confine fra Aree e grant preparazione con sessioni reali", async ({
   browser,
 }) => {
   const contexts = await Promise.all(
@@ -479,8 +544,11 @@ test("M5B: scope Area/Centro e grant preparazione con sessioni reali", async ({
     const anotherCenter = (await list(otherCenterPage)).map(
       (item) => item.codice,
     );
-    expect(anotherCenter).not.toContain("TEST-M5B-R-SENT");
-    expect(anotherCenter).not.toContain("TEST-M5B-R-TAKEN");
+    expect(anotherCenter).toContain("TEST-M5B-R-SENT");
+    expect(anotherCenter).toContain("TEST-M5B-R-TAKEN");
+    const outsideArea = (await list(otherAreaPage)).map((item) => item.codice);
+    expect(outsideArea).not.toContain("TEST-M5B-R-SENT");
+    expect(outsideArea).not.toContain("TEST-M5B-R-TAKEN");
 
     const readerRows = await list(readerPage);
     const operational = readerRows.find(

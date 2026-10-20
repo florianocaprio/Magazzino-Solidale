@@ -1,3 +1,4 @@
+import { operationalCentroId } from "../lib/serviceScope";
 import { Router, type RequestHandler } from "express";
 import {
   db,
@@ -128,7 +129,7 @@ router.get(
               : eq(beneficiariTable.areaOperativaId, actor.areaOperativaId),
             centroScopeFilter(
               beneficiariTable.centroAscoltoId,
-              actor.centroAscoltoId,
+              operationalCentroId(actor),
             ),
             zonaUdsScopeFilter(beneficiariTable.zonaUdsId, actor.zonaUdsId),
           ),
@@ -192,8 +193,8 @@ router.get(
           actor.isAdmin ||
           (actor.permessi.includes("emporio.eligibility.manage") &&
             actor.aree.includes("sociale") &&
-            (actor.centroAscoltoId == null ||
-              actor.centroAscoltoId === beneficiary.centroAscoltoId))
+            (operationalCentroId(actor) == null ||
+              operationalCentroId(actor) === beneficiary.centroAscoltoId))
             ? (right?.right.motivo ?? null)
             : null,
       };
@@ -234,8 +235,8 @@ router.post(
       if (
         !actor.isAdmin &&
         (!actor.aree.includes("sociale") ||
-          (actor.centroAscoltoId != null &&
-            actor.centroAscoltoId !== b.centroAscoltoId))
+          (operationalCentroId(actor) != null &&
+            operationalCentroId(actor) !== b.centroAscoltoId))
       )
         throw new EmporioScopeError(
           403,
@@ -297,6 +298,17 @@ router.post(
             .where(eq(emporioAbilitazioniTable.id, before.id))
             .returning()
         : await tx.insert(emporioAbilitazioniTable).values(values).returning();
+      // The first Emporio activation also enables Credit; never overwrite an
+      // explicit financial suspension/revocation or change balances/quotas.
+      const enableCredit = stato === "attivo" && !b.creditoSolidaleAbilitato &&
+        b.creditoSolidaleStato === "non_abilitato" && b.creditoSolidaleDataAbilitazione == null;
+      if (enableCredit) {
+        await tx.update(beneficiariTable).set({
+          creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo",
+          creditoSolidaleDataAbilitazione: new Date(),
+          versione: b.versione + 1, dataAggiornamento: new Date(),
+        }).where(eq(beneficiariTable.id, id));
+      }
       await auditEmporioTx(tx, {
         entityType: "abilitazione",
         entityId: after.id,
@@ -311,6 +323,7 @@ router.post(
           beneficiarioId: id,
           areaOperativaId: area.id,
           stato,
+          primaAbilitazioneCredito: enableCredit,
           dataEffetto: after.dataEffetto.toISOString(),
         },
       });

@@ -48,6 +48,8 @@ let benB: number;
 let benNull: number;
 let magNull: number;
 let magB: number;
+let foreignBeneficiary: number;
+let foreignWarehouse: number;
 let socialActor: Awaited<ReturnType<typeof createPersistedSocialActor>>;
 let globalSocialActor: typeof socialActor;
 let unassignedSocialActor: typeof socialActor;
@@ -89,6 +91,10 @@ beforeEach(async () => {
   const areaOperativaId = await createAreaOperativa(scope);
   centroA = (await createCentroRec(scope, { areaOperativaId })).id;
   centroB = (await createCentroRec(scope, { areaOperativaId })).id;
+  const otherArea = await createAreaOperativa(scope);
+  const foreignCentre = (await createCentroRec(scope, { areaOperativaId: otherArea })).id;
+  foreignBeneficiary = await createBeneficiario(scope, foreignCentre, { areaOperativaId: otherArea });
+  foreignWarehouse = await createMagazzino(scope, foreignCentre, { areaOperativaId: otherArea });
   benA = await createBeneficiario(scope, centroA, { areaOperativaId });
   benB = await createBeneficiario(scope, centroB, { areaOperativaId });
   benNull = await createBeneficiario(scope, null, { areaOperativaId });
@@ -146,14 +152,22 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe("Consegne — scoping via beneficiario", () => {
-  it("lista: A vede le consegne di benA + beneficiario comune, non quelle di benB", async () => {
+describe("Consegne — scoping per Area via beneficiario", () => {
+  it("legge consegne di un altro Centro della propria Area", async () => {
+    const id = await insertConsegna(scope, { beneficiarioId: benB, magazzinoId: magNull });
+    const app = appAs(consegneRouter, centroA);
+    const list = await request(app).get("/consegne");
+    expect(list.status).toBe(200);
+    expect(idsOf(list.body)).toContain(id);
+    expect((await request(app).get(`/consegne/${id}`)).status).toBe(200);
+  });
+  it("lista: A vede le consegne di benA + beneficiario comune, non quelle di foreignBeneficiary", async () => {
     const cA = await insertConsegna(scope, {
       beneficiarioId: benA,
       magazzinoId: magNull,
     });
     const cB = await insertConsegna(scope, {
-      beneficiarioId: benB,
+      beneficiarioId: foreignBeneficiary,
       magazzinoId: magNull,
     });
     const cNull = await insertConsegna(scope, {
@@ -174,16 +188,16 @@ describe("Consegne — scoping via beneficiario", () => {
       magazzinoId: magNull,
     });
     const cB = await insertConsegna(scope, {
-      beneficiarioId: benB,
+      beneficiarioId: foreignBeneficiary,
       magazzinoId: magNull,
     });
     const res = await request(appAs(consegneRouter, null)).get("/consegne");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([cA, cB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
+  it("GET /:id fuori Area → 403", async () => {
     const cB = await insertConsegna(scope, {
-      beneficiarioId: benB,
+      beneficiarioId: foreignBeneficiary,
       magazzinoId: magNull,
     });
     const res = await request(appAs(consegneRouter, centroA)).get(
@@ -192,11 +206,11 @@ describe("Consegne — scoping via beneficiario", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST: non può creare per un beneficiario di un altro centro → 403", async () => {
+  it("POST: non può creare per un beneficiario di un’altra Area → 403", async () => {
     const res = await request(appAs(consegneRouter, centroA))
       .post("/consegne")
       .send({
-        beneficiarioId: benB,
+        beneficiarioId: foreignBeneficiary,
         tipoConsegna: "domicilio",
         indirizzoConsegna: "Via Test 1",
         dataPrevista: "2026-06-01",
@@ -205,7 +219,7 @@ describe("Consegne — scoping via beneficiario", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST: non può usare un magazzino di un altro centro → 403", async () => {
+  it("POST: non può usare un magazzino di un’altra Area → 403", async () => {
     const res = await request(appAs(consegneRouter, centroA))
       .post("/consegne")
       .send({
@@ -213,7 +227,7 @@ describe("Consegne — scoping via beneficiario", () => {
         tipoConsegna: "domicilio",
         indirizzoConsegna: "Via Test 1",
         dataPrevista: "2026-06-01",
-        magazzinoId: magB,
+        magazzinoId: foreignWarehouse,
       });
     expect(res.status).toBe(403);
   });
@@ -232,7 +246,7 @@ describe("Consegne — scoping via beneficiario", () => {
     scope.consegnaIds.push(res.body.id);
   });
 
-  it("PATCH IDOR: spostare la consegna su un beneficiario/magazzino di un altro centro → 403", async () => {
+  it("PATCH IDOR: spostare la consegna su un beneficiario/magazzino di un’altra Area → 403", async () => {
     const cA = await insertConsegna(scope, {
       beneficiarioId: benA,
       magazzinoId: magNull,
@@ -242,18 +256,18 @@ describe("Consegne — scoping via beneficiario", () => {
       (
         await request(appA)
           .patch(`/consegne/${cA}`)
-          .send({ beneficiarioId: benB })
+          .send({ beneficiarioId: foreignBeneficiary })
       ).status,
     ).toBe(403);
     expect(
-      (await request(appA).patch(`/consegne/${cA}`).send({ magazzinoId: magB }))
+      (await request(appA).patch(`/consegne/${cA}`).send({ magazzinoId: foreignWarehouse }))
         .status,
     ).toBe(403);
   });
 
-  it("azioni (associa-bolla/completa) fuori centro → 403", async () => {
+  it("azioni (associa-bolla/completa) fuori Area → 403", async () => {
     const cB = await insertConsegna(scope, {
-      beneficiarioId: benB,
+      beneficiarioId: foreignBeneficiary,
       magazzinoId: magNull,
     });
     const appA = appAs(consegneRouter, centroA);
@@ -422,7 +436,7 @@ describe("Interventi — scoping via beneficiario", () => {
       ).status,
     ).toBe(403);
   });
-  it("lista: A vede gli interventi di benA, non quelli di benB o senza Centro", async () => {
+  it("lista: vede entrambi i Centri della propria Area, senza cartelle prive di Centro", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const iB = await insertIntervento(scope, { beneficiarioId: benB });
     const iNull = await insertIntervento(scope, { beneficiarioId: benNull });
@@ -433,7 +447,7 @@ describe("Interventi — scoping via beneficiario", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(iA);
     expect(ids).not.toContain(iNull);
-    expect(ids).not.toContain(iB);
+    expect(ids).toContain(iB);
   });
 
   it("lista: il caller globale vede tutto", async () => {
@@ -443,15 +457,15 @@ describe("Interventi — scoping via beneficiario", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([iA, iB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
+  it("GET /:id altro Centro della stessa Area → 200", async () => {
     const iB = await insertIntervento(scope, { beneficiarioId: benB });
     const res = await request(appAs(interventiRouter, centroA)).get(
       `/interventi/${iB}`,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
-  it("POST: non può creare per un beneficiario di un altro centro → 403", async () => {
+  it("POST: crea per un beneficiario di un altro Centro della stessa Area", async () => {
     const res = await request(appAs(interventiRouter, centroA))
       .post("/interventi")
       .send({
@@ -459,7 +473,8 @@ describe("Interventi — scoping via beneficiario", () => {
         dataIntervento: "2026-06-01",
         tipoIntervento: "pacco_alimentare",
       });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    scope.interventoIds.push(res.body.id);
   });
 
   it("POST: crea per un beneficiario del proprio centro", async () => {
@@ -474,11 +489,11 @@ describe("Interventi — scoping via beneficiario", () => {
     scope.interventoIds.push(res.body.id);
   });
 
-  it("PATCH IDOR: spostare l'intervento su un beneficiario di un altro centro → 403", async () => {
+  it("PATCH: il beneficiario dell’intervento resta immutabile anche nella stessa Area", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const res = await request(appAs(interventiRouter, centroA))
       .patch(`/interventi/${iA}`)
       .send({ beneficiarioId: benB });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
   });
 });

@@ -54,7 +54,7 @@ import {
   canAccessCentro,
   canAccessAreaOperativa,
   canAccessZonaUds,
-} from "../lib/centroScope";
+} from "../lib/serviceScope";
 import {
   isModuloAttivo,
   requireAnyModulo,
@@ -1896,6 +1896,7 @@ async function canAssignSocialOperator(
     .where(eq(utentiTable.id, operatoreId))
     .limit(1);
   if (!target?.attivo) return false;
+  if (target.areaOperativaId == null && (target.centroAscoltoId != null || target.zonaUdsId != null)) return false;
   const [beneficiary] = await executor
     .select()
     .from(beneficiariTable)
@@ -1908,6 +1909,8 @@ async function canAssignSocialOperator(
     canReadSocialSubject(
       {
         ...target,
+        centroAscoltoId: null,
+        zonaUdsId: null,
         isAdmin: target.roleAdmin === true,
         aree: target.roleAree,
         zonaAttiva: target.zonaAttiva === true,
@@ -3199,40 +3202,13 @@ router.get(
           isNull(utentiTable.centroAscoltoId),
           isNull(utentiTable.zonaUdsId),
         ),
-        and(
-          eq(areeOperativeTable.attivo, true),
-          or(
-            isNull(utentiTable.centroAscoltoId),
-            and(
-              eq(centriAscoltoTable.attivo, true),
-              eq(
-                centriAscoltoTable.areaOperativaId,
-                utentiTable.areaOperativaId,
-              ),
-            ),
-          ),
-          or(
-            isNull(utentiTable.zonaUdsId),
-            and(
-              eq(zoneUdsTable.attivo, true),
-              eq(zoneUdsTable.areaOperativaId, utentiTable.areaOperativaId),
-            ),
-          ),
-        ),
+        eq(areeOperativeTable.attivo, true),
       )!,
       or(
         eq(utentiTable.areaOperativaId, selectedAreaOperativa),
         isNull(utentiTable.areaOperativaId),
       )!,
     ];
-    if (selectedCentro != null) {
-      conditions.push(
-        or(
-          eq(utentiTable.centroAscoltoId, selectedCentro),
-          isNull(utentiTable.centroAscoltoId),
-        )!,
-      );
-    }
     const rows = await db
       .select({
         id: utentiTable.id,

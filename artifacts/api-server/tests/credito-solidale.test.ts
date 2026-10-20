@@ -67,7 +67,7 @@ async function makeApp(user: {
       expect(actor).toMatchObject({
         isAdmin: options.isAdmin,
         isSuperAdmin: false,
-        centroAscoltoId: options.centroAscoltoId,
+        centroAscoltoId: null,
         areaOperativaId: options.areaOperativaId,
         aree: options.aree,
         permessi: options.permessi,
@@ -222,6 +222,7 @@ afterEach(async () => {
       );
   }
   if (politicaIds.length > 0) {
+    if (beneficiarioIds.length) await db.update(beneficiariTable).set({ politicaCreditoSolidaleId: null }).where(inArray(beneficiariTable.id, beneficiarioIds));
     await db
       .delete(politicheCreditoSolidaleTable)
       .where(inArray(politicheCreditoSolidaleTable.id, politicaIds.splice(0)));
@@ -264,6 +265,30 @@ afterAll(async () => {
 });
 
 describe("Politiche Credito Solidale", () => {
+  it("sceglie una politica applicabile, conserva il saldo e la quota manuale, rifiuta politiche di altre Aree", async () => {
+    const area = await createAreaOperativa();
+    const centre = await createCentro(area);
+    const beneficiary = await createBeneficiario({ areaOperativaId: area, centroAscoltoId: centre, creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo", creditoSolidaleSaldo: 17 });
+    const first = await createPolicy({ nome: "Scelta globale", creditoBaseNucleo: 81 });
+    const second = await createPolicy({ nome: "Scelta Area", areaOperativaId: area, creditoBaseNucleo: 44 });
+    const remote = await createPolicy({ nome: "Altra Area", areaOperativaId: await createAreaOperativa(), creditoBaseNucleo: 999 });
+    const server = await makeApp({ centroAscoltoId: null, areaOperativaId: area });
+    const select = (id: number | null) => request(server).patch(`/credito-solidale/beneficiari/${beneficiary}/configurazione`).send({ politicaCreditoSolidaleId: id });
+    expect((await select(first)).status).toBe(200);
+    expect((await request(server).get(`/credito-solidale/calcola-beneficiario/${beneficiary}`)).body).toMatchObject({ politicaId: first, totaleSuggerito: 81 });
+    let [stored] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiary));
+    expect(Number(stored.creditoSolidaleMensileAssegnato)).toBe(81);
+    expect(Number(stored.creditoSolidaleSaldo)).toBe(17);
+    expect((await select(remote)).status).toBe(400);
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiary)))[0]).toEqual(stored);
+    await db.update(beneficiariTable).set({ creditoSolidaleMensileManuale: true, creditoSolidaleMensileAssegnato: "12" }).where(eq(beneficiariTable.id, beneficiary));
+    expect((await select(second)).status).toBe(200);
+    [stored] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiary));
+    expect(Number(stored.creditoSolidaleMensileAssegnato)).toBe(12);
+    expect(Number(stored.creditoSolidaleSaldo)).toBe(17);
+    expect((await request(server).get(`/credito-solidale/calcola-beneficiario/${beneficiary}`)).body.politicaId).toBe(second);
+    await select(null);
+  });
   it("valida il giorno di ricarica mensile", async () => {
     const res = await request(
       await makeApp({ centroAscoltoId: null, areaOperativaId: null }),

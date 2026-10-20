@@ -5,6 +5,7 @@ import type {
 } from "@workspace/api-client-react";
 
 export type CaricoRowDraft = {
+  lottoProduttoreId?: number | null;
   quantita: string;
   fondoOrigine:
     | "NESSUN_FONDO"
@@ -31,6 +32,19 @@ export type CaricoRowIssue =
   | "precision"
   | "required";
 export type CaricoRowErrors = Partial<Record<CaricoRowField, CaricoRowIssue>>;
+
+/** API quantities have at most six decimals; never subtract formatted values. */
+export function remainingCaricoQuantity(
+  row: Pick<CaricoPraticaRiga, "quantita" | "quantitaRettificata">,
+): string {
+  const scaled = (value: string) => {
+    const [whole, fraction = ""] = value.split(".");
+    return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+  };
+  const remaining =
+    scaled(row.quantita ?? "0") - scaled(row.quantitaRettificata ?? "0");
+  return `${remaining / 1_000_000n}.${(remaining % 1_000_000n).toString().padStart(6, "0")}`;
+}
 
 function validDateOnly(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -121,6 +135,7 @@ export function reconcileCaricoDrafts(
 
 export function caricoDraftFromRow(row: CaricoPraticaRiga): CaricoRowDraft {
   return {
+    lottoProduttoreId: row.lottoProduttoreId ?? null,
     quantita: row.quantita?.toString() ?? "",
     fondoOrigine: row.fondoOrigine,
     codiceLottoProduttore: row.codiceLottoProduttore ?? "",
@@ -159,6 +174,7 @@ function normalizeComparableQuantity(value: string): string {
 
 function comparableRowDraft(draft: CaricoRowDraft): CaricoRowDraft {
   return {
+    lottoProduttoreId: draft.lottoProduttoreId ?? null,
     quantita: normalizeComparableQuantity(draft.quantita),
     fondoOrigine: draft.fondoOrigine,
     codiceLottoProduttore: draft.codiceLottoProduttore.trim(),
@@ -216,4 +232,19 @@ export function shouldAcceptBarcodeScan(
   now: number,
 ) {
   return previous?.value !== value || now - previous.at >= 2500;
+}
+
+/** Mappatura di sola presentazione condivisa da lista e dettaglio del Carico. */
+export function caricoStatusBadgeClass(status: string): string {
+  const classes: Record<string, string> = {
+    bozza:
+      "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+    aperta:
+      "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200",
+    chiusa:
+      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+    annullata:
+      "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
+  };
+  return classes[status] ?? classes.bozza;
 }

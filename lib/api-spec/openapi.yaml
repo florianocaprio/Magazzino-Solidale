@@ -1150,6 +1150,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/FseImportSource"
 
+  /fse-importazioni/sorgenti/automatica:
+    post:
+      operationId: resolveAutomaticFseImportSource
+      tags: [fse-importazioni]
+      description: Riusa il registro FSE+ dell’Area del magazzino o lo configura al primo import. Più registri richiedono una scelta esplicita; i registri disattivati non vengono sostituiti.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseAutomaticSourceInput"
+      responses:
+        "200":
+          description: Registro FSE+ dell’Area
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSource"
+        "409":
+          description: Scelta esplicita necessaria o registro disattivato
+
   /fse-importazioni/analizza:
     post:
       operationId: analyzeFsePracticeImport
@@ -2558,6 +2579,66 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/LottoLogico" }
 
+  /lotti-produttore:
+    get:
+      operationId: listLottiProduttore
+      tags: [Lotti]
+      summary: Anagrafiche territoriali, incluse le preregistrazioni senza merce
+      parameters:
+        - { name: areaOperativaId, in: query, schema: { type: integer } }
+        - { name: prodottoId, in: query, schema: { type: integer } }
+        - { name: origine, in: query, schema: { type: string, enum: [MANUALE, AUTOMATICO, IMPORTATO] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Anagrafiche e saldi delle sole partite visibili
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/LottoProduttore" } }
+                  page: { type: integer }
+                  hasMore: { type: boolean }
+                required: [items, page, hasMore]
+    post:
+      operationId: preregisterLottoProduttore
+      tags: [Lotti]
+      summary: Pre-registra un lotto senza stock, origine assegnata dal server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoProduttoreInput" }
+      responses:
+        "201":
+          description: Anagrafica creata senza movimenti
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttorePreregisResult" }
+        "200":
+          description: Anagrafica riutilizzata o replay, origine invariata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttorePreregisResult" }
+        "409":
+          description: Identità o chiave di retry incompatibile
+  /lotti-produttore/{id}:
+    get:
+      operationId: getLottoProduttore
+      tags: [Lotti]
+      summary: Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Anagrafica con aggregati senza duplicazioni di lineage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttore" }
+
   /lotti:
     get:
       operationId: listLotti
@@ -3195,10 +3276,18 @@ paths:
       operationId: listFornitori
       tags: [fornitori]
       parameters:
+        - name: ambito
+          in: query
+          description: Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).
+          schema:
+            type: string
+            enum: [tutti, globali]
         - name: areaOperativaId
           in: query
+          description: Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.
           schema:
             type: integer
+            minimum: 1
       responses:
         "200":
           description: List of suppliers
@@ -6154,6 +6243,13 @@ paths:
       operationId: listEntiDestinatari
       tags: [bolle]
       parameters:
+        - name: areaOperativaId
+          in: query
+          description: Enti dell’Area e globali; intersecato con l’Area del profilo.
+          schema: { type: integer, minimum: 1 }
+        - name: ambito
+          in: query
+          schema: { type: string, enum: [tutti, globali], default: tutti }
         - { name: attivo, in: query, schema: { type: boolean, default: true } }
         - {
             name: search,
@@ -6368,6 +6464,189 @@ paths:
                 { $ref: "#/components/schemas/DocumentoOperativoDettaglio" }
 
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
+  /bolle/beneficiari-candidati:
+    get:
+      operationId: listBollaBeneficiariCandidati
+      tags:
+      - bolle
+      parameters:
+      - name: areaOperativaId
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 200
+      responses:
+        '200':
+          description: Risultato autorizzato
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BollaBeneficiarioCandidato'
+        '403':
+          description: Operazione non autorizzata
+        '400':
+          description: Parametri non validi
+        '404':
+          description: Persona o tessera non trovata
+
+  /bolle/beneficiari-candidati/tessera:
+    post:
+      operationId: lookupBollaTessera
+      tags:
+      - bolle
+      description: Lettura esatta e senza effetti operativi della tessera trasversale nel contesto selezionato.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BollaTesseraLookupInput'
+      responses:
+        '200':
+          description: Risultato autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BollaBeneficiarioCandidato'
+        '403':
+          description: Operazione non autorizzata
+        '400':
+          description: Parametri non validi
+        '404':
+          description: Persona o tessera non trovata
+
+  /bolle/beneficiari-candidati/{id}:
+    get:
+      operationId: getBollaBeneficiarioConsegna
+      tags:
+      - bolle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: consegnaId
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Risultato autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BollaBeneficiarioCandidato'
+        '403':
+          description: Operazione non autorizzata
+        '400':
+          description: Parametri non validi
+        '404':
+          description: Persona o tessera non trovata
+
+  /beneficiari/{id}/stati-servizi:
+    get:
+      operationId: getBeneficiarioStatiServizi
+      tags: [beneficiari]
+      summary: Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Stati dei servizi nel perimetro autorizzato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiarioServiziRiepilogo' }
+        "403": { description: Beneficiario non accessibile }
+
+  /beneficiari/{id}/stati-servizi-uds:
+    get:
+      operationId: getBeneficiarioStatiServiziUds
+      tags:
+      - beneficiari
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Risultato autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiarioStatiServiziUds'
+        '403':
+          description: Operazione non autorizzata
+        '400':
+          description: Parametri non validi
+        '404':
+          description: Persona o tessera non trovata
+
+  /beneficiari/{id}/tessera-documento:
+    post:
+      operationId: getOrCreateBeneficiarioTesseraDocumento
+      tags:
+      - beneficiari
+      description: Prima emissione o recupero idempotente della tessera. Non sostituisce e non riattiva tessere
+        esistenti.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Risultato autorizzato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TesseraBeneficiario'
+        '403':
+          description: Operazione non autorizzata
+        '400':
+          description: Parametri non validi
+        '404':
+          description: Persona o tessera non trovata
+        '409':
+          description: Persona non attiva
+
   /bolle:
     get:
       operationId: listBolle
@@ -7548,6 +7827,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfigurazioneMatricoleVolontariResponse"
+  /super-admin/configurazione-codici-beneficiari:
+    get:
+      operationId: getSuperAdminConfigurazioneCodiciBeneficiari
+      tags: [super-admin, beneficiari]
+      responses:
+        "200":
+          description: Configurazione attiva e storico versioni delle codici beneficiari
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariResponse"
+    put:
+      operationId: updateSuperAdminConfigurazioneCodiciBeneficiari
+      tags: [super-admin, beneficiari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariInput"
+      responses:
+        "200":
+          description: Nuova versione della configurazione attivata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariResponse"
   /super-admin/moduli:
     get:
       operationId: listSuperAdminModuli
@@ -8135,6 +8441,10 @@ paths:
       operationId: listVolontari
       tags: [volontari]
       parameters:
+        - name: areaOperativaId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
         - name: centroAscoltoId
           in: query
           required: false
@@ -8462,6 +8772,10 @@ paths:
       operationId: analyzeVolontariImport
       tags: [volontari]
       parameters:
+        - name: areaOperativaId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
         - { name: centroAscoltoId, in: query, schema: { type: integer } }
         - {
             name: x-file-name,
@@ -8867,10 +9181,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/VersioneInput"
+              $ref: "#/components/schemas/VolontarioRemoveInput"
       responses:
         "200":
-          description: Volunteer deactivated; the historical record is always retained
+          description: Volunteer removed from operations; historical references retained
           content:
             application/json:
               schema:
@@ -8883,7 +9197,7 @@ paths:
                   versione:
                     type: integer
         "204":
-          description: Volunteer already absent
+          description: Unused volunteer deleted permanently, or already absent
         "400":
           description: Missing or invalid version
         "403":
@@ -10258,7 +10572,8 @@ paths:
     get:
       operationId: listUtenteMense
       tags: [utenti]
-      description: Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+      deprecated: true
+      description: Solo amministratori; storico delle precedenti assegnazioni, senza effetto sugli accessi. Il ruolo abilita tutte le mense dell'Area dell'operatore.
       parameters:
         - {
             name: utenteId,
@@ -10280,7 +10595,8 @@ paths:
     put:
       operationId: setUtenteMensa
       tags: [utenti]
-      description: Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+      deprecated: true
+      description: Operazione dismessa; restituisce 410. Gli accessi Mensa dipendono dal ruolo e dall'Area, senza assegnazioni individuali.
       parameters:
         - {
             name: utenteId,
@@ -10300,13 +10616,12 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/AssegnazioneMensaInput" }
       responses:
-        "200":
-          description: Assegnazione corrente
+        "410":
+          description: Assegnazioni individuali dismesse
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/UtenteMensa" }
+              schema: { type: object, required: [error], properties: { error: { type: string } } }
         "403": { description: Non amministratore }
-        "409": { description: Scope incompatibile }
 
   /mensa/logistica/lotti:
     get:
@@ -10776,9 +11091,16 @@ paths:
           required: true
           schema:
             type: integer
+        - name: removeIfUnused
+          in: query
+          description: Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.
+          schema:
+            type: boolean
       responses:
         "204":
           description: Deleted
+        "409":
+          description: Protected administrator or user profile changed during removal
 
   /utenti/{id}/reset-password:
     post:
@@ -10801,6 +11123,34 @@ paths:
           description: User has no valid email address
         "403":
           description: Not authorized
+
+  /utenti/{id}/temporary-password:
+    post:
+      operationId: setUtenteTemporaryPassword
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemporaryPasswordInput"
+      responses:
+        "204":
+          description: Temporary password assigned; previous sessions and recovery tokens revoked; password change required.
+        "400":
+          description: Invalid password or inactive user
+        "403":
+          description: Not authorized
+        "404":
+          description: User not found
+        "409":
+          description: User changed during the operation
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
@@ -11251,7 +11601,7 @@ components:
           {
             type: integer,
             minimum: 1,
-            description: Mensa assegnata; destinazione derivata dal server.,
+            description: Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.,
           }
         idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
         tipoDestinatario:
@@ -11475,6 +11825,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento:
           type: string
@@ -11483,20 +11837,27 @@ components:
         file:
           type: string
           format: binary
-          description: Workbook XLSX reale; non viene conservato dal server.
+          description: Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server.
       required: [centroAscoltoId, dataRiferimento, file]
     BeneficiariFseImportResolution:
       type: object
       additionalProperties: false
       properties:
         numeroRiga: { type: integer, minimum: 2 }
-        azione: { type: string, enum: [crea, collega] }
+        azione: { type: string, enum: [crea, collega, salta, aggiorna] }
         beneficiarioId: { type: integer, minimum: 1 }
+        aggiornaAnagrafica: { type: boolean }
+        versioneBeneficiario: { type: integer, minimum: 1 }
+        versioneFascicolo: { type: integer, minimum: 1 }
       required: [numeroRiga, azione]
     BeneficiariFseWorkbookImportUpload:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento:
           type: string
@@ -11505,16 +11866,33 @@ components:
         file:
           type: string
           format: binary
-          description: Lo stesso workbook XLSX reale viene rivalidato dal server.
+          description: Lo stesso workbook XLSX o XLSM viene rivalidato dal server.
         risoluzioni:
           type: string
           description: Array JSON di BeneficiariFseImportResolution.
       required: [centroAscoltoId, dataRiferimento, file]
+    BeneficiariFseComparisonField:
+      type: object
+      properties:
+        campo: { type: string }
+        attuale: { type: [string, "null"] }
+        importato: { type: [string, "null"] }
+        esito: { type: string, enum: [conserva, aggiorna, solo_fse] }
+        differente: { type: boolean }
+      required: [campo, attuale, importato, esito]
     BeneficiariFseDuplicateCandidate:
       type: object
       properties:
         id: { type: integer }
         codice: { type: string }
+        nome: { type: string }
+        cognome: { type: string }
+        dataNascita: { type: [string, "null"], format: date }
+        collegabile: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+        confronto:
+          type: array
+          items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
         centroAscoltoId: { type: [integer, "null"] }
       required: [id, codice, centroAscoltoId]
     BeneficiariFsePreviewRow:
@@ -11537,6 +11915,11 @@ components:
         errori: { type: array, items: { type: string } }
         warning: { type: array, items: { type: string } }
         beneficiarioId: { type: integer }
+        versioneBeneficiario: { type: integer, minimum: 1 }
+        versioneFascicolo: { type: integer, minimum: 1 }
+        confronto:
+          type: array
+          items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
         duplicati:
           type: array
           items:
@@ -11556,6 +11939,7 @@ components:
           }
         conteggi: { type: object, additionalProperties: { type: integer } }
         numeroRighe: { type: integer }
+        formatoFile: { type: string, enum: [ELENCO, MASSIVO] }
         dataRiferimento: { type: string, format: date }
       required:
         [
@@ -11576,7 +11960,7 @@ components:
         esito:
           {
             type: string,
-            enum: [creato, collegato, aggiornato, invariato, conflitto, errore],
+            enum: [creato, collegato, aggiornato, invariato, conflitto, errore, saltato],
           }
         errori: { type: array, items: { type: string } }
       required: [numeroRiga, codiceFascicolo, esito, errori]
@@ -11590,6 +11974,7 @@ components:
         collegati: { type: integer }
         aggiornati: { type: integer }
         invariati: { type: integer }
+        saltati: { type: integer }
         conflitti: { type: integer }
         errori: { type: integer }
         dettagli:
@@ -11614,6 +11999,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento: { type: string, format: date }
         soloAttivi: { type: boolean, default: true }
@@ -13005,6 +13394,13 @@ components:
           dataCreazione,
         ]
 
+    FseAutomaticSourceInput:
+      type: object
+      additionalProperties: false
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+      required: [magazzinoId]
+
     FseImportSourceInput:
       type: object
       additionalProperties: false
@@ -13779,6 +14175,8 @@ components:
     CaricoMagazzinoRigaInput:
       type: object
       properties:
+        produttore: { type: [string, "null"], maxLength: 200 }
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         prodottoId: { type: integer, minimum: 1 }
         fondoOrigine:
           $ref: "#/components/schemas/FondoOrigine"
@@ -13881,6 +14279,7 @@ components:
     CaricoPraticaRiga:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         id: { type: integer }
         caricoPraticaId: { type: integer }
         clientId: { type: [string, "null"] }
@@ -13893,6 +14292,9 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
+        quantitaRettificata:
+          description: Quantità già stornata dalla riga, senza alterare il dato originario.
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura: { type: string }
         quantitaFrazionabile: { type: boolean }
         lottoFisicoObbligatorio: { type: boolean }
@@ -13946,6 +14348,9 @@ components:
         - $ref: "#/components/schemas/CaricoPratica"
         - type: object
           properties:
+            soloAggiunte:
+              type: boolean
+              description: La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.
             areaOperativaNome: { type: string }
             lottoLogicoCodice: { type: string }
             fornitoreNome: { type: [string, "null"] }
@@ -13963,6 +14368,7 @@ components:
       type: object
       additionalProperties: false
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         clientId: { type: [string, "null"], maxLength: 100 }
         prodottoId: { type: integer, minimum: 1 }
         fondoOrigine:
@@ -14101,6 +14507,9 @@ components:
           $ref: "#/components/schemas/QuantitaContabile"
         motivo: { type: string, minLength: 1, maxLength: 1000 }
         idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+        ripristinaBozza:
+          type: boolean
+          description: Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico.
       required: [versione, quantita, motivo, idempotencyKey]
 
     CaricoPraticaRettificaResult:
@@ -14109,6 +14518,7 @@ components:
         praticaId: { type: integer }
         rigaId: { type: integer }
         rettificaId: { type: integer }
+        rigaSostitutivaId: { type: integer }
         lottoId: { type: integer }
         movimentoId: { type: integer }
         quantita:
@@ -14119,6 +14529,68 @@ components:
         [praticaId, rigaId, lottoId, movimentoId, quantita, versione, replay]
 
     # ── Lotti ─────────────────────────────────────────────────────────────
+    LottoProduttoreInput:
+      type: object
+      additionalProperties: false
+      properties:
+        areaOperativaId: { type: integer, minimum: 1 }
+        prodottoId: { type: integer, minimum: 1 }
+        codiceLotto: { type: [string, "null"], maxLength: 80 }
+        dataScadenza: { type: [string, "null"], format: date }
+        produttore: { type: [string, "null"], maxLength: 200 }
+        note: { type: [string, "null"], maxLength: 4000 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+      required: [areaOperativaId, prodottoId, idempotencyKey]
+    LottoProduttorePartita:
+      type: object
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: string }
+        fondoOrigine: { $ref: "#/components/schemas/FondoOrigine" }
+        lottoLogicoId: { type: [integer, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        quantitaResidua: { $ref: "#/components/schemas/QuantitaContabile" }
+        quantitaPrenotata: { $ref: "#/components/schemas/QuantitaContabile" }
+        disponibile: { $ref: "#/components/schemas/QuantitaContabile" }
+      required: [id, magazzinoId, magazzinoNome, fondoOrigine, quantitaResidua, quantitaPrenotata, disponibile]
+    LottoProduttore:
+      type: object
+      properties:
+        id: { type: integer }
+        areaOperativaId: { type: integer }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        prodottoCodice: { type: string }
+        unitaMisura: { type: string }
+        codiceOriginale: { type: [string, "null"] }
+        codiceCanonico: { type: [string, "null"] }
+        riferimentoInterno: { type: string }
+        dataScadenza: { type: [string, "null"], format: date }
+        produttore: { type: [string, "null"] }
+        produttoreCanonico: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        origine: { type: [string, "null"], enum: [MANUALE, AUTOMATICO, IMPORTATO, null] }
+        fonte: { type: [string, "null"] }
+        primoAutoreId: { type: [integer, "null"] }
+        autore: { type: [string, "null"] }
+        primaCreazioneAt: { type: [string, "null"], format: date-time }
+        dataAssociazione: { type: string, format: date-time }
+        partite: { type: array, items: { $ref: "#/components/schemas/LottoProduttorePartita" } }
+        numeroPartiteVisibili: { type: integer }
+        residuo: { $ref: "#/components/schemas/QuantitaContabile" }
+        prenotato: { $ref: "#/components/schemas/QuantitaContabile" }
+        disponibile: { $ref: "#/components/schemas/QuantitaContabile" }
+        statoPartite: { type: string, enum: [PARTITE_VISIBILI, MAI_CARICATO, NESSUNA_PARTITA_VISIBILE] }
+      required: [id, areaOperativaId, prodottoId, prodottoNome, prodottoCodice, unitaMisura, riferimentoInterno, dataAssociazione, partite, numeroPartiteVisibili, residuo, prenotato, disponibile, statoPartite]
+    LottoProduttorePreregisResult:
+      allOf:
+        - { $ref: "#/components/schemas/LottoProduttore" }
+        - type: object
+          properties:
+            creato: { type: boolean }
+          required: [creato]
+
     LottoLogico:
       type: object
       properties:
@@ -14189,6 +14661,11 @@ components:
     Lotto:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
+        origineAnagrafica:
+          type: [string, "null"]
+          enum: [MANUALE, AUTOMATICO, IMPORTATO, null]
+          description: Origine dell’anagrafica; null per dati storici non attestati.
         id:
           type: integer
         prodottoId:
@@ -14319,6 +14796,7 @@ components:
     LottoInput:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         prodottoId:
           type: integer
         lottoLogicoId:
@@ -15087,6 +15565,18 @@ components:
         scaricoId: { type: ["integer", "null"] }
         nota: { type: ["string", "null"] }
 
+    VolontarioRemoveInput:
+      type: object
+      required: [versione]
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        removeIfUnused:
+          type: boolean
+          default: false
+          description: Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation.
+
     VersioneInput:
       type: object
       additionalProperties: false
@@ -15620,6 +16110,18 @@ components:
       type: object
       description: Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         id:
           type: integer
         codice:
@@ -15753,6 +16255,16 @@ components:
     BeneficiarioDettaglio:
       type: object
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+        versioneFascicolo:
+          type: integer
+          minimum: 0
         id:
           type: integer
         codice:
@@ -15921,6 +16433,14 @@ components:
       type: object
       additionalProperties: false
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         codice:
           type: string
         codiceFiscale:
@@ -16007,6 +16527,14 @@ components:
       type: object
       additionalProperties: false
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         codiceFiscale:
           type: ["string", "null"]
         statoAnagrafica:
@@ -16510,6 +17038,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         creditoSolidaleAbilitato: { type: boolean }
         creditoSolidaleStato:
           { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
@@ -16523,6 +17055,10 @@ components:
     CreditoSolidaleConfigurazione:
       type: object
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         beneficiarioId: { type: integer }
         creditoSolidaleAbilitato: { type: boolean }
         creditoSolidaleStato:
@@ -17513,6 +18049,7 @@ components:
         - PASSWORD_CHANGED_BY_ADMIN
         - USER_CREATED
         - USER_DISABLED
+        - USER_DELETED
         - USER_ROLE_CHANGED
         - ACCOUNT_LOCKED
         - ACCOUNT_UNLOCKED
@@ -19654,6 +20191,8 @@ components:
     BollaEmporioStampa:
       type: object
       properties:
+        beneficiarioFascicolo:
+          type: [string, "null"]
         intestazione:
           type: string
         numeroBolla:
@@ -19853,7 +20392,7 @@ components:
         indirizzo: { type: string, maxLength: 250 }
         telefono: { type: ["string", "null"], maxLength: 50 }
         email: { type: ["string", "null"], maxLength: 200 }
-        areaOperativaId: { type: integer }
+        areaOperativaId: { type: ["integer", "null"], description: "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione." }
         attivo: { type: boolean }
         versione: { type: integer, minimum: 1 }
         dataCreazione: { type: string, format: date-time }
@@ -19868,7 +20407,7 @@ components:
         indirizzo: { type: string, minLength: 1, maxLength: 250 }
         telefono: { type: ["string", "null"], maxLength: 50 }
         email: { type: ["string", "null"], maxLength: 200 }
-        areaOperativaId: { type: integer, minimum: 1 }
+        areaOperativaId: { type: ["integer", "null"], minimum: 1, description: "Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale." }
 
     EnteDestinatarioUpdate:
       type: object
@@ -20041,6 +20580,8 @@ components:
     BollaDettaglio:
       type: object
       properties:
+        beneficiarioFascicolo:
+          type: [string, "null"]
         id:
           type: integer
         numeroBolla:
@@ -20327,6 +20868,8 @@ components:
         tipoDestinatario:
           type: string
           enum: [beneficiario, ente]
+        contestoBeneficiarioAtteso:
+          $ref: "#/components/schemas/BollaBeneficiarioContestoAtteso"
         beneficiarioId:
           type: ["integer", "null"]
         enteDestinatarioId:
@@ -20445,10 +20988,80 @@ components:
             { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
       required: [configurazione, esempio]
 
+    ConfigurazioneCodiciBeneficiari:
+      type: object
+      properties:
+        id: { type: integer }
+        scopeTipo: { type: string, enum: [GLOBALE] }
+        versione: { type: integer, minimum: 1 }
+        prefissoAssociazione: { type: ["string", "null"], maxLength: 12 }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso: { type: ["string", "null"], maxLength: 8 }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+        attiva: { type: boolean }
+        aggiornataDa: { type: ["integer", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          scopeTipo,
+          versione,
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+          attiva,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    ConfigurazioneCodiciBeneficiariInput:
+      type: object
+      additionalProperties: false
+      properties:
+        prefissoAssociazione:
+          { type: ["string", "null"], maxLength: 12, pattern: "^[A-Za-z0-9]*$" }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso:
+          { type: ["string", "null"], maxLength: 8, pattern: "^[A-Za-z0-9]*$" }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+      required:
+        [
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+        ]
+
+    ConfigurazioneCodiciBeneficiariResponse:
+      type: object
+      properties:
+        configurazione:
+          anyOf:
+            - { $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiari" }
+            - { type: "null" }
+        esempio: { type: ["string", "null"] }
+        storico:
+          type: array
+          items:
+            { $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiari" }
+      required: [configurazione, esempio]
+
     # ── Volontari ─────────────────────────────────────────────────────────
     Volontario:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         nome:
@@ -20575,6 +21188,8 @@ components:
     VolontarioInput:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         nome:
           type: string
         cognome:
@@ -20643,6 +21258,8 @@ components:
     VolontarioUpdate:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         nome:
           type: string
         cognome:
@@ -20693,6 +21310,8 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: string
         nome: { type: string }
         cognome: { type: string }
         matricola: { type: string }
@@ -21249,6 +21868,8 @@ components:
     Mezzo:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         codice:
@@ -21393,6 +22014,8 @@ components:
     ApprovazioneVolontario:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         nome:
@@ -22555,16 +23178,24 @@ components:
         ruoloNome:
           type: ["string", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         centroAscoltoNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         zonaUdsNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         isSuperAdmin:
           type: boolean
@@ -22658,16 +23289,24 @@ components:
         ruoloNome:
           type: ["string", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         centroAscoltoNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         zonaUdsNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         isSuperAdmin:
           type: boolean
@@ -22697,6 +23336,15 @@ components:
           dataCreazione,
         ]
 
+    TemporaryPasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
+          writeOnly: true
+
     UtenteInput:
       type: object
       properties:
@@ -22721,10 +23369,14 @@ components:
         ruoloId:
           type: ["integer", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         attivo:
           type: boolean
@@ -22746,10 +23398,14 @@ components:
         ruoloId:
           type: ["integer", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         attivo:
           type: boolean
@@ -22815,3 +23471,100 @@ components:
             type: string
         isAdmin:
           type: boolean
+
+    BollaBeneficiarioContestoAtteso:
+      type: object
+      additionalProperties: false
+      required:
+      - areaOperativaId
+      - centroAscoltoId
+      properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+        centroAscoltoId:
+          type: integer
+          minimum: 1
+    BollaTesseraLookupInput:
+      type: object
+      required:
+      - areaOperativaId
+      - centroAscoltoId
+      - codiceTessera
+      properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+        centroAscoltoId:
+          type: integer
+          minimum: 1
+        codiceTessera:
+          type: string
+          minLength: 1
+          maxLength: 256
+    BollaBeneficiarioCandidato:
+      type: object
+      required:
+      - id
+      - nome
+      - cognome
+      - codice
+      - areaOperativaId
+      - centroAscoltoId
+      - consegnaDomicilio
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        nome:
+          type: string
+        cognome:
+          type: string
+        codice:
+          type: string
+        areaOperativaId:
+          type:
+          - integer
+          - 'null'
+        centroAscoltoId:
+          type:
+          - integer
+          - 'null'
+        consegnaDomicilio:
+          type: boolean
+    BeneficiarioServizioStatoUds:
+      type: object
+      required:
+      - disponibile
+      - stato
+      properties:
+        disponibile:
+          type: boolean
+        stato:
+          type:
+          - string
+          - 'null'
+    BeneficiarioServiziRiepilogo:
+      type: object
+      properties:
+        emporio: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+        mensa: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+        tessera: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+      required: [emporio, mensa, tessera]
+    BeneficiarioServizioStato:
+      type: object
+      properties:
+        disponibile: { type: boolean }
+        stato: { type: [string, 'null'] }
+      required: [disponibile, stato]
+
+    BeneficiarioStatiServiziUds:
+      type: object
+      required:
+      - emporio
+      - mensa
+      properties:
+        emporio:
+          $ref: '#/components/schemas/BeneficiarioServizioStatoUds'
+        mensa:
+          $ref: '#/components/schemas/BeneficiarioServizioStatoUds'

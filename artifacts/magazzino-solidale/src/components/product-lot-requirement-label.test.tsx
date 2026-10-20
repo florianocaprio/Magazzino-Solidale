@@ -53,3 +53,24 @@ describe("LOT-COLOR — evidenza lotto produttore", () => {
     }
   });
 });
+
+describe("BUG18 — classificazione FSE+ e obbligo lotto indipendenti", () => {
+  for (const fsePlus of [false, true])
+    for (const lotRequired of [false, true]) {
+      it(`FSE+=${fsePlus}, obbligo lotto=${lotRequired}`, () => {
+        const element = document.createElement("div");
+        element.innerHTML = renderToStaticMarkup(
+          <ProductLotRequirementLabel
+            name="Campione"
+            lotRequired={lotRequired}
+            fsePlus={fsePlus}
+          />,
+        );
+        expect(element.textContent?.includes("FSE+")).toBe(fsePlus);
+        expect(element.textContent?.includes("Lotto richiesto")).toBe(
+          lotRequired,
+        );
+        expect(element.querySelector(".bg-purple-50") != null).toBe(fsePlus);
+      });
+    }
+});

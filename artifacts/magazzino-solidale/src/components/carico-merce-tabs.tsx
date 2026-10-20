@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { ProducerLotOriginBadge } from "./producer-lot-origin-badge";
+import { formatMagazzinoQuantity } from "@/lib/magazzino-quantity";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -272,7 +274,7 @@ function RettificaDialog({
   lotto: Lotto;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mutation = useRettificaLotto();
@@ -320,7 +322,10 @@ function RettificaDialog({
           <DialogDescription>
             {t("uxCaricoLotti.adjustHelp", {
               code: lotto.codiceLotto ?? `#${lotto.id}`,
-              residual: lotto.quantitaResiduaPrecisa,
+              residual: formatMagazzinoQuantity(
+                lotto.quantitaResiduaPrecisa,
+                i18n.resolvedLanguage ?? i18n.language,
+              ),
             })}
           </DialogDescription>
         </DialogHeader>
@@ -404,7 +409,7 @@ function RettificaDialog({
 }
 
 export function RaccolteTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("magazzino.stock.receive");
@@ -578,7 +583,12 @@ export function RaccolteTab() {
                   {lot.stato}
                 </p>
                 <p className="text-sm">
-                  {t("uxCaricoLotti.residual")}: {lot.quantitaResiduaPrecisa} ·{" "}
+                  {t("uxCaricoLotti.residual")}:{" "}
+                  {formatMagazzinoQuantity(
+                    lot.quantitaResiduaPrecisa,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}{" "}
+                  ·{" "}
                   {lot.maiCaricato
                     ? t("uxCaricoLotti.neverLoaded")
                     : lot.esaurito
@@ -635,7 +645,11 @@ export function RaccolteTab() {
               {selected?.codice} · {selected?.descrizione}
             </DialogTitle>
             <DialogDescription>
-              {selected?.stato} · {selected?.quantitaResiduaPrecisa}
+              {selected?.stato} ·{" "}
+              {formatMagazzinoQuantity(
+                selected?.quantitaResiduaPrecisa,
+                i18n.resolvedLanguage ?? i18n.language,
+              )}
             </DialogDescription>
           </DialogHeader>
           {error && (
@@ -740,8 +754,10 @@ export function RaccolteTab() {
   );
 }
 
+const LottiProduttorePanel = lazy(() => import("./lotti-produttore-panel"));
+
 export function LottiFisiciTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { hasPermission } = useAuth();
   const canAdjust = hasPermission("magazzino.stock.adjust");
   const { data: areas = [] } = useListAreeOperative();
@@ -764,7 +780,9 @@ export function LottiFisiciTab() {
   );
   const [expiry, setExpiry] = useState("");
   const [search, setSearch] = useState("");
-  const [includeExhausted, setIncludeExhausted] = useState(false);
+  const [includeExhausted, setIncludeExhausted] = useState(
+    Boolean(legacySearch.get("lottoId")),
+  );
   const [adjustLot, setAdjustLot] = useState<Lotto | null>(null);
   const areaId =
     area === "all"
@@ -777,6 +795,23 @@ export function LottiFisiciTab() {
     }
   }, [area, warehouse, warehouses]);
   const query = useListLotti({ includeEsauriti: includeExhausted });
+  const revealed = useRef<number | null>(null);
+  useEffect(() => {
+    const id = Number(
+      new URLSearchParams(window.location.search).get("lottoId"),
+    );
+    if (
+      id > 0 &&
+      revealed.current !== id &&
+      query.data?.some((lot) => lot.id === id)
+    ) {
+      const row = document.getElementById(`physical-lot-${id}`);
+      if (row) {
+        row.scrollIntoView({ block: "center" });
+        revealed.current = id;
+      }
+    }
+  }, [query.data]);
   const logicalQuery = useListLottiLogici(
     { areaOperativaId: areaId || undefined, includeStorico: true },
     {
@@ -835,7 +870,7 @@ export function LottiFisiciTab() {
           </Link>
         </Button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="max-w-sm">
         <Select
           value={area === "all" ? "all" : String(areaId || "")}
           onValueChange={(value) => {
@@ -858,6 +893,11 @@ export function LottiFisiciTab() {
               ))}
           </SelectContent>
         </Select>
+      </div>
+      <Suspense fallback={null}>
+        <LottiProduttorePanel areaId={areaId} />
+      </Suspense>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Select value={warehouse} onValueChange={setWarehouse}>
           <SelectTrigger aria-label={t("caricoPratiche.warehouse")}>
             <SelectValue />
@@ -1021,14 +1061,21 @@ export function LottiFisiciTab() {
           </thead>
           <tbody>
             {visible.map((lot) => (
-              <tr key={lot.id} className="border-b align-top">
+              <tr
+                key={lot.id}
+                id={`physical-lot-${lot.id}`}
+                className="border-b align-top"
+              >
                 <td className="p-2">
                   {lot.prodottoNome}
                   <div className="text-muted-foreground">
                     {lot.prodottoCodice}
                   </div>
                 </td>
-                <td className="p-2">{lot.codiceLotto ?? "—"}</td>
+                <td className="p-2">
+                  <span className="block">{lot.codiceLotto ?? "—"}</span>
+                  <ProducerLotOriginBadge origin={lot.origineAnagrafica} />
+                </td>
                 <td className="p-2">{lot.dataScadenza ?? "—"}</td>
                 <td className="p-2">{lot.magazzinoNome ?? "—"}</td>
                 <td className="p-2">
@@ -1062,7 +1109,11 @@ export function LottiFisiciTab() {
                             {t(`caricoPratiche.origin${event.origineCarico}`, {
                               defaultValue: event.origineCarico,
                             })}{" "}
-                            · {event.quantitaOperativa}{" "}
+                            ·{" "}
+                            {formatMagazzinoQuantity(
+                              event.quantitaOperativa,
+                              i18n.resolvedLanguage ?? i18n.language,
+                            )}{" "}
                             {event.unitaMisuraOperativa}
                             {event.fornitoreNome
                               ? ` · ${event.fornitoreNome}`
@@ -1091,10 +1142,30 @@ export function LottiFisiciTab() {
                     : (lot.documentoCarico ?? "—")}
                 </td>
                 <td className="p-2">{lot.fondoOrigine}</td>
-                <td className="p-2">{lot.quantitaCaricataPrecisa}</td>
-                <td className="p-2">{lot.quantitaResiduaPrecisa}</td>
-                <td className="p-2">{lot.quantitaPrenotataPrecisa ?? "—"}</td>
-                <td className="p-2">{lot.disponibileRealePrecisa}</td>
+                <td className="p-2">
+                  {formatMagazzinoQuantity(
+                    lot.quantitaCaricataPrecisa,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}
+                </td>
+                <td className="p-2">
+                  {formatMagazzinoQuantity(
+                    lot.quantitaResiduaPrecisa,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}
+                </td>
+                <td className="p-2">
+                  {formatMagazzinoQuantity(
+                    lot.quantitaPrenotataPrecisa,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}
+                </td>
+                <td className="p-2">
+                  {formatMagazzinoQuantity(
+                    lot.disponibileRealePrecisa,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}
+                </td>
                 <td className="p-2">
                   <Badge variant="outline">
                     {t(`uxCaricoLotti.${physicalLotState(lot, today)}`)}

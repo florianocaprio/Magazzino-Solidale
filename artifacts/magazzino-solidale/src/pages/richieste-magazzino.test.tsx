@@ -28,6 +28,7 @@ vi.mock("@/pages/trasferimenti", () => ({
   newRiga: () => ({}),
 }));
 vi.mock("@/components/documento-operativo", () => ({
+  documentProgressBadge: (value: string) => <span>{value}</span>,
   DocumentoOperativoDettaglioComune: ({ selection, onBackToRequest }: any) => (
     <div data-testid="contextual-document">
       {selection.tipo}:{selection.id}
@@ -347,6 +348,8 @@ describe("M5C2-A-R1 Sheet richieste", () => {
       sheet().querySelector('[data-testid="contextual-document"]')?.textContent,
     ).toContain("bolla:1");
     await click("back-to-request", sheet());
-    expect(sheet().textContent).toContain("richiesteMagazzino.cancelAfterExit");
+    expect(sheet()).toBeNull();
+    expect(window.location.search).not.toContain("richiestaId");
+    expect(window.location.search).not.toContain("documento");
   });
 });

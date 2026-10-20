@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListAreeOperative, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useAuth } from "@/lib/auth";
+import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building, Filter, Upload } from "lucide-react";
@@ -44,6 +47,7 @@ export default function Fornitori() {
   const lockedAreaOperativaId = user?.areaOperativaId ?? null;
   const isAreaOperativaLocked = lockedAreaOperativaId != null;
   const isGlobal = !isAreaOperativaLocked;
+  const globalAdmin = canManageGlobalAdminResources(user);
   const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   useEffect(() => {
     if (isAreaOperativaLocked && lockedAreaOperativaId != null) {
@@ -51,7 +55,7 @@ export default function Fornitori() {
     }
   }, [isAreaOperativaLocked, lockedAreaOperativaId]);
   const { data: fornitori, isLoading } = useListFornitori(
-    areaOperativaFilter !== "all" ? { areaOperativaId: parseInt(areaOperativaFilter) } : undefined
+    areaOperativaFilter === "global" ? { ambito: "globali" } : areaOperativaFilter !== "all" ? { areaOperativaId: Number(areaOperativaFilter) } : undefined
   );
   const { data: areaOperativa } = useListAreeOperative();
   const { data: tipologie } = useListTipologieFornitore();
@@ -78,7 +82,7 @@ export default function Fornitori() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", areaOperativaId: "all", noteOperative: ""
+      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", areaOperativaId: "", noteOperative: ""
     }
   });
 
@@ -88,7 +92,7 @@ export default function Fornitori() {
       nome: f.nome, tipo: f.tipo, partitaIva: f.partitaIva || "", codiceFiscale: f.codiceFiscale || "",
       indirizzo: f.indirizzo || "", comune: f.comune || "", telefono: f.telefono || "",
       email: f.email || "", referente: f.referente || "", note: f.note || "",
-      areaOperativaId: f.areaOperativaId != null ? String(f.areaOperativaId) : "all",
+      areaOperativaId: f.areaOperativaId != null ? String(f.areaOperativaId) : "global",
       noteOperative: f.noteOperative || ""
     });
     setIsFormOpen(true);
@@ -96,15 +100,19 @@ export default function Fornitori() {
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", areaOperativaId: isAreaOperativaLocked && lockedAreaOperativaId != null ? String(lockedAreaOperativaId) : "all", noteOperative: "" });
+    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", areaOperativaId: isAreaOperativaLocked && lockedAreaOperativaId != null ? String(lockedAreaOperativaId) : "", noteOperative: "" });
     setIsFormOpen(true);
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const { areaOperativaId, ...rest } = values;
+    if (!areaOperativaId) {
+      form.setError("areaOperativaId", { type: "required", message: t("common.requiredField") });
+      return;
+    }
     const data = {
       ...rest,
-      areaOperativaId: areaOperativaId && areaOperativaId !== "all" ? parseInt(areaOperativaId) : null,
+      areaOperativaId: areaOperativaId !== "global" ? Number(areaOperativaId) : null,
     };
     if (editingId) {
       updateFornitore.mutate({ id: editingId, data }, {
@@ -126,7 +134,7 @@ export default function Fornitori() {
   };
 
   const filtered = fornitori?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase()));
-  const areaOperativaNome = (id: number | null | undefined) => id != null ? (areaOperativa?.find(c => c.id === id)?.nome ?? "-") : t("fornitori.tutteAreaOperativa");
+  const areaOperativaNome = (id: number | null | undefined) => id != null ? (areaOperativa?.find(c => c.id === id)?.nome ?? "-") : t("fornitori.global");
 
   const tipoColors: Record<string, string> = {
     commerciale: "bg-blue-500/10 text-blue-700",
@@ -156,7 +164,7 @@ export default function Fornitori() {
               { header: t("common.phone"), accessor: (f) => f.telefono },
               { header: t("common.email"), accessor: (f) => f.email },
               { header: t("fornitori.referente"), accessor: (f) => f.referente },
-              { header: t("fornitori.areaOperativa"), accessor: (f) => f.areaOperativaId == null ? t("fornitori.tutteAreaOperativa") : (f.areaOperativaNome ?? areaOperativaNome(f.areaOperativaId)) },
+              { header: t("fornitori.areaOperativa"), accessor: (f) => f.areaOperativaId == null ? t("fornitori.global") : (f.areaOperativaNome ?? areaOperativaNome(f.areaOperativaId)) },
               { header: t("fornitori.noteOperative"), accessor: (f) => f.noteOperative },
             ]}
             filename="fornitori"
@@ -220,20 +228,22 @@ export default function Fornitori() {
         <CardHeader className="py-4 border-b">
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <Input placeholder={t("fornitori.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-            {isGlobal && (
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder={t("fornitori.tutteAreaOperativa")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("fornitori.tutteAreaOperativa")}</SelectItem>
-                    {areaOperativa?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
+                <SelectTrigger className="w-[220px]" aria-label={t("fornitori.areaOperativa")}>
+                  <SelectValue placeholder={t("fornitori.tutteAreaOperativa")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {isGlobal && <SelectItem value="all">{t("fornitori.tutteAreaOperativa")}</SelectItem>}
+                  <SelectItem value="global">{t("fornitori.onlyGlobal")}</SelectItem>
+                  {areaOperativa?.filter(c => isGlobal || c.id === lockedAreaOperativaId).map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome} · {t("fornitori.withGlobal")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant={areaOperativaFilter === "global" ? "default" : "outline"} aria-controls="fornitori-results" onClick={() => setAreaOperativaFilter("global")}>
+                {t("fornitori.onlyGlobal")}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -248,7 +258,7 @@ export default function Fornitori() {
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody id="fornitori-results">
               {isLoading ? (
                 Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
@@ -263,7 +273,9 @@ export default function Fornitori() {
               ) : filtered?.map((f) => (
                 <TableRow key={f.id} className={!f.attivo ? "opacity-50" : ""}>
                   <TableCell>
-                    <div className="font-medium text-base">{f.nome}</div>
+                    <div className="flex flex-wrap items-center gap-2 font-medium text-base">{f.nome}
+                      {f.areaOperativaId == null && <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">{t("fornitori.global")}</Badge>}
+                    </div>
                     {f.comune && <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Building className="h-3 w-3" /> {f.comune}</div>}
                   </TableCell>
                   <TableCell>
@@ -274,7 +286,7 @@ export default function Fornitori() {
                   {isGlobal && (
                     <TableCell className="text-sm">
                       {f.areaOperativaId == null
-                        ? <span className="text-muted-foreground italic">{t("fornitori.tutteAreaOperativa")}</span>
+                        ? <span className="text-muted-foreground">{t("fornitori.global")}</span>
                         : (f.areaOperativaNome ?? areaOperativaNome(f.areaOperativaId))}
                     </TableCell>
                   )}
@@ -286,14 +298,14 @@ export default function Fornitori() {
                   </TableCell>
                   <TableCell className="text-sm">{f.referente || "-"}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    {(globalAdmin || f.areaOperativaId != null) && <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(f)}><Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}</DropdownMenuItem>
                         {f.attivo ? <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>
                           : <DropdownMenuItem onClick={() => reactivate(f.id)}>Riattiva Fornitore</DropdownMenuItem>}
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -343,14 +355,25 @@ export default function Fornitori() {
                 )} />
                 <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                   <FormItem>
+                    {globalAdmin && (
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <Label htmlFor="fornitore-global">{t("fornitori.global")}</Label>
+                        <Switch id="fornitore-global" checked={field.value === "global"} onCheckedChange={(checked) => {
+                          field.onChange(checked ? "global" : "");
+                          form.clearErrors("areaOperativaId");
+                        }} />
+                      </div>
+                    )}
                     <FormLabel>{t("fornitori.areaOperativa")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isAreaOperativaLocked}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <Select onValueChange={(value) => { field.onChange(value); form.clearErrors("areaOperativaId"); }} value={field.value || ""} disabled={isAreaOperativaLocked}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("fornitori.areaOperativa")} /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="all">{t("fornitori.tutteAreaOperativa")}</SelectItem>
+                        {globalAdmin && <SelectItem value="global">{t("fornitori.global")}</SelectItem>}
                         {areaOperativa?.filter((c) => c.attivo || String(c.id) === field.value).map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {field.value === "global" && <p className="text-sm text-muted-foreground">{t("fornitori.globalHint")}</p>}
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="noteOperative" render={({ field }) => (

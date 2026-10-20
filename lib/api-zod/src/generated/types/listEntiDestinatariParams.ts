@@ -5,8 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListEntiDestinatariAmbito } from "./listEntiDestinatariAmbito";
 
 export type ListEntiDestinatariParams = {
+  /**
+   * Enti dell’Area e globali; intersecato con l’Area del profilo.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  ambito?: ListEntiDestinatariAmbito;
   attivo?: boolean;
   /**
    * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email

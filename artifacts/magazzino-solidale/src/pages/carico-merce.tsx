@@ -1,10 +1,13 @@
+import { cn } from "@/lib/utils";
+import { ProducerLotLookup } from "@/components/producer-lot-lookup";
+import i18nInstance from "@/lib/i18n";
+import { registerBlocco05 } from "@/lib/i18n/namespaces/blocco05";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetCaricoPraticaQueryKey,
   getListCaricoPraticheQueryKey,
-  getListLottiQueryKey,
   getListLottiLogiciQueryKey,
   useAddCaricoPraticaRiga,
   useCancelCaricoPratica,
@@ -15,12 +18,12 @@ import {
   useListAreeOperative,
   useListCaricoPratiche,
   useListLottiLogici,
-  useListLotti,
   useListFornitori,
   useListMagazzini,
   useListProdotti,
   useRegisterCaricoPratica,
   useReopenCaricoPratica,
+  useRectifyCaricoPraticaRiga,
   useUpdateCaricoPratica,
   useUpdateCaricoPraticaRiga,
   type CaricoPraticaDettaglio,
@@ -45,6 +48,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { formatMagazzinoQuantity } from "@/lib/magazzino-quantity";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -71,20 +83,18 @@ import {
 } from "@/hooks/use-unsaved-changes-guard";
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/api-error";
-import {
-  scannedPhysicalLotDraft,
-  suggestedPhysicalLotDraft,
-  suggestedPhysicalLots,
-} from "@/lib/carico-lotti";
+import { scannedPhysicalLotDraft } from "@/lib/carico-lotti";
 import {
   blocksCaricoDraftSave,
   caricoDraftFromRow,
+  caricoStatusBadgeClass,
   isCaricoRowDraftDirty,
   newCommandKey,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
   reconcileCaricoDrafts,
+  remainingCaricoQuantity,
   shouldAcceptBarcodeScan,
   type CaricoRowDraft,
   type CaricoRowField,
@@ -101,6 +111,8 @@ import {
   Plus,
   Save,
 } from "lucide-react";
+
+registerBlocco05(i18nInstance);
 
 const ORIGINS: OrigineCaricoManuale[] = [
   "DONAZIONE",
@@ -177,7 +189,7 @@ function rowIssueKey(field: CaricoRowField, issue: CaricoRowIssue): string {
 }
 
 function CarichiContent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const { hasPermission } = useAuth();
   const canReceive = hasPermission("magazzino.stock.receive");
@@ -188,6 +200,16 @@ function CarichiContent() {
   const [creating, setCreating] = useState(false);
   const [header, setHeader] = useState<HeaderForm>(emptyHeader);
   const [dirty, setDirty] = useState(false);
+  const [headerExpanded, setHeaderExpanded] = useState(false);
+  const [correction, setCorrection] = useState<{
+    row: CaricoPraticaRiga;
+    replace: boolean;
+    versione: number;
+    key: string;
+    motivo: string;
+    attempted: boolean;
+  } | null>(null);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
   const [filterArea, setFilterArea] = useState("");
   const [filterWarehouse, setFilterWarehouse] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -195,6 +217,17 @@ function CarichiContent() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [productPanelOpen, setProductPanelOpen] = useState(false);
+  const [panelFocusReleased, setPanelFocusReleased] = useState(true);
+  const [addedProductName, setAddedProductName] = useState("");
+  const [importedRowIds, setImportedRowIds] = useState<Set<number>>(new Set());
+  const [rowToReveal, setRowToReveal] = useState<{
+    practiceId: number;
+    rowId: number;
+  } | null>(null);
+  const productSearchInput = useRef<HTMLInputElement>(null);
+  const addProductsButton = useRef<HTMLButtonElement>(null);
+  const addingProduct = useRef(false);
   const [rowDrafts, setRowDrafts] = useState<Record<number, CaricoRowDraft>>(
     {},
   );
@@ -227,16 +260,6 @@ function CarichiContent() {
   const { data: warehouses = [] } = useListMagazzini();
   const { data: products = [] } = useListProdotti();
   const { data: suppliers = [] } = useListFornitori();
-  const knownLotsParams = {
-    magazzinoId: header.magazzinoId ? Number(header.magazzinoId) : undefined,
-    includeEsauriti: true,
-  };
-  const { data: knownLots = [] } = useListLotti(knownLotsParams, {
-    query: {
-      enabled: Boolean(header.magazzinoId),
-      queryKey: getListLottiQueryKey(knownLotsParams),
-    },
-  });
   const selectedAreaId = header.areaOperativaId
     ? Number(header.areaOperativaId)
     : null;
@@ -354,6 +377,9 @@ function CarichiContent() {
     const samePractice = previous?.id === practice.id;
     if (!samePractice) {
       setHeader(headerFromPractice(practice));
+      setHeaderExpanded(false);
+      setCorrection(null);
+      setCorrectionError(null);
       setRowDrafts(
         Object.fromEntries(
           practice.righe.map((row) => [row.id, caricoDraftFromRow(row)]),
@@ -364,6 +390,9 @@ function CarichiContent() {
       setRowErrors({});
       setRowSavedIncomplete(new Set());
       setFocusRowField(null);
+      setProductPanelOpen(false);
+      setRowToReveal(null);
+      setAddedProductName("");
       setHeaderAttempted(false);
       setHeaderError(null);
       setSectionError(null);
@@ -444,6 +473,7 @@ function CarichiContent() {
   const closeMutation = useCloseCaricoPratica();
   const reopenMutation = useReopenCaricoPratica();
   const cancelMutation = useCancelCaricoPratica();
+  const rectifyMutation = useRectifyCaricoPraticaRiga();
   const pending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -453,7 +483,8 @@ function CarichiContent() {
     registerMutation.isPending ||
     closeMutation.isPending ||
     reopenMutation.isPending ||
-    cancelMutation.isPending;
+    cancelMutation.isPending ||
+    rectifyMutation.isPending;
   const registrationBlockReason = pending
     ? t("caricoPratiche.operationPending")
     : registrationUncertain
@@ -473,7 +504,16 @@ function CarichiContent() {
                 : null;
 
   useEffect(() => {
-    if (pending || !focusRowField) return;
+    if (
+      pending ||
+      !focusRowField ||
+      productPanelOpen ||
+      !panelFocusReleased ||
+      confirmRegister ||
+      fseImportOpen ||
+      activityOpen
+    )
+      return;
     const handle = requestAnimationFrame(() => {
       const suffix = {
         quantita: "quantity",
@@ -490,7 +530,53 @@ function CarichiContent() {
       setFocusRowField(null);
     });
     return () => cancelAnimationFrame(handle);
-  }, [focusRowField, pending, practice]);
+  }, [
+    focusRowField,
+    pending,
+    practice,
+    productPanelOpen,
+    panelFocusReleased,
+    confirmRegister,
+    fseImportOpen,
+    activityOpen,
+  ]);
+
+  useEffect(() => {
+    if (
+      !rowToReveal ||
+      productPanelOpen ||
+      !panelFocusReleased ||
+      pending ||
+      confirmRegister ||
+      fseImportOpen ||
+      activityOpen ||
+      unsavedGuard.dialogOpen ||
+      correction != null ||
+      practice?.id !== rowToReveal.practiceId
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      const input = document.getElementById(
+        `carico-quantity-${rowToReveal.rowId}`,
+      );
+      if (!(input instanceof HTMLInputElement) || input.disabled) return;
+      input.closest("[data-testid]")?.scrollIntoView({ block: "center" });
+      input.focus({ preventScroll: true });
+      setRowToReveal(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    rowToReveal,
+    productPanelOpen,
+    panelFocusReleased,
+    pending,
+    practice,
+    confirmRegister,
+    fseImportOpen,
+    activityOpen,
+    unsavedGuard.dialogOpen,
+    correction,
+  ]);
 
   const updateDetailCache = (value: CaricoPraticaDettaglio) => {
     queryClient.setQueryData(getGetCaricoPraticaQueryKey(value.id), value);
@@ -569,6 +655,7 @@ function CarichiContent() {
         updateDetailCache(updated);
       }
       setDirty(false);
+      setHeaderExpanded(false);
       toast({ title: t("caricoPratiche.saved") });
     } catch (error) {
       setHeaderError(errorMessage(error, t("caricoPratiche.error")));
@@ -577,7 +664,9 @@ function CarichiContent() {
   };
 
   const addProduct = async (productId: number) => {
-    if (!practice || pending) return;
+    if (!practice || pending || !canEditManual || addingProduct.current) return;
+    addingProduct.current = true;
+    const clientId = crypto.randomUUID();
     try {
       const updated = await addRowMutation.mutateAsync({
         id: practice.id,
@@ -586,15 +675,21 @@ function CarichiContent() {
           prodottoId: productId,
           fondoOrigine: "NESSUN_FONDO",
           quantita: null,
-          clientId: crypto.randomUUID(),
+          clientId,
         },
       });
       updateDetailCache(updated);
-      setProductSearch("");
-      setSectionError(null);
+      const added = updated.righe.find((row) => row.clientId === clientId);
+      setAddedProductName(added?.prodottoNome ?? "");
+      setRowToReveal(
+        added ? { practiceId: updated.id, rowId: added.id } : null,
+      );
+      setSectionError(added ? null : t("blocco05.rowNotFound"));
     } catch (error) {
       setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
+    } finally {
+      addingProduct.current = false;
     }
   };
 
@@ -634,6 +729,7 @@ function CarichiContent() {
           prodottoId: row.prodottoId,
           fondoOrigine: draft.fondoOrigine,
           quantita: draft.quantita ? normalizeUiQuantity(draft.quantita) : null,
+          lottoProduttoreId: draft.lottoProduttoreId ?? null,
           codiceLottoProduttore: draft.codiceLottoProduttore.trim() || null,
           dataScadenza: draft.dataScadenza || null,
           fattoreKgLtPezzo: draft.fattoreKgLtPezzo
@@ -762,6 +858,44 @@ function CarichiContent() {
     }
   };
 
+  const correctRegisteredRow = async () => {
+    if (!correction || !practice) return;
+    setCorrection((current) => current && { ...current, attempted: true });
+    setCorrectionError(null);
+    try {
+      const result = await rectifyMutation.mutateAsync({
+        id: practice.id,
+        rigaId: correction.row.id,
+        data: {
+          versione: correction.versione,
+          quantita: remainingCaricoQuantity(correction.row),
+          motivo: correction.motivo.trim(),
+          idempotencyKey: correction.key,
+          ripristinaBozza: correction.replace,
+        },
+      });
+      await detailQuery.refetch();
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/carico-pratiche"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/lotti"],
+      });
+      setCorrection(null);
+      if (result.rigaSostitutivaId) {
+        setPanelFocusReleased(true);
+        setRowToReveal({
+          practiceId: practice.id,
+          rowId: result.rigaSostitutivaId,
+        });
+      }
+      toast({ title: t("blocco05.correctionSaved") });
+    } catch (error) {
+      setCorrectionError(errorMessage(error, t("caricoPratiche.error")));
+      void detailQuery.refetch();
+    }
+  };
+
   const lifecycle = async (action: "close" | "reopen" | "cancel") => {
     if (!practice) return;
     const reason =
@@ -785,6 +919,7 @@ function CarichiContent() {
               });
       updateDetailCache(updated);
       setSectionError(null);
+      if (action === "close" || action === "cancel") leaveDetail();
     } catch (error) {
       setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
@@ -797,8 +932,21 @@ function CarichiContent() {
   );
   const leaveDetail = () => {
     unsavedGuard.requestClose(() => {
+      if (practice) {
+        setFilterArea(String(practice.areaOperativaId));
+        setFilterWarehouse(String(practice.magazzinoId));
+        setFilterStatus("all");
+        setFilterSearch("");
+        setDateFrom("");
+        setDateTo("");
+      }
+      setHeaderExpanded(false);
       setSelectedId(null);
       setCreating(false);
+      previousPractice.current = null;
+      setRowDrafts({});
+      setRowToReveal(null);
+      setProductPanelOpen(false);
       setDirty(false);
       setHeaderAttempted(false);
       setHeaderError(null);
@@ -947,7 +1095,10 @@ function CarichiContent() {
                 <div>
                   <div className="flex items-center gap-2">
                     <strong>{item.codice}</strong>
-                    <Badge variant="outline">
+                    <Badge
+                      variant="outline"
+                      className={caricoStatusBadgeClass(item.stato)}
+                    >
                       {statusLabel(t, item.stato)}
                     </Badge>
                   </div>
@@ -988,7 +1139,23 @@ function CarichiContent() {
         {practice && (
           <div className="flex flex-wrap items-center gap-2">
             <strong>{practice.codice}</strong>
-            <Badge>{statusLabel(t, practice.stato)}</Badge>
+            <span className="text-sm text-muted-foreground">
+              {practice.areaOperativaNome} · {practice.magazzinoNome}
+            </span>
+            <Button
+              variant="outline"
+              aria-expanded={headerExpanded}
+              aria-controls="carico-practice-data"
+              onClick={() => setHeaderExpanded((current) => !current)}
+            >
+              {t("blocco05.practiceData")}
+            </Button>
+            <Badge
+              variant="outline"
+              className={caricoStatusBadgeClass(practice.stato)}
+            >
+              {statusLabel(t, practice.stato)}
+            </Badge>
             {canOpenFseImport && (
               <Button
                 variant="outline"
@@ -1004,7 +1171,7 @@ function CarichiContent() {
         )}
       </div>
 
-      <Card>
+      <Card id="carico-practice-data" hidden={!creating && !headerExpanded}>
         <CardHeader>
           <CardTitle>{t("caricoPratiche.title")}</CardTitle>
         </CardHeader>
@@ -1136,7 +1303,10 @@ function CarichiContent() {
               }
               value={header.lottoLogicoId}
               onValueChange={(value) => {
-                setHeader((current) => ({ ...current, lottoLogicoId: value }));
+                setHeader((current) => ({
+                  ...current,
+                  lottoLogicoId: value,
+                }));
                 setDirty(true);
               }}
             >
@@ -1352,6 +1522,8 @@ function CarichiContent() {
                   .map((supplier) => (
                     <SelectItem key={supplier.id} value={String(supplier.id)}>
                       {supplier.nome}
+                      {supplier.areaOperativaId == null &&
+                        ` · ${t("fornitori.global")}`}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -1400,32 +1572,50 @@ function CarichiContent() {
               onClick={() => void saveHeader()}
             >
               <Save className="mr-2 h-4 w-4" />
-              {t("caricoPratiche.saveDraft")}
+              {t(creating ? "blocco05.openPractice" : "blocco05.saveChanges")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {practice && canEditManual && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("caricoPratiche.addProduct")}</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {t("uxCaricoLotti.lotLegend")}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Sheet
+          open={productPanelOpen}
+          onOpenChange={(open) => {
+            setProductPanelOpen(open);
+            if (open) setPanelFocusReleased(false);
+          }}
+        >
+          <SheetContent
+            className="flex w-full flex-col gap-4 sm:max-w-lg"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              productSearchInput.current?.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              setPanelFocusReleased(true);
+              if (!rowToReveal) addProductsButton.current?.focus();
+            }}
+          >
+            <SheetHeader className="pe-8">
+              <SheetTitle>{t("caricoPratiche.addProduct")}</SheetTitle>
+              <SheetDescription>
+                {t("uxCaricoLotti.lotLegend")}
+              </SheetDescription>
+            </SheetHeader>
             {sectionError && (
               <Alert variant="destructive">
                 <AlertDescription>{sectionError}</AlertDescription>
               </Alert>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                aria-label={t("caricoPratiche.productSearch")}
+                ref={productSearchInput}
+                aria-label={t("blocco05.searchProducts")}
                 value={productSearch}
                 onChange={(event) => setProductSearch(event.target.value)}
-                placeholder={t("caricoPratiche.productSearch")}
+                placeholder={t("blocco05.searchProducts")}
               />
               <BarcodeScannerButton
                 onScan={scanProduct}
@@ -1434,7 +1624,7 @@ function CarichiContent() {
                 label={t("caricoPratiche.scan")}
               />
             </div>
-            <ScrollArea className="h-48 rounded-md border p-2">
+            <ScrollArea className="min-h-0 flex-1 rounded-md border p-2">
               <div className="grid gap-1">
                 {productChoices.map((product) => (
                   <Button
@@ -1464,8 +1654,18 @@ function CarichiContent() {
                 </p>
               )}
             </ScrollArea>
-          </CardContent>
-        </Card>
+            {addedProductName && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {t("blocco05.productAdded", { name: addedProductName })}
+              </p>
+            )}
+            <SheetClose asChild>
+              <Button type="button" variant="outline">
+                {t("blocco05.closePanel")}
+              </Button>
+            </SheetClose>
+          </SheetContent>
+        </Sheet>
       )}
 
       {practice && (
@@ -1481,6 +1681,10 @@ function CarichiContent() {
             )}
             {pendingRows.map((row) => {
               const draft = rowDrafts[row.id] ?? caricoDraftFromRow(row);
+              const saved =
+                !isRowDirty(row) &&
+                (rowSavedIncomplete.has(row.id) ||
+                  Object.keys(validateCaricoRow(row, draft)).length === 0);
               const issues = rowAttempted.has(row.id)
                 ? validateCaricoRow(row, draft)
                 : {};
@@ -1490,7 +1694,11 @@ function CarichiContent() {
                 <div
                   key={row.id}
                   data-testid={`carico-row-${row.id}`}
-                  className="grid gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-4"
+                  className={cn(
+                    "grid min-w-0 gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-4",
+                    importedRowIds.has(row.id) &&
+                      "border-teal-400 bg-teal-50/40 dark:bg-teal-950/20",
+                  )}
                 >
                   <div className="flex items-start gap-2">
                     <Checkbox
@@ -1665,6 +1873,7 @@ function CarichiContent() {
                             [row.id]: {
                               ...draft,
                               codiceLottoProduttore: event.target.value,
+                              lottoProduttoreId: null,
                             },
                           }));
                         }}
@@ -1675,49 +1884,28 @@ function CarichiContent() {
                         onScan={(value) =>
                           setRowDrafts((current) => ({
                             ...current,
-                            [row.id]: scannedPhysicalLotDraft(draft, value),
+                            [row.id]: {
+                              ...scannedPhysicalLotDraft(draft, value),
+                              lottoProduttoreId: null,
+                            },
                           }))
                         }
                       />
                     </div>
-                    {suggestedPhysicalLots(
-                      knownLots,
-                      row.prodottoId,
-                      practice.magazzinoId,
-                    ).length > 0 && (
-                      <Select
-                        onValueChange={(id) => {
-                          const lot = knownLots.find(
-                            (entry) => entry.id === Number(id),
-                          );
-                          if (!lot) return;
+                    {canEditManual && (
+                      <ProducerLotLookup
+                        key={`${practice.areaOperativaId}:${row.prodottoId}:${row.id}`}
+                        areaId={practice.areaOperativaId}
+                        productId={row.prodottoId}
+                        draft={draft}
+                        disabled={pending}
+                        onSelect={(next) =>
                           setRowDrafts((current) => ({
                             ...current,
-                            [row.id]: suggestedPhysicalLotDraft(draft, lot),
-                          }));
-                        }}
-                      >
-                        <SelectTrigger
-                          aria-label={t("uxCaricoLotti.suggestedLots")}
-                        >
-                          <SelectValue
-                            placeholder={t("uxCaricoLotti.suggestedLots")}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suggestedPhysicalLots(
-                            knownLots,
-                            row.prodottoId,
-                            practice.magazzinoId,
-                          ).map((lot) => (
-                            <SelectItem key={lot.id} value={String(lot.id)}>
-                              {lot.codiceLotto} · {lot.dataScadenza ?? "—"} ·{" "}
-                              {lot.lottoLogicoDescrizione ?? "—"} ·{" "}
-                              {lot.fondoOrigine} · {lot.fornitoreNome ?? "—"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            [row.id]: next,
+                          }))
+                        }
+                      />
                     )}
                     {fieldError("codiceLottoProduttore") && (
                       <p
@@ -1825,24 +2013,35 @@ function CarichiContent() {
                       )}
                     </div>
                   )}
-                  <div className="flex items-end gap-2">
+                  <div className="flex min-w-0 flex-wrap items-end gap-2 md:col-span-2 lg:col-span-4">
                     <Button
                       variant="outline"
+                      className={
+                        saved
+                          ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          : undefined
+                      }
                       disabled={
                         pending ||
                         !canEditManual ||
+                        saved ||
                         rowErrors[row.id] === t("caricoPratiche.rowConflict")
                       }
                       onClick={() => void saveRow(row)}
                     >
-                      {t("caricoPratiche.saveDraft")}
+                      {t(
+                        saved
+                          ? "blocco05.productSaved"
+                          : "blocco05.insertProduct",
+                      )}
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
+                      className="border-red-200 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
                       disabled={pending || !canRemoveRow}
                       onClick={() => void removeRow(row)}
                     >
-                      {t("caricoPratiche.removeRow")}
+                      {t("blocco05.removeProduct")}
                     </Button>
                   </div>
                   {!draft.quantita && (
@@ -1900,23 +2099,42 @@ function CarichiContent() {
                 )}
               </Alert>
             )}
-            <Button
-              aria-describedby={
-                registrationBlockReason ? "carico-register-reason" : undefined
-              }
-              disabled={Boolean(registrationBlockReason)}
-              onClick={() => setConfirmRegister(true)}
-            >
-              {registerMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                aria-describedby={
+                  registrationBlockReason ? "carico-register-reason" : undefined
+                }
+                disabled={Boolean(registrationBlockReason)}
+                onClick={() => setConfirmRegister(true)}
+              >
+                {registerMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {t("caricoPratiche.register")}
+              </Button>
+              {canEditManual && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  ref={addProductsButton}
+                  className="border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+                  disabled={pending}
+                  onClick={() => {
+                    setPanelFocusReleased(false);
+                    setAddedProductName("");
+                    setProductPanelOpen(true);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("blocco05.addMore")}
+                </Button>
               )}
-              {t("caricoPratiche.register")}
-            </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {practice && (
+      {practice && registeredRows.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>{t("caricoPratiche.registeredRows")}</CardTitle>
@@ -1937,8 +2155,57 @@ function CarichiContent() {
                   </span>
                 </span>
                 <Badge>
-                  {row.quantita} {row.unitaMisura}
+                  {formatMagazzinoQuantity(
+                    remainingCaricoQuantity(row),
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}{" "}
+                  {row.unitaMisura}
                 </Badge>
+                {row.quantitaRettificata &&
+                  Number(row.quantitaRettificata) > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      {t("blocco05.reversed", {
+                        quantity: formatMagazzinoQuantity(
+                          row.quantitaRettificata,
+                          i18n.language,
+                        ),
+                        unit: row.unitaMisura,
+                      })}
+                    </span>
+                  )}
+                {canEditManual &&
+                  practice.soloAggiunte === false &&
+                  hasPermission("magazzino.stock.adjust") &&
+                  remainingCaricoQuantity(row) !== "0.000000" && (
+                    <div className="flex flex-wrap gap-2">
+                      {[true, false].map((replace) => (
+                        <Button
+                          key={String(replace)}
+                          variant="outline"
+                          disabled={pending}
+                          onClick={() =>
+                            unsavedGuard.requestClose(() => {
+                              setCorrectionError(null);
+                              setCorrection({
+                                row,
+                                replace,
+                                versione: practice.versione,
+                                key: newCommandKey(),
+                                motivo: "",
+                                attempted: false,
+                              });
+                            })
+                          }
+                        >
+                          {t(
+                            replace
+                              ? "blocco05.editRegistered"
+                              : "blocco05.removeProduct",
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
               </div>
             ))}
             {registeredRows.length === 0 && (
@@ -1971,11 +2238,20 @@ function CarichiContent() {
         <div className="flex flex-wrap gap-2">
           {practice.stato === "aperta" && (
             <Button
-              variant="outline"
-              disabled={pending || pendingRows.length > 0}
+              className="bg-emerald-700 text-white hover:bg-emerald-800"
+              disabled={pending || pendingRows.length > 0 || hasUnsavedChanges}
               onClick={() => void lifecycle("close")}
             >
               {t("caricoPratiche.close")}
+            </Button>
+          )}
+          {practice.stato === "aperta" && canReceive && (
+            <Button
+              className="bg-violet-700 text-white hover:bg-violet-800"
+              disabled={pending}
+              onClick={leaveDetail}
+            >
+              {t("blocco05.suspend")}
             </Button>
           )}
           {practice.stato === "chiusa" && (
@@ -1993,16 +2269,77 @@ function CarichiContent() {
               disabled={pending}
               onClick={() => void lifecycle("cancel")}
             >
-              {t("caricoPratiche.cancel")}
+              {t("blocco05.cancelPractice")}
             </Button>
           )}
-          <Button asChild variant="ghost">
-            <Link href="/carico-merce?tab=lotti">
-              {t("uxCaricoLotti.tabLotti")}
-            </Link>
-          </Button>
         </div>
       )}
+
+      <AlertDialog
+        open={correction != null}
+        onOpenChange={(open) => {
+          if (!open && !pending) setCorrection(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                correction?.replace
+                  ? "blocco05.editRegistered"
+                  : "blocco05.removeProduct",
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                correction?.replace
+                  ? "blocco05.replaceHelp"
+                  : "blocco05.removeHelp",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <p>
+            {correction?.row.prodottoNome} ·{" "}
+            {correction &&
+              formatMagazzinoQuantity(
+                remainingCaricoQuantity(correction.row),
+                i18n.language,
+              )}{" "}
+            {correction?.row.unitaMisura}
+          </p>
+          <Label htmlFor="carico-correction-reason">
+            {t("caricoPratiche.reason")}
+          </Label>
+          <Textarea
+            id="carico-correction-reason"
+            maxLength={1000}
+            value={correction?.motivo ?? ""}
+            disabled={pending || correction?.attempted}
+            onChange={(event) =>
+              setCorrection(
+                (current) =>
+                  current && { ...current, motivo: event.target.value },
+              )
+            }
+          />
+          {correctionError && (
+            <Alert variant="destructive">
+              <AlertDescription>{correctionError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <Button
+              disabled={pending || !correction?.motivo.trim()}
+              onClick={() => void correctRegisteredRow()}
+            >
+              {t("blocco05.confirmCorrection")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ActivityDialog
         open={activityOpen}
@@ -2034,7 +2371,12 @@ function CarichiContent() {
               {selectedPendingRows.map((row) => (
                 <li key={row.id}>
                   {row.prodottoNome}:{" "}
-                  {rowDrafts[row.id]?.quantita ?? row.quantita}{" "}
+                  {formatMagazzinoQuantity(
+                    normalizeUiQuantity(
+                      rowDrafts[row.id]?.quantita ?? row.quantita ?? "",
+                    ),
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}{" "}
                   {row.unitaMisura}
                 </li>
               ))}
@@ -2075,6 +2417,18 @@ function CarichiContent() {
           practice={practice}
           products={products}
           onPracticeReady={(practiceId) => {
+            const before = new Set(practice.righe.map((row) => row.id));
+            void detailQuery
+              .refetch()
+              .then((result) =>
+                setImportedRowIds(
+                  new Set(
+                    result.data?.righe
+                      .filter((row) => !before.has(row.id))
+                      .map((row) => row.id) ?? [],
+                  ),
+                ),
+              );
             setSelectedId(practiceId);
             void queryClient.invalidateQueries({
               queryKey: ["/api/carico-pratiche"],

@@ -339,6 +339,11 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   leftY += 5;
+  if (!ente && bolla.beneficiarioFascicolo) {
+    const lines = doc.splitTextToSize(`Fascicolo: ${bolla.beneficiarioFascicolo}`, colWidth) as string[];
+    doc.text(lines, colLeftX, leftY);
+    leftY += lines.length * 4.5;
+  }
   const indirizzoDest =
     bolla.indirizzoConsegna ||
     (ente ? bolla.enteDestinatarioIndirizzo : bolla.beneficiarioIndirizzo);

@@ -224,13 +224,162 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     await login(page);
   });
 
+  test("Fornitori: locali e globali, tag persistente, filtri e disponibilità nei carichi delle Aree", async ({ page }) => {
+    const fixtures = await loadDemoFixtures(page);
+    const name = `Fornitore Globale BUG17 ${runSuffix}`;
+    const localName = `Fornitore Locale BUG17 ${runSuffix}`;
+    const foreignName = `Fornitore Altra Area BUG17 ${runSuffix}`;
+    const areas = await expectJson<Array<{ id: number; nome: string; attivo: boolean }>>(await page.request.get("/api/aree-operative"), 200);
+    const originArea = areas.find((area) => area.id === fixtures.origin.areaOperativaId)!;
+    const otherArea = await expectJson<{ id: number; nome: string }>(await page.request.post("/api/aree-operative", {
+      data: { nome: `Area Fornitori BUG17 ${runSuffix}`, sigla: "FG", codiceMatricola: "FG", attivo: true },
+    }), 201);
+    await expectJson(await page.request.post("/api/fornitori", {
+      data: { nome: foreignName, tipo: "commerciale", areaOperativaId: otherArea.id },
+    }), 201);
+    await page.goto("/fornitori");
+    await page.getByRole("button", { name: "Nuovo Fornitore", exact: true }).click();
+    const form = page.getByRole("dialog");
+    await form.getByLabel("Nominativo / Ragione Sociale").fill(localName);
+    await expect(form.getByRole("switch", { name: "Globale", exact: true })).not.toBeChecked();
+    await form.getByRole("button", { name: "Salva", exact: true }).click();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toHaveAttribute("aria-invalid", "true");
+    await expect(form.getByText("Campo obbligatorio", { exact: true })).toBeVisible();
+    await selectOption(page, form.getByRole("combobox", { name: "Area Operativa", exact: true }), originArea.nome);
+    const localSaved = page.waitForResponse((r) => r.url().endsWith("/api/fornitori") && r.request().method() === "POST");
+    await form.getByRole("button", { name: "Salva", exact: true }).click();
+    expect((await expectJson<{ areaOperativaId: number }>(await localSaved, 201)).areaOperativaId).toBe(originArea.id);
+    await expect(form).toBeHidden();
+    await page.getByRole("button", { name: "Nuovo Fornitore", exact: true }).click();
+    await form.getByLabel("Nominativo / Ragione Sociale").fill(name);
+    await form.getByRole("switch", { name: "Globale", exact: true }).check();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toContainText("Globale");
+    await expect(form).toContainText("Utilizzabile in tutte le Aree Operative.");
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/fornitori") && r.request().method() === "POST");
+    await form.getByRole("button", { name: "Salva", exact: true }).click();
+    const supplier = await expectJson<{ id: number; areaOperativaId: null }>(await saved, 201);
+    expect(supplier.areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    const row = page.getByRole("row").filter({ hasText: name });
+    await expect(row.getByText("Globale", { exact: true }).first()).toBeVisible();
+    await row.getByRole("button").click();
+    await page.getByRole("menuitem", { name: "Modifica", exact: true }).click();
+    await expect(form.getByRole("switch", { name: "Globale", exact: true })).toBeChecked();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toContainText("Globale");
+    const edited = page.waitForResponse((r) => r.url().endsWith(`/api/fornitori/${supplier.id}`) && r.request().method() === "PATCH");
+    await form.getByRole("button", { name: "Salva", exact: true }).click();
+    expect((await expectJson<{ areaOperativaId: null }>(await edited, 200)).areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    await expect(row.getByText("Globale", { exact: true }).first()).toBeVisible();
+    const globalResponse = page.waitForResponse((r) => r.url().includes("/api/fornitori?") && new URL(r.url()).searchParams.get("ambito") === "globali");
+    await page.getByRole("button", { name: "Solo globali", exact: true }).click();
+    const globals = await expectJson<Array<{ id: number; areaOperativaId: number | null }>>(await globalResponse, 200);
+    expect(globals.some((s) => s.id === supplier.id)).toBe(true);
+    expect(globals.every((s) => s.areaOperativaId === null)).toBe(true);
+    await expect(page.getByText(localName, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(foreignName, { exact: true })).toHaveCount(0);
+    const filter = page.getByRole("combobox", { name: "Area Operativa", exact: true });
+    await selectOption(page, filter, `${originArea.nome} · incl. globali`);
+    await expect(page.getByText(localName, { exact: true })).toBeVisible();
+    await expect(row).toBeVisible();
+    await expect(page.getByText(foreignName, { exact: true })).toHaveCount(0);
+    await selectOption(page, filter, "Tutte le Aree e globali");
+    await expect(page.getByText(foreignName, { exact: true })).toBeVisible();
+    await expect(row).toBeVisible();
+    await page.goto("/carico-merce");
+    await page.getByRole("button", { name: "Nuova pratica", exact: true }).click();
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa", exact: true }), originArea.nome);
+    const picker = page.getByRole("combobox", { name: "Fornitore", exact: true });
+    await picker.click();
+    await expect(page.getByRole("option", { name: localName, exact: true })).toBeVisible();
+    await expect(page.getByRole("option", { name: foreignName, exact: true })).toHaveCount(0);
+    await page.getByRole("option", { name: `${name} · Globale`, exact: true }).click();
+    await expect(picker).toContainText(`${name} · Globale`);
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa", exact: true }), otherArea.nome);
+    await picker.click();
+    await expect(page.getByRole("option", { name: localName, exact: true })).toHaveCount(0);
+    await expect(page.getByRole("option", { name: foreignName, exact: true })).toBeVisible();
+    await page.getByRole("option", { name: `${name} · Globale`, exact: true }).click();
+    await expect(picker).toContainText(`${name} · Globale`);
+  });
+
+  test("BUG17: definisce un Ente globale, conserva tag e filtro; la Bolla include locali e globali", async ({ page }) => {
+    const fixtures = await loadDemoFixtures(page);
+    const name = `Globale BUG17 ${runSuffix}`;
+    const localName = `Territoriale BUG17 ${runSuffix}`;
+    await expectJson<Ente>(await page.request.post("/api/enti-destinatari", {
+      data: { idempotencyKey: key("bug17-local-picker"), denominazione: localName, indirizzo: "Via territoriale sintetica 1", areaOperativaId: fixtures.origin.areaOperativaId },
+    }), 201);
+    await page.goto("/enti-esterni");
+    await page.getByRole("button", { name: "Nuovo Ente", exact: true }).click();
+    const form = page.getByRole("dialog");
+    await form.getByRole("switch", { name: "Globale", exact: true }).check();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toContainText("Globale");
+    await expect(form).toContainText("Ente destinatario utilizzabile in tutte le Aree Operative.");
+    await form.getByLabel("Denominazione", { exact: true }).fill(name);
+    await form.getByLabel("Indirizzo", { exact: true }).fill("Via sintetica globale 1");
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/enti-destinatari") && r.request().method() === "POST");
+    await form.getByRole("button", { name: /salva/i }).click();
+    const entity = await expectJson<Ente & { areaOperativaId: null }>(await saved, 201);
+    expect(entity.areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    const card = page.getByTestId(`ente-${entity.id}`);
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    await expect(form).toContainText("Globale");
+    const updated = page.waitForResponse((r) => r.url().endsWith(`/api/enti-destinatari/${entity.id}`) && r.request().method() === "PATCH");
+    await form.getByRole("button", { name: /salva/i }).click();
+    expect((await expectJson<{ areaOperativaId: null }>(await updated, 200)).areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    const globalFilter = page.getByRole("button", { name: "Solo globali", exact: true });
+    await expect(globalFilter).toBeVisible();
+    const filtered = page.waitForResponse((r) => r.url().includes("/api/enti-destinatari?") && new URL(r.url()).searchParams.get("ambito") === "globali");
+    await globalFilter.click();
+    const globalItems = await expectJson<Array<{ areaOperativaId: number | null }>>(await filtered, 200);
+    expect(globalItems.length).toBeGreaterThan(0);
+    expect(globalItems.every((item) => item.areaOperativaId === null)).toBe(true);
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await expect(page.getByText(localName, { exact: true })).toHaveCount(0);
+    const areas = await expectJson<Array<{ id: number; nome: string }>>(await page.request.get("/api/aree-operative"), 200);
+    const areaName = areas.find((area) => area.id === fixtures.origin.areaOperativaId)!.nome;
+    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), `${areaName} · incl. globali`);
+    await expect(page.getByText(localName, { exact: true })).toBeVisible();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), "Tutte le Aree e globali");
+    await expect(page.getByText(localName, { exact: true })).toBeVisible();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    const dialog = await openCreateBollaDialog(page);
+    await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");
+    await selectOption(page, dialog.getByRole("combobox", { name: /magazzino di uscita/i }), fixtures.origin.nome);
+    await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
+    await page.getByPlaceholder(/cerca per denominazione/i).fill(localName);
+    await page.getByRole("option", { name: new RegExp(localName) }).click();
+    await expect(dialog.getByRole("button", { name: "Solo globali", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);
+    await dialog.getByRole("combobox").filter({ hasText: localName }).click();
+    await page.getByPlaceholder(/cerca per denominazione/i).fill(name);
+    await page.getByRole("option", { name: new RegExp(`${name}.*Globale`) }).click();
+    await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);
+    const created = page.waitForResponse((r) => r.url().endsWith("/api/bolle") && r.request().method() === "POST");
+    await dialog.getByRole("button", { name: /crea bolla/i }).click();
+    const document = await expectJson<{ areaOperativaIdSnapshot: number }>(await created, 201);
+    expect(document.areaOperativaIdSnapshot).toBe(fixtures.origin.areaOperativaId);
+  });
+
   test("Beneficiario: una risposta persa conserva payload/key, crea una sola bozza e la riprende dopo login", async ({
     page,
   }) => {
     const fixtures = await loadDemoFixtures(page);
     const dialog = await openCreateBollaDialog(page);
     const scan = dialog.getByPlaceholder(/scansiona o digita il codice/i);
-    await scan.fill(fixtures.beneficiary.codice);
+    const detail = await expectJson<{ areaOperativaId: number; centroAscoltoId: number }> (await page.request.get(`/api/beneficiari/${fixtures.beneficiary.id}`), 200);
+    const areas = await (await page.request.get("/api/aree-operative")).json();
+    const centres = await (await page.request.get("/api/centri-ascolto")).json();
+    await selectOption(page, dialog.getByRole("combobox", { name: "Area destinatario" }), areas.find((area: { id: number }) => area.id === detail.areaOperativaId).nome);
+    await selectOption(page, dialog.getByRole("combobox", { name: /centro di ascolto/i }), centres.find((centre: { id: number }) => centre.id === detail.centroAscoltoId).nome);
+    const card = await expectJson<{ codice: string }>(await page.request.post(`/api/beneficiari/${fixtures.beneficiary.id}/tessera-documento`, { data: {} }), 200);
+    await scan.fill(card.codice);
     await scan.press("Enter");
     await expect(dialog).toContainText(
       `${fixtures.beneficiary.cognome} ${fixtures.beneficiary.nome}`,

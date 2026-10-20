@@ -1,12 +1,14 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import JsBarcode from "jsbarcode";
-import { format, type Locale } from "date-fns";
-import { it } from "date-fns/locale";
+import type { Locale } from "date-fns";
+import { formatDateEuropeRome } from "@/lib/europe-rome";
 import type { BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export interface TesseraBeneficiario {
   codice: string;
+  /** Token registrato per QR e barcode, distinto dal codice anagrafico stampato. */
+  codiceTessera?: string;
   nome: string;
   cognome: string;
   codiceFiscale?: string | null;
@@ -67,7 +69,7 @@ function barcodeDataUrl(text: string): string | null {
     const canvas = document.createElement("canvas");
     JsBarcode(canvas, text, {
       format: "CODE128",
-      displayValue: true,
+      displayValue: false,
       fontSize: 26,
       height: 70,
       margin: 4,
@@ -97,6 +99,7 @@ export interface TesseraPdfOptions {
   associationLogoDataUrl?: string | null;
   branding?: BrandingAmbiente | null;
   locale?: Locale;
+  dataEmissione?: string;
 }
 
 function drawCenteredFitText(
@@ -107,6 +110,7 @@ function drawCenteredFitText(
   maxWidth: number,
   maxFontSize: number,
   minFontSize: number,
+  align: "center" | "left" = "center",
 ): void {
   let fontSize = maxFontSize;
   doc.setFontSize(fontSize);
@@ -114,16 +118,21 @@ function drawCenteredFitText(
     fontSize -= 0.5;
     doc.setFontSize(fontSize);
   }
-  doc.text(text, x, y, { align: "center" });
+  doc.text(text, x, y, { align });
 }
 
 /** Genera una tessera beneficiario formato CR80 (85.6 x 54 mm) con QR e codice a barre. */
-export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void> {
+export async function generateTesseraPdf(
+  opts: TesseraPdfOptions,
+): Promise<void> {
   const { beneficiario: b, labels, associationLogoDataUrl, branding } = opts;
-  const locale = opts.locale ?? it;
   const W = 85.6;
   const H = 54;
-  const doc = new jsPDF({ unit: "mm", format: [W, H], orientation: "landscape" });
+  const doc = new jsPDF({
+    unit: "mm",
+    format: [W, H],
+    orientation: "landscape",
+  });
 
   // Card background + border
   doc.setFillColor(255, 255, 255);
@@ -155,7 +164,16 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
   doc.setTextColor(20, 20, 20);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(`${b.cognome} ${b.nome}`.toUpperCase(), leftX, y);
+  drawCenteredFitText(
+    doc,
+    `${b.cognome} ${b.nome}`.toUpperCase(),
+    leftX,
+    y,
+    50,
+    12,
+    5,
+    "left",
+  );
 
   y += 6;
   doc.setFont("helvetica", "normal");
@@ -167,10 +185,11 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
   }
   doc.setFont("helvetica", "bold");
   doc.setTextColor(20, 20, 20);
-  doc.text(`${labels.codeLabel}: ${b.codice}`, leftX, y);
+  const codeText = `${labels.codeLabel}: ${b.codice}`;
+  drawCenteredFitText(doc, codeText, leftX, y, W - leftX - 4, 8, 5, "left");
 
   // QR code (top-right)
-  const qr = await qrDataUrl(b.codice);
+  const qr = await qrDataUrl(b.codiceTessera ?? b.codice);
   if (qr) {
     doc.addImage(qr, "PNG", W - 22, 5, 17, 17);
     doc.setFont("helvetica", "normal");
@@ -180,22 +199,29 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
   }
 
   // Barcode (bottom, full width)
-  const bc = barcodeDataUrl(b.codice);
+  const bc = barcodeDataUrl(b.codiceTessera ?? b.codice);
   if (bc) {
     doc.addImage(bc, "PNG", leftX, 38, 48, 12);
   }
 
-  // Issue date (right side, moved up to leave room for the logo below)
+  // Riga dedicata sotto ai dati, prima di barcode e logo.
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(110, 110, 110);
-  const issued = `${labels.issuedLabel}: ${format(new Date(), "dd/MM/yyyy", { locale })}`;
-  doc.text(issued, W - 4, 29, { align: "right" });
+  const issued = `${labels.issuedLabel}: ${formatDateEuropeRome(opts.dataEmissione ?? new Date())}`;
+  doc.text(issued, W - 4, 36, { align: "right" });
 
   // Association logo (bottom-right, below the issue date)
   if (associationLogoDataUrl) {
-    await drawImageRightBottom(doc, associationLogoDataUrl, W - 4, H - 4, 22, 18);
+    await drawImageRightBottom(
+      doc,
+      associationLogoDataUrl,
+      W - 4,
+      H - 4,
+      22,
+      10,
+    );
   }
 
-  doc.save(`tessera-${b.codice}.pdf`);
+  doc.save(`tessera-${b.codice.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`);
 }

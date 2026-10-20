@@ -83,6 +83,8 @@ import {
   useGetMapsCapabilities,
 } from "@workspace/api-client-react";
 import { canManageGlobalAdminResources } from "@/lib/admin-scope";
+import { currentNavigationItem } from "@/lib/navigation-current";
+import { useNavigationGroups } from "@/hooks/use-navigation-groups";
 
 export type NavItem = {
   key: string;
@@ -671,12 +673,13 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
     <SidebarMenuButton asChild isActive={isActive}>
       <Link
         href={item.url}
+        aria-current={isActive ? "page" : undefined}
         onClick={() => {
           if (isMobile) setOpenMobile(false);
         }}
-        className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
+        className="app-nav-link flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
       >
-        <item.icon className="h-4 w-4" />
+        <item.icon className="h-4 w-4" aria-hidden="true" />
         <span>
           {item.key === "richiesteMagazzino"
             ? t("richiesteMagazzino.title")
@@ -735,18 +738,41 @@ export function isNavItemEnabledByAccess(
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  // AuthGate unmounts on logout, including re-entry with the same account.
+  // Key the owner of group state for an identity switch without a logout.
+  return user ? <SessionLayout key={user.id}>{children}</SessionLayout> : null;
+}
+
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  generale: LayoutDashboard,
+  amministrazione: UserCog,
+  magazzino: Warehouse,
+  sociale: HeartHandshake,
+  emporio: Store,
+  mensa: Soup,
+  uds: Footprints,
+  logistica: Truck,
+  analisi: BarChart3,
+  supporto: HandHeart,
+  superAdmin: ShieldCheck,
+};
+
+function SessionLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canAskMaps = canAccessMapsApplication(user, hasArea, hasPermission);
-  const { data: mapsCapabilities } = useGetMapsCapabilities({
+  const mapsQuery = useGetMapsCapabilities({
     query: {
-      queryKey: getGetMapsCapabilitiesQueryKey(),
+      queryKey: [...getGetMapsCapabilitiesQueryKey(), "actor", user],
       enabled: canAskMaps,
+      retry: false,
       staleTime: 5 * 60 * 1000,
     },
   });
+  const mapsCapabilities = mapsQuery.isError ? undefined : mapsQuery.data;
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
@@ -771,6 +797,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         isModuloAttivo("CENTRO_ASCOLTO"))
     );
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
+  const currentItem = currentNavigationItem(location, visibleItems);
+  const { openGroups, changeGroup } = useNavigationGroups(
+    location,
+    currentItem?.groupKey,
+    canAskMaps && mapsQuery.isPending,
+  );
 
   const groupedNav = visibleItems.reduce(
     (acc, item) => {
@@ -786,7 +818,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <Sidebar
           side={
-            location.startsWith("/report") && i18n.dir() === "rtl"
+            (location.startsWith("/report") ||
+              location.startsWith("/carico-merce")) &&
+            i18n.dir() === "rtl"
               ? "right"
               : "left"
           }
@@ -803,44 +837,57 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               className="h-8 w-auto object-contain"
             />
           </div>
-          <SidebarContent>
-            {Object.entries(groupedNav).map(([group, items]) => (
-              <Collapsible
-                key={`${user?.id}:${group}`}
-                defaultOpen={false}
-                className="group/collapsible"
-              >
-                <SidebarGroup>
-                  <SidebarGroupLabel asChild>
-                    <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between px-4 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground">
-                      {group === "mensa"
-                        ? t("mensa.nav.group")
-                        : t(`nav.groups.${group}`)}
-                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90" />
-                    </CollapsibleTrigger>
-                  </SidebarGroupLabel>
-                  <CollapsibleContent>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {items.map((item) => (
-                          <SidebarMenuItem key={item.url}>
-                            <NavMenuLink
-                              item={item}
-                              isActive={
-                                location === item.url ||
-                                (item.url !== "/" &&
-                                  item.url !== "/report" &&
-                                  location.startsWith(item.url))
-                              }
-                            />
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </CollapsibleContent>
-                </SidebarGroup>
-              </Collapsible>
-            ))}
+          <SidebarContent role="navigation">
+            {Object.entries(groupedNav).map(([group, items]) => {
+              const GroupIcon = GROUP_ICONS[group];
+              return (
+                <Collapsible
+                  key={group}
+                  open={openGroups.has(group)}
+                  onOpenChange={(open) => changeGroup(group, open)}
+                  className="group/collapsible"
+                >
+                  <SidebarGroup>
+                    <SidebarGroupLabel asChild>
+                      <CollapsibleTrigger
+                        type="button"
+                        data-current={currentItem?.groupKey === group}
+                        className="app-nav-group flex min-h-11 w-full items-center justify-between px-4 py-2 text-xs uppercase tracking-wider transition-colors"
+                      >
+                        <GroupIcon
+                          className="h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                          data-nav-group-icon={group}
+                        />
+                        <span>
+                          {group === "mensa"
+                            ? t("mensa.nav.group")
+                            : t(`nav.groups.${group}`)}
+                        </span>
+                        <ChevronDown
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90"
+                        />
+                      </CollapsibleTrigger>
+                    </SidebarGroupLabel>
+                    <CollapsibleContent>
+                      <SidebarGroupContent>
+                        <SidebarMenu>
+                          {items.map((item) => (
+                            <SidebarMenuItem key={item.url}>
+                              <NavMenuLink
+                                item={item}
+                                isActive={currentItem?.key === item.key}
+                              />
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </SidebarGroupContent>
+                    </CollapsibleContent>
+                  </SidebarGroup>
+                </Collapsible>
+              );
+            })}
           </SidebarContent>
           <SidebarFooter className="border-t border-border">
             <div className="px-2 pt-2">

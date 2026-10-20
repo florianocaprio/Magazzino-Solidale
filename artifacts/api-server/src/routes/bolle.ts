@@ -1,9 +1,13 @@
+import { bollaBeneficiariLookup } from "../lib/bollaBeneficiariLookup";
+import { enteMatchesArea } from "../lib/entiScope";
+import { volunteerMatchesCentre, volunteerAreaFilter, volunteerContextFilter } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   bolleTable,
   bollaRigheTable,
   beneficiariTable,
+  fseFascicoliSocialiTable,
   magazziniTable,
   lottiTable,
   prodottiTable,
@@ -11,6 +15,7 @@ import {
   consegneTable,
   utentiTable,
   centriAscoltoTable,
+  areeOperativeTable,
   prenotazioniMagazzinoTable,
   speseEmporioRigheTable,
   speseEmporioTable,
@@ -221,6 +226,7 @@ async function canUseVolontarioConsegna(
   const centroBeneficiario = await beneficiarioCentroId(beneficiarioId);
   const [volontario] = await db
     .select({
+      areaOperativaId: volontariTable.areaOperativaId,
       centroAscoltoId: volontariTable.centroAscoltoId,
       attivo: volontariTable.attivo,
       statoApprovazione: volontariTable.statoApprovazione,
@@ -230,7 +236,11 @@ async function canUseVolontarioConsegna(
   if (!volontario) return false;
   if (!volontario.attivo || volontario.statoApprovazione !== "approvato")
     return false;
-  return canAccessCentro(volontario.centroAscoltoId, centroBeneficiario);
+  const area = await beneficiarioAreaOperativaId(beneficiarioId);
+  if (area != null && volontario.areaOperativaId !== area) return false;
+  return centroBeneficiario != null
+    ? await volunteerMatchesCentre(db, volontario, centroBeneficiario)
+    : area != null && volontario.centroAscoltoId == null;
 }
 
 async function bollaVolunteerReference(
@@ -282,6 +292,7 @@ export async function buildDettaglio(id: number) {
       benefDomicilio: beneficiariTable.domicilio,
       benefComune: beneficiariTable.comune,
       benefTelefono: beneficiariTable.telefono,
+      beneficiarioFascicolo: fseFascicoliSocialiTable.codiceFascicolo,
       enteDenominazione: entiDestinatariTable.denominazione,
       enteIndirizzo: entiDestinatariTable.indirizzo,
       enteTelefono: entiDestinatariTable.telefono,
@@ -299,6 +310,7 @@ export async function buildDettaglio(id: number) {
       beneficiariTable,
       eq(bolleTable.beneficiarioId, beneficiariTable.id),
     )
+    .leftJoin(fseFascicoliSocialiTable, eq(bolleTable.beneficiarioId, fseFascicoliSocialiTable.beneficiarioId))
     .leftJoin(
       entiDestinatariTable,
       eq(bolleTable.enteDestinatarioId, entiDestinatariTable.id),
@@ -472,6 +484,7 @@ export async function buildDettaglio(id: number) {
     tipoDestinatario: row.b.tipoDestinatario,
     areaOperativaIdSnapshot: row.b.areaOperativaIdSnapshot,
     beneficiarioId: row.b.beneficiarioId,
+    beneficiarioFascicolo: row.b.tipoDestinatario === "ente" ? null : row.beneficiarioFascicolo,
     beneficiarioNome:
       row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
     enteDestinatarioId: row.b.enteDestinatarioId ?? null,
@@ -1010,6 +1023,11 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
   );
 });
 
+// Proiezione circoscritta ai destinatari del comando, senza beneficiari.view.
+router.get("/bolle/beneficiari-candidati", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "search"));
+router.post("/bolle/beneficiari-candidati/tessera", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "card"));
+router.get("/bolle/beneficiari-candidati/:id", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "locked"));
+
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 
 router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
@@ -1031,6 +1049,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     "idempotencyKey",
     "tipoDestinatario",
     "beneficiarioId",
+    "contestoBeneficiarioAtteso",
     "enteDestinatarioId",
     "consegnaId",
     "magazzinoId",
@@ -1089,8 +1108,13 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
       .json({ error: "Destinatario tipizzato e Magazzino non validi" });
     return;
   }
+  const expectedContext = body.contestoBeneficiarioAtteso;
+  if (expectedContext !== undefined && (!isBeneficiario || !expectedContext || typeof expectedContext !== "object" || Array.isArray(expectedContext) || Object.keys(expectedContext).some((key) => !["areaOperativaId", "centroAscoltoId"].includes(key)) || !Number.isSafeInteger(expectedContext.areaOperativaId) || expectedContext.areaOperativaId <= 0 || !Number.isSafeInteger(expectedContext.centroAscoltoId) || expectedContext.centroAscoltoId <= 0)) {
+    res.status(400).json({ error: "Contesto del beneficiario non valido" }); return;
+  }
   const requestHash = commandRequestHash({
     tipoDestinatario,
+    ...(expectedContext !== undefined ? { contestoBeneficiarioAtteso: expectedContext } : {}),
     beneficiarioId: isBeneficiario ? body.beneficiarioId : null,
     enteDestinatarioId: isEnte ? body.enteDestinatarioId : null,
     consegnaId: body.consegnaId ?? null,
@@ -1146,7 +1170,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     res.status(400).json({ error: "Ente destinatario non trovato" });
     return;
   }
-  if (ente && ente.areaOperativaId !== magazzino.areaOperativaId) {
+  if (ente && !enteMatchesArea(ente, magazzino.areaOperativaId)) {
     res.status(400).json({
       error: "Ente e Magazzino devono appartenere alla stessa Area Operativa",
     });
@@ -1407,6 +1431,15 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
           );
         }
       }
+      if (expectedContext && lockedBeneficiario && (lockedBeneficiario.areaOperativaId !== expectedContext.areaOperativaId || lockedBeneficiario.centroAscoltoId !== expectedContext.centroAscoltoId)) {
+        throw new BollaActionError(409, "Il beneficiario ha cambiato Area o Centro: ripeti la ricerca");
+      }
+      if (expectedContext) {
+        const [context] = await tx.select({ centroAttivo: centriAscoltoTable.attivo, areaAttiva: areeOperativeTable.attivo })
+          .from(centriAscoltoTable).innerJoin(areeOperativeTable, eq(centriAscoltoTable.areaOperativaId, areeOperativeTable.id))
+          .where(and(eq(centriAscoltoTable.id, expectedContext.centroAscoltoId), eq(areeOperativeTable.id, expectedContext.areaOperativaId))).for("share", { of: [centriAscoltoTable, areeOperativeTable] });
+        if (!context?.centroAttivo || !context.areaAttiva) throw new BollaActionError(409, "Area o Centro non più attivi: ripeti la ricerca");
+      }
       const [lockedMagazzino] = await tx
         .select()
         .from(magazziniTable)
@@ -1427,7 +1460,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
         if (
           !lockedEnte ||
           !lockedEnte.attivo ||
-          lockedEnte.areaOperativaId !== lockedMagazzino.areaOperativaId
+          !enteMatchesArea(lockedEnte, lockedMagazzino.areaOperativaId)
         ) {
           throw new BollaActionError(
             409,
@@ -1438,7 +1471,8 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
       if (isBeneficiario && body.volontarioConsegnaId != null) {
         const [lockedVolontario] = await tx
           .select({
-            centroAscoltoId: volontariTable.centroAscoltoId,
+            areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
             attivo: volontariTable.attivo,
             statoApprovazione: volontariTable.statoApprovazione,
           })
@@ -1633,7 +1667,8 @@ router.get(
         id: volontariTable.id,
         nome: volontariTable.nome,
         cognome: volontariTable.cognome,
-        centroAscoltoId: volontariTable.centroAscoltoId,
+        areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
         tipoVolontario: volontariTable.tipoVolontario,
         statoApprovazione: volontariTable.statoApprovazione,
         attivo: volontariTable.attivo,
@@ -1641,12 +1676,8 @@ router.get(
       .from(volontariTable)
       .where(
         and(
-          centroId == null
-            ? undefined
-            : or(
-                eq(volontariTable.centroAscoltoId, centroId),
-                isNull(volontariTable.centroAscoltoId),
-              ),
+          volunteerAreaFilter(await beneficiarioAreaOperativaId(det.beneficiarioId) ?? (centroId == null ? -1 : (await db.select({ area: centriAscoltoTable.areaOperativaId }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId)))[0]?.area ?? -1)),
+          centroId == null ? isNull(volontariTable.centroAscoltoId) : volunteerContextFilter(centroId),
           riferimento == null
             ? eq(volontariTable.tipoVolontario, "PERMANENTE")
             : undefined,
@@ -2059,19 +2090,20 @@ router.patch(
           if (
             !lockedEnte ||
             !lockedEnte.attivo ||
-            lockedEnte.areaOperativaId !== lockedMagazzino.areaOperativaId
+            !enteMatchesArea(lockedEnte, lockedMagazzino.areaOperativaId)
           ) {
             throw new BollaActionError(
               409,
               "L'Ente destinatario non è più attivo o coerente con il Magazzino",
             );
           }
-          areaOperativaIdSnapshot = lockedEnte.areaOperativaId;
+          areaOperativaIdSnapshot = lockedMagazzino.areaOperativaId;
         } else {
           if (nextVolontarioId != null) {
             const [lockedVolontario] = await tx
               .select({
-                centroAscoltoId: volontariTable.centroAscoltoId,
+                areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
                 attivo: volontariTable.attivo,
                 statoApprovazione: volontariTable.statoApprovazione,
               })
@@ -2811,7 +2843,7 @@ router.post(
           current.tipoDestinatario === "ente" &&
           (!enteDaCongelare ||
             !enteDaCongelare.attivo ||
-            enteDaCongelare.areaOperativaId !== current.areaOperativaIdSnapshot)
+            !enteMatchesArea(enteDaCongelare, current.areaOperativaIdSnapshot))
         ) {
           throw new BollaActionError(
             409,

@@ -1,3 +1,4 @@
+import { volunteerMatchesCentre } from "./volontariArea";
 import {
   db,
   mezziTable,
@@ -168,13 +169,15 @@ export function effectiveCentroFilter(centroId: number | null): SQL | undefined 
 
 export function effectiveAreaOperativaFilter(
   areaOperativaCentroIds: number[] | null,
+  areaId?: number | null,
 ): SQL | undefined {
   if (areaOperativaCentroIds == null) return undefined;
-  if (areaOperativaCentroIds.length === 0) return sql`${effectiveMezzoCentroExpr} IS NULL`;
-  return or(
-    sql`${effectiveMezzoCentroExpr} IS NULL`,
-    inArray(effectiveMezzoCentroExpr, areaOperativaCentroIds),
-  );
+  const own = or(sql`${effectiveMezzoCentroExpr} IS NULL`,
+    areaOperativaCentroIds.length ? inArray(effectiveMezzoCentroExpr, areaOperativaCentroIds) : sql`false`);
+  const ownerArea = areaId != null ? eq(volontariTable.areaOperativaId, areaId)
+    : sql`${volontariTable.areaOperativaId} in (select area_operativa_id from centri_di_ascolto where id in ${areaOperativaCentroIds.length ? sql`(${sql.join(areaOperativaCentroIds.map(id => sql`${id}`), sql`, `)})` : sql`(null)`})`;
+  return sql`case when ${mezziTable.volontarioId} is null then ${own} else ${ownerArea} end`;
+
 }
 
 export async function effectiveCentroMezzoTx(
@@ -237,7 +240,7 @@ export async function assertVolontarioAssignableTx(
     .for("update");
   if (
     !volontario ||
-    !compatibleCentro(volontario.centroAscoltoId, input.centroAscoltoId)
+    !(await volunteerMatchesCentre(tx, volontario, input.centroAscoltoId))
   ) {
     throw new LogisticaPolicyError(
       403,
@@ -311,7 +314,9 @@ export async function assertMezzoAssignableTx(
   if (
     mezzo.stato !== "disponibile" ||
     mezzo.statoApprovazione !== "approvato" ||
-    !compatibleCentro(effectiveCentroId, input.centroAscoltoId) ||
+    !(mezzo.volontarioId != null
+      ? locked.owners.has(mezzo.volontarioId) && await volunteerMatchesCentre(tx, locked.owners.get(mezzo.volontarioId)!, input.centroAscoltoId)
+      : compatibleCentro(effectiveCentroId, input.centroAscoltoId)) ||
     scaduto
   ) {
     throw new LogisticaPolicyError(

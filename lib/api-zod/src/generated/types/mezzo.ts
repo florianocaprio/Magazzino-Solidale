@@ -9,6 +9,8 @@ import type { MezzoStato } from "./mezzoStato";
 import type { MezzoStatoApprovazione } from "./mezzoStatoApprovazione";
 
 export interface Mezzo {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   codice: string;
   tipo: string;

@@ -5,7 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListFornitoriAmbito } from "./listFornitoriAmbito";
 
 export type ListFornitoriParams = {
+  /**
+   * Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).
+   */
+  ambito?: ListFornitoriAmbito;
+  /**
+   * Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.
+   * @minimum 1
+   */
   areaOperativaId?: number;
 };

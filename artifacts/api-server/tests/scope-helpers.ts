@@ -1,3 +1,4 @@
+import { sessionStub } from "./helpers/session-stub";
 import express, {
   type Express,
   type RequestHandler,
@@ -9,6 +10,7 @@ import {
   magazziniTable,
   beneficiariTable,
   prodottiTable,
+  lottiProduttoreTable,
   fornitoriTable,
   volontariTable,
   mezziTable,
@@ -179,10 +181,7 @@ export function makeScopedApp(
 export function makeSessionApp(router: Router, userId: number): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
-    (req as unknown as { session: { userId: number } }).session = { userId };
-    next();
-  });
+  app.use(sessionStub(userId));
   app.use(router);
   return app;
 }
@@ -254,7 +253,7 @@ export async function createCentro(
 ): Promise<number> {
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome })
+    .values({ nome, areaOperativaId: await createAreaOperativa(scope) })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
@@ -268,7 +267,13 @@ export async function createCentroRec(
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({
+      nome,
+      areaOperativaId:
+        opts.areaOperativaId === undefined
+          ? await createAreaOperativa(scope)
+          : opts.areaOperativaId,
+    })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return { id: c.id, nome };
@@ -443,12 +448,23 @@ export async function createVolontario(
   scope: SeedScope,
   centroId: number | null,
 ): Promise<number> {
+  // Valid synthetic Area assignment; no production legacy data is inferred here.
+  const areaOperativaId =
+    centroId == null
+      ? (scope.areaOperativaIds[0] ?? (await createAreaOperativa(scope)))
+      : ((
+          await db
+            .select({ area: centriAscoltoTable.areaOperativaId })
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.id, centroId))
+        )[0]?.area ?? null);
   const [v] = await db
     .insert(volontariTable)
     .values({
       nome: "Vol",
       cognome: rnd(),
       ruolo: "autista",
+      areaOperativaId,
       centroAscoltoId: centroId,
       attivo: true,
       statoApprovazione: "approvato",
@@ -525,6 +541,14 @@ export async function createUtente(
     opts.ruoloId === undefined
       ? await createRuolo(scope, { isAdmin: true })
       : opts.ruoloId;
+  // Valid account fixtures carry an Area; Centre is retained as legacy metadata.
+  const [center] =
+    opts.centroId == null
+      ? []
+      : await db
+          .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, opts.centroId));
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -533,6 +557,7 @@ export async function createUtente(
       nome: "Test",
       cognome: "Utente",
       centroAscoltoId: opts.centroId ?? null,
+      areaOperativaId: center?.areaOperativaId ?? null,
       ruoloId: roleId,
     })
     .returning({ id: utentiTable.id });
@@ -1003,6 +1028,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(mezziTable).where(inArray(mezziTable.id, scope.mezzoIds));
   }
   if (scope.prodottoIds.length > 0) {
+    await db
+      .delete(lottiProduttoreTable)
+      .where(inArray(lottiProduttoreTable.prodottoId, scope.prodottoIds));
     await db
       .delete(prodottiTable)
       .where(inArray(prodottiTable.id, scope.prodottoIds));

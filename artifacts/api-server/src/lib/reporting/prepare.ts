@@ -72,7 +72,7 @@ export async function prepareReport(req: Request) {
   const filters = parseReportFilters(req);
   await assertReportFilterScope(req, filters);
   if (section === "mensa" && filters.callerMensaIds?.length === 0)
-    throw new ReportingError(403, "Nessuna assegnazione Mensa attiva");
+    throw new ReportingError(403, "Nessuna Mensa disponibile nell'Area");
   const initialModules = await moduleState();
   const prepared = await db.transaction(
     async (tx) => {

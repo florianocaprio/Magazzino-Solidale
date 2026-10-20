@@ -283,6 +283,7 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
     expect(response.body[0]).not.toHaveProperty("codiceFiscale");
     expect(response.body[0]).not.toHaveProperty("noteInterne");
     expect(response.body[0]).not.toHaveProperty("creditoSolidaleSaldo");
+    expect(response.body[0]).not.toHaveProperty("politicaCreditoSolidaleId");
     expect((await request(socialAreaA()).get("/beneficiari").query({ limit: 101 })).status).toBe(400);
     expect((await request(socialAreaA()).get("/beneficiari").query({ areaOperativaId: "abc" })).status).toBe(400);
   });

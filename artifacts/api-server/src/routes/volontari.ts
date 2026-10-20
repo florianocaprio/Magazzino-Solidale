@@ -1,3 +1,5 @@
+import { canAccessVolunteer, volunteerAreaFilter, volunteerCallerArea, volunteerContextFilter, validateVolunteerArea } from "../lib/volontariArea";
+import { hasVolontarioHistory } from "../lib/volontarioRemoval";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import { db } from "@workspace/db";
@@ -149,8 +151,9 @@ async function preflightVolunteerConversion(
   volunteer: VolontarioValidationState,
 ): Promise<VolontarioFieldErrors> {
   const fieldErrors = validateVolontarioState(volunteer, {
-    requireCenter: true,
+    requireCenter: false,
   });
+  if (!Number.isSafeInteger(volunteer.areaOperativaId) || Number(volunteer.areaOperativaId) <= 0) fieldErrors.areaOperativaId = "Seleziona un’Area Operativa";
   const ruoloId = Number(volunteer.ruoloVolontarioId);
   const [ruolo] = Number.isSafeInteger(ruoloId)
     ? await executor
@@ -178,7 +181,7 @@ async function preflightVolunteerConversion(
           ),
         )
     : [];
-  if (!centro) {
+  if (volunteer.centroAscoltoId != null && !centro) {
     fieldErrors.centroAscoltoId =
       "Seleziona un centro attivo e coerente con il perimetro";
   }
@@ -204,6 +207,7 @@ const fmt = (
   cognome: r.cognome,
   matricola: r.matricola ?? null,
   tipoVolontario: r.tipoVolontario,
+  areaOperativaId: r.areaOperativaId ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: r.centroAscoltoNome ?? null,
   telefono: includeSensitive ? (r.telefono ?? null) : null,
@@ -296,10 +300,7 @@ router.get(
           .json({ error: "Centro non accessibile per il tuo perimetro" });
         return;
       }
-      requestedCentroScope = centroScopeFilter(
-        volontariTable.centroAscoltoId,
-        requestedCentroId,
-      );
+      requestedCentroScope = volunteerContextFilter(requestedCentroId);
     }
     const search =
       typeof req.query.search === "string" ? req.query.search.trim() : "";
@@ -351,21 +352,24 @@ router.get(
       sqlFilters.push(eq(volontariTable.tipoVolontario, tipo));
     if (ruoloVolontarioId != null)
       sqlFilters.push(eq(volontariTable.ruoloVolontarioId, ruoloVolontarioId));
+    if (req.query.areaOperativaId != null) {
+      const areaId = Number(req.query.areaOperativaId);
+      const callerArea = await volunteerCallerArea(req);
+      if (!Number.isSafeInteger(areaId) || areaId <= 0) { res.status(400).json({ error: "Area non valida" }); return; }
+      if (callerArea != null && areaId !== callerArea) { res.status(403).json({ error: "Area non accessibile" }); return; }
+      sqlFilters.push(eq(volontariTable.areaOperativaId, areaId));
+    }
     const rows = await selectVolontario()
       .where(
         andScoped(
-          centroScopeFilter(volontariTable.centroAscoltoId, caller),
-          idSetScopeFilter(
-            volontariTable.centroAscoltoId,
-            areaOperativaCentroIds,
-          ),
+          volunteerAreaFilter(await volunteerCallerArea(req)),
           requestedCentroScope,
           searchScope,
           ...sqlFilters,
         ),
       )
       .orderBy(desc(volontariTable.id));
-    const states = await operationalStatesForRows(db, rows, dataRiferimento);
+    const states = await operationalStatesForRows(db, rows, dataRiferimento, req.query.centroAscoltoId == null ? caller : Number(req.query.centroAscoltoId));
     let result = rows.map((row) => fmt(row, states.get(row.id), false));
     const stato =
       typeof req.query.stato === "string"
@@ -503,25 +507,8 @@ async function createVolontarioOne(
         "Il codice fiscale è già associato a un altro volontario";
     }
   }
-  const areaId = callerAreaOperativaId(req);
-  const visibleIds = await visibleCentroIds(areaId);
-  if (caller != null) values.centroAscoltoId = caller;
-  else if (areaId != null && values.centroAscoltoId == null) {
-    fieldErrors.centroAscoltoId =
-      "Seleziona un Centro della tua Area Operativa";
-  } else if (values.centroAscoltoId != null) {
-    const centroAscoltoId = Number(values.centroAscoltoId);
-    if (!Number.isSafeInteger(centroAscoltoId) || centroAscoltoId <= 0) {
-      fieldErrors.centroAscoltoId = "Centro non valido";
-    } else if (!inVisibleCentroSet(centroAscoltoId, visibleIds)) {
-      const result = validationResult(
-        { centroAscoltoId: "Centro non accessibile per la tua area operativa" },
-        "CENTRO_SCOPE_FORBIDDEN",
-        "Centro non accessibile per la tua area operativa",
-      );
-      return { ...result, status: 403 };
-    } else values.centroAscoltoId = centroAscoltoId;
-  }
+  Object.assign(fieldErrors, await validateVolunteerArea(req, values));
+  if (fieldErrors.areaOperativaId === "Area Operativa non accessibile") return { ...validationResult(fieldErrors, "AREA_SCOPE_FORBIDDEN"), status: 403 };
   const ruoloVolontarioId = Number(values.ruoloVolontarioId);
   const [ruolo] = await db
     .select({ id: ruoliVolontariTable.id, nome: ruoliVolontariTable.nome })
@@ -747,14 +734,7 @@ router.get(
       .from(volontariTable)
       .where(
         andScoped(
-          centroScopeFilter(
-            volontariTable.centroAscoltoId,
-            callerCentroId(req),
-          ),
-          idSetScopeFilter(
-            volontariTable.centroAscoltoId,
-            areaOperativaCentroIds,
-          ),
+          volunteerAreaFilter(await volunteerCallerArea(req)),
         ),
       );
     const visibileSet = new Set(visibili.map((v) => v.id));
@@ -780,11 +760,7 @@ router.get(
       return;
     }
     if (
-      !canAccessCentro(volunteer.centroAscoltoId, callerCentroId(req)) ||
-      !inVisibleCentroSet(
-        volunteer.centroAscoltoId,
-        await visibleCentroIds(callerAreaOperativaId(req)),
-      )
+      !(await canAccessVolunteer(req, volunteer))
     ) {
       res.status(403).json({ error: "Volontario non accessibile" });
       return;
@@ -823,11 +799,7 @@ router.get(
       return;
     }
     if (
-      !canAccessCentro(volunteer.centroAscoltoId, callerCentroId(req)) ||
-      !inVisibleCentroSet(
-        volunteer.centroAscoltoId,
-        await visibleCentroIds(callerAreaOperativaId(req)),
-      )
+      !(await canAccessVolunteer(req, volunteer))
     ) {
       res.status(403).json({ error: "Volontario non accessibile" });
       return;
@@ -853,7 +825,7 @@ router.get(
         matricolaAttuale: volunteer.matricola,
         dataConversione: todayRome(),
         preview: await previewPermanentVolunteerIdentifier(
-          volunteer.centroAscoltoId,
+          volunteer.centroAscoltoId, volunteer.areaOperativaId,
         ),
       });
     } catch (error) {
@@ -900,11 +872,7 @@ router.post(
           .for("update");
         if (!existing) throw new Error("VOLUNTEER_NOT_FOUND");
         if (
-          !canAccessCentro(existing.centroAscoltoId, callerCentroId(req)) ||
-          !inVisibleCentroSet(
-            existing.centroAscoltoId,
-            await visibleCentroIds(callerAreaOperativaId(req)),
-          )
+          !(await canAccessVolunteer(req, existing))
         )
           throw new Error("VOLUNTEER_FORBIDDEN");
         if (existing.versione !== versione) throw new Error("STALE_VERSION");
@@ -1046,23 +1014,13 @@ router.get(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+    if (!(await canAccessVolunteer(req, row))) {
       res
         .status(403)
         .json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
-    if (
-      !inVisibleCentroSet(
-        row.centroAscoltoId,
-        await visibleCentroIds(callerAreaOperativaId(req)),
-      )
-    ) {
-      res
-        .status(403)
-        .json({ error: "Risorsa non accessibile per la tua area operativa" });
-      return;
-    }
+
     const dataRiferimento =
       typeof req.query.dataRiferimento === "string"
         ? req.query.dataRiferimento
@@ -1091,23 +1049,13 @@ router.patch(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    if (!(await canAccessVolunteer(req, existing))) {
       res
         .status(403)
         .json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
-    if (
-      !inVisibleCentroSet(
-        existing.centroAscoltoId,
-        await visibleCentroIds(callerAreaOperativaId(req)),
-      )
-    ) {
-      res
-        .status(403)
-        .json({ error: "Risorsa non accessibile per la tua area operativa" });
-      return;
-    }
+
     const versione = parseRequiredVersion(req.body?.versione);
     if (versione == null) {
       const result = validationResult({
@@ -1160,36 +1108,13 @@ router.patch(
       ).map((field) => [field, req.body[field]]),
     );
     const updates = normalizeVolontarioPatch(requestedPatch);
-    const areaId = callerAreaOperativaId(req);
-    if (caller != null) delete updates.centroAscoltoId;
     const nextState = mergeVolontarioNextState(existing, updates);
     const fieldErrors = validateVolontarioState(nextState);
-    if (areaId != null && nextState.centroAscoltoId == null) {
-      fieldErrors.centroAscoltoId =
-        "Seleziona un Centro della tua Area Operativa";
-    } else if (nextState.centroAscoltoId != null) {
-      const centroAscoltoId =
-        nextState.centroAscoltoId == null
-          ? null
-          : Number(nextState.centroAscoltoId);
-      if (
-        centroAscoltoId != null &&
-        (!Number.isSafeInteger(centroAscoltoId) || centroAscoltoId <= 0)
-      ) {
-        fieldErrors.centroAscoltoId = "Centro non valido";
-      } else if (
-        !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(areaId))
-      ) {
-        const result = validationResult(
-          {
-            centroAscoltoId: "Centro non accessibile per la tua area operativa",
-          },
-          "CENTRO_SCOPE_FORBIDDEN",
-          "Centro non accessibile per la tua area operativa",
-        );
-        res.status(403).json(validationResponse(req, result));
-        return;
-      }
+    Object.assign(fieldErrors, await validateVolunteerArea(req, nextState));
+    if (fieldErrors.areaOperativaId === "Area Operativa non accessibile") { res.status(403).json(validationResponse(req, { ...validationResult(fieldErrors, "AREA_SCOPE_FORBIDDEN"), status: 403 })); return; }
+    if (!fieldErrors.areaOperativaId && !fieldErrors.centroAscoltoId) {
+      updates.areaOperativaId = nextState.areaOperativaId;
+      updates.centroAscoltoId = nextState.centroAscoltoId;
     }
     const nextCf = normalizeCodiceFiscale(nextState.codiceFiscale);
     let codiceFiscaleDuplicato = false;
@@ -1293,6 +1218,7 @@ router.patch(
           "codiceFiscale",
           "codiceFiscaleNonDisponibile",
           "codiceFiscaleNota",
+          "areaOperativaId",
           "centroAscoltoId",
           "ruoloVolontarioId",
         ].filter((field) => field in updates);
@@ -1389,6 +1315,11 @@ router.delete(
     const caller = callerCentroId(req);
     const id = parseInt(String(req.params.id));
     const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+    const removeIfUnused = req.body?.removeIfUnused === true;
+    if (req.body?.removeIfUnused !== undefined && typeof req.body.removeIfUnused !== "boolean") {
+      res.status(400).json({ error: "removeIfUnused non valido" });
+      return;
+    }
     const result = await db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
@@ -1397,12 +1328,17 @@ router.delete(
         .for("update");
       if (!existing) return { status: 204 as const };
       if (
-        !canAccessCentro(existing.centroAscoltoId, caller) ||
-        !inVisibleCentroSet(existing.centroAscoltoId, visibleIds)
+        !(await canAccessVolunteer(req, existing))
       )
         return { status: 403 as const };
       const versione = parseRequiredVersion(req.body?.versione);
       if (versione == null) return { status: 400 as const };
+      if (versione !== existing.versione) return { status: 409 as const };
+      if (removeIfUnused && !(await hasVolontarioHistory(tx, id))) {
+        await auditLogistica(tx, req, { entita: "volontario", id, azione: "eliminazione", precedente: { versione, centroAscoltoId: existing.centroAscoltoId }, nuovo: null });
+        await tx.delete(volontariTable).where(eq(volontariTable.id, id));
+        return { status: 204 as const };
+      }
       const [row] = await tx
         .update(volontariTable)
         .set({
@@ -1423,15 +1359,15 @@ router.delete(
         id: row.id,
         azione: "disattivazione",
         precedente: { versione: existing.versione, attivo: existing.attivo },
-        nuovo: { versione: row.versione, attivo: false },
+        nuovo: { versione: row.versione, attivo: false, preservedForHistory: removeIfUnused },
       });
       const date = todayRome();
       await tx.insert(statiVolontariTable).values({
         volontarioId: id,
         tipoEvento: "SOSPENSIONE",
         dataEffettiva: date,
-        motivo: "sospensione organizzativa",
-        note: "Compatibilità disattivazione",
+        motivo: removeIfUnused ? "dimissioni_cessazione" : "sospensione organizzativa",
+        note: removeIfUnused ? "Rimozione operativa; storico conservato" : "Compatibilità disattivazione",
         creatoDa: actorId(req),
       });
       await appendVolontarioLedgerEvent(tx, {
@@ -1442,8 +1378,8 @@ router.delete(
         dataEffettiva: date,
         snapshot: await buildVolunteerEventSnapshot(tx, existing, {
           statoPrecedente: existing.attivo ? "ATTIVO" : "NON_ATTIVO",
-          nuovoStato: "SOSPESO",
-          motivo: "sospensione_organizzativa",
+          nuovoStato: removeIfUnused ? "CESSATO" : "SOSPESO",
+          motivo: removeIfUnused ? "dimissioni_cessazione" : "sospensione_organizzativa",
           dataEffettiva: date,
           versione: row.versione,
           datiEvento: { origine: "disattivazione_compatibilita" },

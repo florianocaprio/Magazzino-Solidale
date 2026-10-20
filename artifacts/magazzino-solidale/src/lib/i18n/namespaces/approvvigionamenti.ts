@@ -1,5 +1,7 @@
 export const approvvigionamenti = {
   it: {
+    requestedProduct: "Prodotto richiesto",
+    requestedQuantity: "Quantità richiesta",
     receiptTitle: "Ricevi approvvigionamento",
     receiptDescription:
       "Indica le partite reali. La somma per riga deve coincidere con il residuo; nessun carico parziale.",
@@ -56,6 +58,8 @@ export const approvvigionamenti = {
     toastCompleted: "Ordine completato",
   },
   es: {
+    requestedProduct: "Producto solicitado",
+    requestedQuantity: "Cantidad solicitada",
     receiptTitle: "Recibir pedido",
     receiptDescription:
       "Indique los lotes reales. La suma por línea debe coincidir con el saldo; sin recepción parcial.",
@@ -112,6 +116,8 @@ export const approvvigionamenti = {
     toastCompleted: "Pedido completado",
   },
   en: {
+    requestedProduct: "Requested product",
+    requestedQuantity: "Requested quantity",
     receiptTitle: "Receive supply order",
     receiptDescription:
       "Enter the actual batches. Each line total must equal its remaining quantity; no partial receipt.",
@@ -166,6 +172,8 @@ export const approvvigionamenti = {
     toastCompleted: "Order completed",
   },
   fr: {
+    requestedProduct: "Produit demandé",
+    requestedQuantity: "Quantité demandée",
     receiptTitle: "Réceptionner la commande",
     receiptDescription:
       "Indiquez les lots réels. Le total par ligne doit égaler le reste ; aucune réception partielle.",
@@ -222,6 +230,8 @@ export const approvvigionamenti = {
     toastCompleted: "Commande terminée",
   },
   de: {
+    requestedProduct: "Angefordertes Produkt",
+    requestedQuantity: "Angeforderte Menge",
     receiptTitle: "Lieferung empfangen",
     receiptDescription:
       "Tatsächliche Chargen angeben. Jede Zeilensumme muss der Restmenge entsprechen; kein Teilempfang.",
@@ -279,6 +289,8 @@ export const approvvigionamenti = {
     toastCompleted: "Bestellung abgeschlossen",
   },
   ar: {
+    requestedProduct: "المنتج المطلوب",
+    requestedQuantity: "الكمية المطلوبة",
     receiptTitle: "استلام التوريد",
     receiptDescription:
       "أدخل الدفعات الفعلية. يجب أن يساوي مجموع كل بند الكمية المتبقية؛ لا استلام جزئي.",

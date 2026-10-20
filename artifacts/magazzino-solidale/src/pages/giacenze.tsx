@@ -1,3 +1,4 @@
+import { formatMagazzinoQuantity } from "@/lib/magazzino-quantity";
 import { useEffect, useState } from "react";
 import {
   useListAreeOperative,
@@ -41,7 +42,7 @@ function filenamePart(value: string): string {
 }
 
 export default function Giacenze() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [areaId, setAreaId] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("all");
   const [sottoscortaOnly, setSottoscortaOnly] = useState(false);
@@ -346,7 +347,12 @@ export default function Giacenze() {
                       </TableCell>
                     )}
                     <TableCell className="text-right">
-                      <span className="font-bold">{row.giacenzaFisica}</span>{" "}
+                      <span className="font-bold">
+                        {formatMagazzinoQuantity(
+                          row.giacenzaFisica,
+                          i18n.resolvedLanguage ?? i18n.language,
+                        )}
+                      </span>{" "}
                       {!isAreaMode && (
                         <span className="text-xs text-muted-foreground">
                           {row.unitaMisura}
@@ -354,7 +360,12 @@ export default function Giacenze() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-medium">{row.impegnato}</span>{" "}
+                      <span className="font-medium">
+                        {formatMagazzinoQuantity(
+                          row.impegnato,
+                          i18n.resolvedLanguage ?? i18n.language,
+                        )}
+                      </span>{" "}
                       {!isAreaMode && (
                         <span className="text-xs text-muted-foreground">
                           {row.unitaMisura}
@@ -363,7 +374,10 @@ export default function Giacenze() {
                     </TableCell>
                     <TableCell className="text-right">
                       <span className="font-bold">
-                        {Math.max(0, row.disponibileReale)}
+                        {formatMagazzinoQuantity(
+                          Math.max(0, row.disponibileReale),
+                          i18n.resolvedLanguage ?? i18n.language,
+                        )}
                       </span>{" "}
                       {!isAreaMode && (
                         <span className="text-xs text-muted-foreground">
@@ -378,7 +392,11 @@ export default function Giacenze() {
                     )}
                     {!isAreaMode && (
                       <TableCell className="text-right text-muted-foreground">
-                        {row.scortaMinima}
+                        {formatMagazzinoQuantity(
+                          row.scortaMinima,
+                          i18n.resolvedLanguage ?? i18n.language,
+                          "",
+                        )}
                       </TableCell>
                     )}
                     <TableCell className="text-center text-sm">

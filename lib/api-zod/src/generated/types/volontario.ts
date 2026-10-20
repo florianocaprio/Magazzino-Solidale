@@ -10,6 +10,8 @@ import type { VolontarioStatoAssicurazione } from "./volontarioStatoAssicurazion
 import type { VolontarioTipoVolontario } from "./volontarioTipoVolontario";
 
 export interface Volontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;

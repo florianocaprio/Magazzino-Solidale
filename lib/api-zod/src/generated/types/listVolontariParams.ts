@@ -10,6 +10,10 @@ import type { ListVolontariStatoAssicurazione } from "./listVolontariStatoAssicu
 import type { ListVolontariTipoVolontario } from "./listVolontariTipoVolontario";
 
 export type ListVolontariParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
   search?: string;
   stato?: ListVolontariStato;

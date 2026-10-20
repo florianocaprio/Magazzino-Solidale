@@ -1,3 +1,4 @@
+import { canAccessVolunteer, volunteerAreaFilter, volunteerCallerArea, volunteerContextFilter } from "../lib/volontariArea";
 import { createHash } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import {
@@ -123,6 +124,12 @@ async function scopedRows(
     return { ok: false, status: 403, error: "Centro non accessibile" };
   }
   const conditions: SQL[] = [];
+  const requestedArea = filters.areaOperativaId == null ? null : Number(filters.areaOperativaId);
+  if (requestedArea != null) {
+    if (!Number.isSafeInteger(requestedArea) || requestedArea <= 0 || callerAreaId != null && callerAreaId !== requestedArea)
+      return { ok: false, status: 403, error: "Area non accessibile" };
+    conditions.push(eq(volontariTable.areaOperativaId, requestedArea));
+  }
   const tipo =
     typeof filters.tipo === "string" ? filters.tipo.toUpperCase() : "TUTTI";
   if (!["TUTTI", "PERMANENTE", "TEMPORANEO"].includes(tipo))
@@ -201,17 +208,11 @@ async function scopedRows(
     .where(
       andScoped(
         historicalResolution
-          ? historicalScope
-          : centroScopeFilter(
-              volontariTable.centroAscoltoId,
-              callerCentroId(req),
-            ),
-        historicalResolution
-          ? undefined
-          : idSetScopeFilter(volontariTable.centroAscoltoId, visibleIds),
+          ? callerAreaId != null && requestedCenter == null ? or(volunteerAreaFilter(callerAreaId), historicalScope) : historicalScope
+          : volunteerAreaFilter(await volunteerCallerArea(req)),
         historicalResolution || requestedCenter == null
           ? undefined
-          : eq(volontariTable.centroAscoltoId, requestedCenter),
+          : volunteerContextFilter(requestedCenter),
         ...conditions,
       ),
     )
@@ -371,6 +372,7 @@ async function officialRegisterRows(
   reference: string,
   filters: Record<string, unknown>,
   allowedCenterIds: number[] | null,
+  allowedAreaId: number | null,
 ) {
   const servizioDa =
     typeof filters.servizioDa === "string" ? filters.servizioDa : null;
@@ -380,6 +382,7 @@ async function officialRegisterRows(
     servizioDa,
     servizioA,
     allowedCenterIds,
+    includeUnassignedServiceCentre: allowedAreaId != null,
   });
   const stateById = await operationalStatesForRows(db, rows, reference);
   const tipo =
@@ -402,6 +405,7 @@ async function officialRegisterRows(
     const identity = item.identity;
     if (
       allowedCenterIds != null &&
+      !(identity.centroAscoltoId == null && allowedAreaId != null && rows.find((row) => row.id === item.volontarioId)?.areaOperativaId === allowedAreaId) &&
       (typeof identity.centroAscoltoId !== "number" ||
         !allowedCenterIds.includes(identity.centroAscoltoId))
     )
@@ -489,6 +493,7 @@ function sanitizedLedgerSnapshot(snapshot: Record<string, unknown>) {
   const allowed = [
     "volontarioId",
     "tipoVolontario",
+    "areaOperativaId",
     "centroAscoltoId",
     "centroAscoltoNome",
     "ruoloVolontarioId",
@@ -620,6 +625,7 @@ router.post(
         scoped.reference,
         appliedFilters,
         allowedCenterIds,
+        areaId,
       );
     } catch (error) {
       if (error instanceof Error && error.message === "REGISTRO_VOLONTARI_INCOMPLETO") {
@@ -834,9 +840,10 @@ router.get(
       .where(
         eventCenterIds == null
           ? undefined
-          : eventCenterIds.length
-            ? inArray(registroVolontariEventiTable.centroAscoltoId, eventCenterIds)
-            : sql`false`,
+          : or(
+              areaId == null ? undefined : inArray(registroVolontariEventiTable.volontarioId, db.select({ id: volontariTable.id }).from(volontariTable).where(eq(volontariTable.areaOperativaId, areaId))),
+              eventCenterIds.length ? inArray(registroVolontariEventiTable.centroAscoltoId, eventCenterIds) : sql`false`,
+            ),
       )
       .orderBy(desc(registroVolontariEventiTable.progressivo))
       .limit(500);
@@ -866,7 +873,9 @@ router.post(
       res.status(404).json({ error: "Evento non trovato" });
       return;
     }
+    const [eventVolunteer] = await db.select().from(volontariTable).where(eq(volontariTable.id, event.volontarioId));
     if (
+      !eventVolunteer || !(await canAccessVolunteer(req, eventVolunteer)) ||
       !canAccessCentro(event.centroAscoltoId, callerCentroId(req)) ||
       !inVisibleCentroSet(
         event.centroAscoltoId,

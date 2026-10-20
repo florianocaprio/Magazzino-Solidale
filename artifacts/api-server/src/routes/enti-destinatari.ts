@@ -1,12 +1,9 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { db, entiDestinatariTable } from "@workspace/db";
 import { requirePermission } from "../middlewares/auth";
 import { isModuloAttivo } from "../lib/featureFlags";
-import {
-  callerAreaOperativaId,
-  canAccessAreaOperativa,
-} from "../lib/centroScope";
+import { callerAreaOperativaId } from "../lib/centroScope";
 import {
   auditContextFromRequest,
   auditFields,
@@ -22,6 +19,8 @@ import {
   requireIdempotencyKey,
   storeDocumentCommand,
 } from "../lib/documentCommand";
+
+import { canManageEnte } from "../lib/entiScope";
 
 const router: IRouter = Router();
 router.use("/enti-destinatari", async (req, res, next) => {
@@ -68,7 +67,30 @@ router.get(
   requirePermission("enti-destinatari.view"),
   async (req, res) => {
     const activeOnly = req.query.attivo !== "false";
-    const area = callerAreaOperativaId(req);
+    const callerArea = callerAreaOperativaId(req);
+    const requestedArea =
+      req.query.areaOperativaId == null
+        ? null
+        : Number(req.query.areaOperativaId);
+    const ambito = req.query.ambito ?? "tutti";
+    if (
+      (requestedArea != null &&
+        (!Number.isSafeInteger(requestedArea) || requestedArea <= 0)) ||
+      typeof ambito !== "string" ||
+      !["tutti", "globali"].includes(ambito)
+    ) {
+      res.status(400).json({ error: "Filtro Area o ambito non valido" });
+      return;
+    }
+    if (
+      callerArea != null &&
+      requestedArea != null &&
+      requestedArea !== callerArea
+    ) {
+      res.status(403).json({ error: "Area Operativa non accessibile" });
+      return;
+    }
+    const area = requestedArea ?? callerArea;
     const search =
       typeof req.query.search === "string" ? req.query.search.trim() : "";
     const limit = req.query.limit == null ? 50 : Number(req.query.limit);
@@ -86,8 +108,15 @@ router.get(
       return;
     }
     const conditions = [];
-    if (area != null)
-      conditions.push(eq(entiDestinatariTable.areaOperativaId, area));
+    if (ambito === "globali")
+      conditions.push(isNull(entiDestinatariTable.areaOperativaId));
+    else if (area != null)
+      conditions.push(
+        or(
+          eq(entiDestinatariTable.areaOperativaId, area),
+          isNull(entiDestinatariTable.areaOperativaId),
+        ),
+      );
     if (activeOnly) conditions.push(eq(entiDestinatariTable.attivo, true));
     if (search) {
       const escaped = search.replace(/[\\%_]/g, "\\$&");
@@ -123,7 +152,10 @@ router.post(
     const indirizzo = cleanText(req.body?.indirizzo, 250);
     const telefono = cleanText(req.body?.telefono, 50);
     const email = cleanText(req.body?.email, 200);
-    const areaOperativaId = Number(req.body?.areaOperativaId);
+    const areaOperativaId =
+      req.body?.areaOperativaId === null
+        ? null
+        : Number(req.body?.areaOperativaId);
     let idempotencyKey: string;
     try {
       idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
@@ -137,15 +169,15 @@ router.post(
     if (
       !denominazione ||
       !indirizzo ||
-      !Number.isSafeInteger(areaOperativaId) ||
-      areaOperativaId <= 0
+      (areaOperativaId !== null &&
+        (!Number.isSafeInteger(areaOperativaId) || areaOperativaId <= 0))
     ) {
       res.status(400).json({
         error: "Denominazione, indirizzo e Area Operativa sono obbligatori",
       });
       return;
     }
-    if (!canAccessAreaOperativa(areaOperativaId, callerAreaOperativaId(req))) {
+    if (!canManageEnte(req, areaOperativaId)) {
       res.status(403).json({ error: "Area Operativa non accessibile" });
       return;
     }
@@ -173,12 +205,7 @@ router.post(
             .from(entiDestinatariTable)
             .where(eq(entiDestinatariTable.id, replay.aggregatoId));
           if (!entity) throw new Error("COMMAND_RECEIPT_ENTITY_NOT_FOUND");
-          if (
-            !canAccessAreaOperativa(
-              entity.areaOperativaId,
-              callerAreaOperativaId(req),
-            )
-          ) {
+          if (!canManageEnte(req, entity.areaOperativaId)) {
             throw new Error("COMMAND_REPLAY_SCOPE_DENIED");
           }
           return { entity, replay: true };
@@ -268,13 +295,18 @@ router.patch(
       res.status(404).json({ error: "Ente destinatario non trovato" });
       return;
     }
-    if (
-      !canAccessAreaOperativa(
-        current.areaOperativaId,
-        callerAreaOperativaId(req),
-      )
-    ) {
+    if (!canManageEnte(req, current.areaOperativaId)) {
       res.status(403).json({ error: "Ente destinatario non accessibile" });
+      return;
+    }
+    // The baseline does not allow moving recipients, including conversion to/from global.
+    if (
+      "areaOperativaId" in (req.body ?? {}) &&
+      req.body.areaOperativaId !== current.areaOperativaId
+    ) {
+      res
+        .status(400)
+        .json({ error: "L’Area e l’ambito dell’Ente non sono modificabili" });
       return;
     }
     const updates: Partial<typeof entiDestinatariTable.$inferInsert> = {};
@@ -322,12 +354,7 @@ router.patch(
             .from(entiDestinatariTable)
             .where(eq(entiDestinatariTable.id, id));
           if (!entity) throw new Error("COMMAND_RECEIPT_ENTITY_NOT_FOUND");
-          if (
-            !canAccessAreaOperativa(
-              entity.areaOperativaId,
-              callerAreaOperativaId(req),
-            )
-          ) {
+          if (!canManageEnte(req, entity.areaOperativaId)) {
             throw new Error("COMMAND_REPLAY_SCOPE_DENIED");
           }
           return entity;
@@ -339,12 +366,7 @@ router.patch(
           .where(eq(entiDestinatariTable.id, id))
           .for("update");
         if (!locked) throw new Error("ENTE_DESTINATARIO_NOT_FOUND");
-        if (
-          !canAccessAreaOperativa(
-            locked.areaOperativaId,
-            callerAreaOperativaId(req),
-          )
-        ) {
+        if (!canManageEnte(req, locked.areaOperativaId)) {
           throw new Error("COMMAND_REPLAY_SCOPE_DENIED");
         }
         if (locked.versione !== expectedVersion) {

@@ -16,6 +16,19 @@ import type { Intervento } from "./intervento";
 import type { NucleoFamiliare } from "./nucleoFamiliare";
 
 export interface BeneficiarioDettaglio {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /** @minimum 0 */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */

@@ -5,6 +5,7 @@ import {
   carichiMagazzinoTable,
   FONDI_ORIGINE,
   lottiTable,
+  lottiProduttoreTable,
   lottiLogiciTable,
   prodottiTable,
   magazziniTable,
@@ -140,6 +141,7 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
   const rows = await db
     .select({
       lotto: lottiTable,
+      origineAnagrafica: lottiProduttoreTable.origine,
       prodottoNome: prodottiTable.nome,
       prodottoCodice: prodottiTable.codice,
       magazzinoNome: magazziniTable.nome,
@@ -149,6 +151,10 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
       fornitoreNome: fornitoriTable.nome,
     })
     .from(lottiTable)
+    .leftJoin(
+      lottiProduttoreTable,
+      eq(lottiTable.lottoProduttoreId, lottiProduttoreTable.id),
+    )
     .leftJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
     .leftJoin(magazziniTable, eq(lottiTable.magazzinoId, magazziniTable.id))
     .leftJoin(
@@ -233,6 +239,8 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     rows.map((r) => {
       return {
         id: r.lotto.id,
+        lottoProduttoreId: r.lotto.lottoProduttoreId,
+        origineAnagrafica: r.origineAnagrafica,
         prodottoId: r.lotto.prodottoId,
         lottoLogicoId: r.lotto.lottoLogicoId ?? null,
         lottoLogicoCodice: r.lottoLogicoCodice ?? null,
@@ -353,6 +361,7 @@ router.post(
     try {
       const row = await db.transaction((tx) =>
         creaCaricoInventariale(tx, {
+          lottoProduttoreId: body.lottoProduttoreId,
           prodottoId: body.prodottoId,
           lottoLogicoId: positiveInteger(body.lottoLogicoId)
             ? body.lottoLogicoId

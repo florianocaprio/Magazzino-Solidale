@@ -7,11 +7,16 @@
  */
 
 export interface BeneficiariFseWorkbookImportUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data confermata nella preview e rivalidata dal server. */
   dataRiferimento: Date;
-  /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
+  /** Lo stesso workbook XLSX o XLSM viene rivalidato dal server. */
   file: Uint8Array;
   /** Array JSON di BeneficiariFseImportResolution. */
   risoluzioni?: string;

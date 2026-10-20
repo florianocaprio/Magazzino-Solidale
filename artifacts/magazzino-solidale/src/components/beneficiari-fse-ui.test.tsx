@@ -279,6 +279,95 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(button("Esporta FSE+")).toBeUndefined();
   });
 
+  async function analyzeSelectionPreview() {
+    await act(async () => root.render(
+      <FseBeneficiariActions
+        centri={[{ id: 7, nome: "Centro UI", areaOperativaId: 3 }]}
+        lockedCentroId={7} canImport canExport={false} onImported={vi.fn()}
+      />,
+    ));
+    await act(async () => button("Importa FSE+")?.click());
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="File FSE+"]')!;
+    const bytes = workbookBytes();
+    const file = new File([bytes], "selezionati.xlsx");
+    Object.defineProperty(file, "arrayBuffer", { value: vi.fn().mockResolvedValue(bytes) });
+    Object.defineProperty(input, "files", { configurable: true, value: [file] });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => button("Carica e analizza")?.click());
+  }
+
+  const selectionPreview = () => ({
+    centroAscoltoId: 7, areaOperativaId: 3, areaOperativaDerivata: true,
+    numeroRighe: 7, conteggi: { da_aggiornare: 1, possibile_duplicato: 2, nuovo: 1, invariato: 1, conflitto: 1, errore: 1 }, warningHeader: [],
+    righe: [
+      { numeroRiga: 2, classificazione: "da_aggiornare", beneficiarioId: 9, versioneBeneficiario: 4, versioneFascicolo: 2 },
+      { numeroRiga: 3, classificazione: "possibile_duplicato" },
+      { numeroRiga: 4, classificazione: "nuovo" },
+      { numeroRiga: 5, classificazione: "invariato", beneficiarioId: 10, versioneBeneficiario: 2, versioneFascicolo: 1 },
+      { numeroRiga: 6, classificazione: "conflitto" },
+      { numeroRiga: 7, classificazione: "errore", errori: ["Dato non valido"] },
+      { numeroRiga: 8, classificazione: "possibile_duplicato" },
+    ].map((row) => ({ errori: [], warning: [], codiceFascicolo: `SCELTA-${row.numeroRiga}`, ...row })),
+  });
+
+  it("conferma solo le scelte esplicite, conta le restanti ed esclude nuove, invariati e conflitti non selezionati", async () => {
+    mocks.preview.mockResolvedValueOnce(selectionPreview());
+    mocks.importRows.mockResolvedValueOnce({ batchId: 12, creati: 1, collegati: 0, aggiornati: 1, invariati: 0, conflitti: 0, errori: 0, saltati: 5, dettagli: [] });
+    await analyzeSelectionPreview();
+    expect(button("Importa solo selezionati")?.disabled).toBe(true);
+    expect(button("Importazione completa")?.disabled).toBe(true);
+    const clickRow = async (row: number, label: string) => act(async () => {
+      const section = document.querySelector(`[data-fse-review-row="${row}"]`)!;
+      Array.from(section.querySelectorAll("button")).find((b) => b.textContent === label)?.click();
+    });
+    await clickRow(8, "Salta questa riga");
+    expect(button("Importa solo selezionati")?.disabled).toBe(true);
+    await clickRow(2, "Aggiorna anagrafica");
+    await clickRow(4, "Crea nuovo");
+    expect(button("Importa solo selezionati")?.disabled).toBe(false);
+    expect(button("Importazione completa")?.disabled).toBe(true);
+    await act(async () => button("Importa solo selezionati")?.click());
+    expect(mocks.importRows).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Anagrafiche da importare: 2");
+    expect(document.body.textContent).toContain("Restano da gestire: 4");
+    expect(document.body.textContent).toContain("Già allineate: 1");
+    await act(async () => button("Torna alla selezione")?.click());
+    expect(mocks.importRows).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-fse-review-row="2"] button[aria-pressed="true"]')?.textContent).toBe("Aggiorna anagrafica");
+    await act(async () => button("Importa solo selezionati")?.click());
+    await act(async () => button("Importa solo selezionati")?.click());
+    expect(mocks.importRows).toHaveBeenCalledOnce();
+    const payload = mocks.importRows.mock.calls[0][0].data;
+    expect(JSON.parse(payload.risoluzioni)).toEqual([
+      { numeroRiga: 2, azione: "aggiorna", beneficiarioId: 9, versioneBeneficiario: 4, versioneFascicolo: 2 },
+      { numeroRiga: 3, azione: "salta" },
+      { numeroRiga: 4, azione: "crea" },
+      { numeroRiga: 5, azione: "salta" },
+      { numeroRiga: 6, azione: "salta" },
+      { numeroRiga: 7, azione: "salta" },
+      { numeroRiga: 8, azione: "salta" },
+    ]);
+    expect(document.body.textContent).toContain("Anagrafiche importate: 2");
+    expect(document.body.textContent).toContain("Restano da gestire: 4");
+    expect(document.querySelector("[data-fse-review-row]")).toBeNull();
+  });
+
+  it("mantiene la conferma in caso di errore e calcola il residuo sull’esito effettivo, non sulle selezioni", async () => {
+    mocks.preview.mockResolvedValueOnce(selectionPreview());
+    mocks.importRows.mockRejectedValueOnce(new Error("Connessione interrotta"))
+      .mockResolvedValueOnce({ batchId: 13, creati: 0, collegati: 0, aggiornati: 0, invariati: 0, conflitti: 1, errori: 0, saltati: 6, dettagli: [] });
+    await analyzeSelectionPreview();
+    await act(async () => button("Aggiorna anagrafica")?.click());
+    await act(async () => button("Importa solo selezionati")?.click());
+    await act(async () => button("Importa solo selezionati")?.click());
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("Connessione interrotta");
+    expect(button("Torna alla selezione")).toBeDefined();
+    await act(async () => button("Importa solo selezionati")?.click());
+    expect(document.body.textContent).toContain("Anagrafiche importate: 0");
+    expect(document.body.textContent).toContain("Restano da gestire: 6");
+    expect(document.body.textContent).toContain("Già allineate: 1");
+  });
+
   it("mostra lo scope derivato e consente un import parziale esplicito", async () => {
     const onImported = vi.fn();
     await act(async () =>
@@ -300,7 +389,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       ),
     );
     await act(async () => button("Importa FSE+")?.click());
-    expect(document.body.textContent).toContain("Area Operativa: Area UI");
+    expect(document.querySelector('[aria-label="Area Operativa FSE+"]')).not.toBeNull();
     const dataRiferimento = document.querySelector<HTMLInputElement>(
       'input[aria-label="Data di riferimento import FSE+"]',
     )!.value;
@@ -323,14 +412,15 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(mocks.preview).toHaveBeenCalled();
     expect(mocks.preview).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, dataRiferimento, file },
+      data: { centroAscoltoId: 7, areaOperativaId: 3, dataRiferimento, file },
     });
     expect(document.body.textContent).toContain(
       "Le righe non valide saranno escluse",
     );
-    const confirm = button("Conferma importazione") as HTMLButtonElement;
+    const confirm = button("Importazione completa") as HTMLButtonElement;
     expect(confirm.disabled).toBe(false);
     await act(async () => {
       confirm.click();
@@ -338,7 +428,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     });
     expect(mocks.importRows).toHaveBeenCalled();
     expect(mocks.importRows).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, dataRiferimento, file, risoluzioni: "[]" },
+      data: { centroAscoltoId: 7, areaOperativaId: 3, dataRiferimento, file, risoluzioni: "[]" },
     });
     expect(onImported).toHaveBeenCalledOnce();
     expect(document.body.textContent).toContain("Risultato import · batch 11");
@@ -590,7 +680,10 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
           classificazione: "possibile_duplicato",
           errori: [],
           warning: ["Possibile duplicato"],
-          duplicati: [{ id: 9, codice: "BEN-9" }],
+          confronto: [{ campo: "nome", attuale: null, importato: "Test", esito: "conserva" }],
+          duplicati: [{ id: 9, codice: "BEN-9", versione: 1, nome: "Test", cognome: "Import", dataNascita: "1990-01-01",
+            confronto: [{ campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva" },
+              { campo: "numeroComponenti", attuale: "2", importato: "3", esito: "aggiorna" }] }],
         },
       ],
     });
@@ -633,21 +726,30 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(
-      (button("Conferma importazione") as HTMLButtonElement).disabled,
+      (button("Importazione completa") as HTMLButtonElement).disabled,
     ).toBe(true);
-    await act(async () => button("Collega a BEN-9")?.click());
+    expect(document.body.textContent).toContain("Test Import · BEN-9");
+    expect(document.body.textContent).toContain("01/01/1990");
+    expect(document.body.textContent).toContain("Dati registrati");
+    expect(document.body.textContent).toContain("Dati nel file FSE+");
+    expect(document.body.textContent).not.toContain("Non presente nel file");
+    await act(async () => button("Salta questa riga")?.click());
+    expect((button("Importazione completa") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => button("Collega e aggiorna anagrafica")?.click());
     expect(
-      (button("Conferma importazione") as HTMLButtonElement).disabled,
+      (button("Importazione completa") as HTMLButtonElement).disabled,
     ).toBe(false);
     await act(async () => button("Crea nuovo")?.click());
     await act(async () => {
-      button("Conferma importazione")?.click();
+      button("Importazione completa")?.click();
       await Promise.resolve();
     });
     expect(mocks.importRows).toHaveBeenCalledWith({
       data: {
         centroAscoltoId: 7,
+        areaOperativaId: 3,
         dataRiferimento,
         file,
         risoluzioni: JSON.stringify([{ numeroRiga: 2, azione: "crea" }]),
@@ -689,9 +791,10 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(document.body.textContent).toContain("Codice associato altrove");
     expect(
-      (button("Conferma importazione") as HTMLButtonElement).disabled,
+      (button("Importazione completa") as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 });

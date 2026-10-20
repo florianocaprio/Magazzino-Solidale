@@ -1,3 +1,5 @@
+import { isNotFutureDateOnly } from "./date-only";
+
 export type VolunteerFormField =
   | "nome"
   | "cognome"
@@ -13,6 +15,7 @@ export type VolunteerFormField =
   | "telefono"
   | "telefonoSecondario"
   | "email"
+  | "areaOperativaId"
   | "centroAscoltoId"
   | "ruoloVolontarioId"
   | "maxConsegneTurno"
@@ -27,6 +30,7 @@ export type VolunteerDraft = {
   nome: string;
   cognome: string;
   tipoVolontario: "PERMANENTE" | "TEMPORANEO";
+  areaOperativaId: number | null;
   centroAscoltoId: number | null;
   ruoloVolontarioId: number;
   telefono: string;
@@ -72,6 +76,7 @@ export function validateVolunteerDraft(
   options: { editing: boolean },
 ): VolunteerFormErrors {
   const errors: VolunteerFormErrors = {};
+  if (!Number.isSafeInteger(draft.areaOperativaId) || Number(draft.areaOperativaId) <= 0) errors.areaOperativaId = "Seleziona un’Area Operativa";
   if (!draft.nome.trim()) errors.nome = "Il nome è obbligatorio";
   if (!draft.cognome.trim()) errors.cognome = "Il cognome è obbligatorio";
   if (!draft.luogoNascita.trim())
@@ -79,6 +84,8 @@ export function validateVolunteerDraft(
   if (!DATE_RE.test(draft.dataNascita))
     errors.dataNascita =
       "La data di nascita è obbligatoria e deve essere valida";
+  else if (!isNotFutureDateOnly(draft.dataNascita))
+    errors.dataNascita = "La data di nascita deve essere reale e non futura.";
   if (!draft.indirizzoResidenza.trim())
     errors.indirizzoResidenza = "L'indirizzo di residenza è obbligatorio";
   if (!draft.domicilioCoincideResidenza && !draft.indirizzoDomicilio.trim())
@@ -132,6 +139,7 @@ function normalizedPayload(
   return {
     nome: draft.nome.trim(),
     cognome: draft.cognome.trim(),
+    areaOperativaId: draft.areaOperativaId,
     centroAscoltoId: lockedCenterId ?? draft.centroAscoltoId,
     ruoloVolontarioId: draft.ruoloVolontarioId,
     telefono: draft.telefono.trim() || null,

@@ -1,4 +1,11 @@
 const it = {
+  saveConfiguration: "Salva configurazione Credito",
+  chooseBeneficiaryPolicy: "Politica per questo beneficiario",
+  selectBeneficiaryPolicy: "Seleziona la politica da applicare",
+  automaticBeneficiaryPolicy: "Automatica (Centro, Area, Globale)",
+  applyBeneficiaryPolicy: "Applica politica",
+  beneficiaryPolicyHelp: "Scegli una politica attiva del Centro, dell’Area o globale e premi Applica politica. La scelta resta associata alla persona anche se vengono aggiunte nuove politiche. Aggiorna il calcolo e la quota non manuale; quota manuale, saldo e movimenti restano conservati.",
+  savedTerritoryHelp: "I servizi usano Area e Centro salvati. Salva prima eventuali modifiche al territorio per abilitarli.",
   campoObbligatorio: "Campo obbligatorio",
   rettificaCredito: "Rettifica credito",
   rettificaDescrizione:

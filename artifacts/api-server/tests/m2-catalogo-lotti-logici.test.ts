@@ -753,7 +753,7 @@ describe("M2 — lotto logico operativo", () => {
     expect(samePhysicalParty.body.righe[0].lottoId).toBe(
       firstLoad.body.righe[0].lottoId,
     );
-    const secondProductAndExpiry = await postLoad({
+    const conflictingExpiry = await postLoad({
       lottoLogicoId: logicalLotId,
       righe: [
         {
@@ -768,6 +768,26 @@ describe("M2 — lotto logico operativo", () => {
           fondoOrigine: "NESSUN_FONDO",
           quantitaOperativa: "0.5",
           codiceLotto: "PROD-2",
+          dataScadenza: "2028-12-31",
+        },
+      ],
+    });
+    expect(conflictingExpiry.status).toBe(409);
+    const secondProductAndExpiry = await postLoad({
+      lottoLogicoId: logicalLotId,
+      righe: [
+        {
+          prodottoId: kgProductId,
+          fondoOrigine: "NESSUN_FONDO",
+          quantitaOperativa: "0.25",
+          codiceLotto: "PROD-2",
+          dataScadenza: "2027-12-31",
+        },
+        {
+          prodottoId: kgProductId,
+          fondoOrigine: "NESSUN_FONDO",
+          quantitaOperativa: "0.5",
+          codiceLotto: "PROD-2-B",
           dataScadenza: "2028-12-31",
         },
       ],

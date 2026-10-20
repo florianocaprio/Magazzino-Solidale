@@ -930,12 +930,12 @@ describe("visibilità territoriale del workflow", () => {
     expect(nullAreaOperativa.status).toBe(403);
   });
 
-  it("preserva l'isolamento Sociale per centro e area operativa", async () => {
+  it("consente gli altri Centri della propria Area e nega altre Aree", async () => {
     const otherCentre = await createWorkflow({
       beneficiarioId: socialeAltroCentroRoma,
       ambito: "sociale",
     });
-    expect(otherCentre.status).toBe(403);
+    expect(otherCentre.status).toBe(201);
 
     const otherAreaOperativa = await createWorkflow({
       beneficiarioId: socialeMilano,

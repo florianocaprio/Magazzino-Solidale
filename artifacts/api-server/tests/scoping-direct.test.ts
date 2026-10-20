@@ -113,6 +113,61 @@ describe("Fornitori — scoping per area operativa", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([fA, fB]));
   });
 
+  it("BUG17: Solo globali esclude i locali, anche con filtro Area", async () => {
+    const local = await createFornitore(scope, areaOperativaA);
+    const foreign = await createFornitore(scope, areaOperativaB);
+    const global = await createFornitore(scope, null);
+    for (const callerArea of [null, areaOperativaA]) {
+      const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: callerArea });
+      const res = await request(app).get(`/fornitori?ambito=globali&areaOperativaId=${areaOperativaB}`);
+      expect(res.status).toBe(200);
+      expect(idsOf(res.body)).toContain(global);
+      expect(idsOf(res.body)).not.toContain(local);
+      expect(idsOf(res.body)).not.toContain(foreign);
+      expect(res.body.every((f: { areaOperativaId: number | null }) => f.areaOperativaId === null)).toBe(true);
+    }
+  });
+
+  it("BUG17: il filtro Area include locali e globali senza altre Aree", async () => {
+    const local = await createFornitore(scope, areaOperativaA);
+    const foreign = await createFornitore(scope, areaOperativaB);
+    const global = await createFornitore(scope, null);
+    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const res = await request(app).get(`/fornitori?areaOperativaId=${areaOperativaA}`);
+    expect(res.status).toBe(200);
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([local, global]));
+    expect(idsOf(res.body)).not.toContain(foreign);
+    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    const attempted = await request(scoped).get(`/fornitori?areaOperativaId=${areaOperativaB}`);
+    expect(attempted.status).toBe(200);
+    expect(idsOf(attempted.body)).toEqual(expect.arrayContaining([local, global]));
+    expect(idsOf(attempted.body)).not.toContain(foreign);
+  });
+
+  it.each(["ambito=altro", "ambito=globali&ambito=tutti", "areaOperativaId=0", "areaOperativaId=1x", "areaOperativaId=NaN"])("BUG17: rifiuta il filtro malformato %s", async (query) => {
+    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    expect((await request(app).get(`/fornitori?${query}`)).status).toBe(400);
+  });
+
+  it("BUG17: crea e modifica un globale; il territoriale può leggerlo ma non gestirlo", async () => {
+    const admin = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const created = await request(admin).post("/fornitori").send({ nome: "Globale BUG17", tipo: "commerciale", areaOperativaId: null });
+    expect(created.status).toBe(201);
+    scope.fornitoreIds.push(created.body.id);
+    expect(created.body.areaOperativaId).toBeNull();
+    const edited = await request(admin).patch(`/fornitori/${created.body.id}`).send({ nome: "Globale BUG17 aggiornato", areaOperativaId: null });
+    expect(edited.status).toBe(200);
+    expect(edited.body.areaOperativaId).toBeNull();
+    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    expect((await request(scoped).get(`/fornitori/${created.body.id}`)).status).toBe(200);
+    expect((await request(scoped).patch(`/fornitori/${created.body.id}`).send({ nome: "Non consentito" })).status).toBe(403);
+    expect((await request(scoped).delete(`/fornitori/${created.body.id}`)).status).toBe(403);
+    const attempted = await request(scoped).post("/fornitori").send({ nome: "Tentativo globale", tipo: "commerciale", areaOperativaId: null });
+    expect(attempted.status).toBe(201);
+    scope.fornitoreIds.push(attempted.body.id);
+    expect(attempted.body.areaOperativaId).toBe(areaOperativaA);
+  });
+
   it("GET /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(
@@ -235,7 +290,7 @@ describe("Volontari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST rifiuta l'assegnazione esplicita a un altro centro", async () => {
+  it("POST rifiuta l'assegnazione esplicita a un Centro di un’altra Area", async () => {
     const res = await request(
       makeScopedApp(volontariRouter, {
         id: operatoreId,
@@ -254,9 +309,8 @@ describe("Volontari — scoping per centro", () => {
         codiceFiscaleNonDisponibile: true,
         codiceFiscaleNota: "Non disponibile nel test automatico",
       });
-    expect(res.status).toBe(201);
-    scope.volontarioIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(422);
+    expect(res.body.fieldErrors.centroAscoltoId).toBeDefined();
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
@@ -359,7 +413,7 @@ describe("Mezzi — scoping per centro", () => {
   });
 });
 
-describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
+describe("Utenti — scoping per Area (niente globali/NULL)", () => {
   // The utenti router bakes in requireAuth+requireAdmin, so the caller must be a
   // real admin utente loaded via the session; its centro drives the scoping.
   let adminA: number;
@@ -377,7 +431,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     });
   });
 
-  it("lista: A vede SOLO gli utenti del proprio centro (non B, non globali/NULL)", async () => {
+  it("lista: A vede SOLO gli utenti della propria Area (non B, non globali/NULL)", async () => {
     const uA = await createUtente(scope, { centroId: centroA });
     const uB = await createUtente(scope, { centroId: centroB });
     const uNull = await createUtente(scope, { centroId: null });
@@ -409,7 +463,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     expect((await request(appA).get(`/utenti/${uNull}`)).status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST ignora il Centro legacy e assegna l’Area del caller", async () => {
     const ruoloId = await createRuolo(scope, {});
     const res = await request(makeSessionApp(utentiRouter, adminA))
       .post("/utenti")
@@ -422,7 +476,9 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
         ruoloId,
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    scope.utenteIds.push(res.body.id);
+    expect(res.body).toMatchObject({ areaOperativaId: areaOperativaA, centroAscoltoId: null });
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
@@ -505,7 +561,7 @@ describe("Beneficiari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST rifiuta un Centro di un’altra Area senza assegnazioni implicite", async () => {
     const res = await request(
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
@@ -520,9 +576,31 @@ describe("Beneficiari — scoping per centro", () => {
         sesso: "M",
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(201);
-    scope.beneficiarioIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(400);
+  });
+
+  it("profilo sociale: crea, legge e modifica in un altro Centro della stessa Area", async () => {
+    const other = await createCentroRec(scope, { areaOperativaId: areaOperativaA });
+    const app = makeScopedApp(beneficiariRouter, {
+      id: operatoreId, centroAscoltoId: centroA, areaOperativaId: areaOperativaA,
+      aree: ["sociale"],
+    });
+    const created = await request(app).post("/beneficiari").send({
+      nome: "Area", cognome: "Condivisa", sesso: "M", centroAscoltoId: other.id,
+    });
+    expect(created.status, created.text).toBe(201);
+    scope.beneficiarioIds.push(created.body.id);
+    expect(created.body.centroAscoltoId).toBe(other.id);
+    const path = `/beneficiari/${created.body.id}`;
+    expect((await request(app).get(path)).status).toBe(200);
+    const updated = await request(app).patch(path).send({ nome: "Aggiornato", versione: created.body.versione });
+    expect(updated.status, updated.text).toBe(200);
+    const foreign = await request(app).patch(path).send({
+      centroAscoltoId: centroB, versione: updated.body.versione,
+    });
+    expect(foreign.status, foreign.text).toBe(403);
+    expect((await request(app).get(path)).body.centroAscoltoId).toBe(other.id);
+    expect((await request(app).delete(path)).status).toBe(204);
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
@@ -700,7 +778,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(aA);
     expect(ids).toContain(aNull);
-    expect(ids).not.toContain(aB);
+    expect(ids).toContain(aB);
   });
 
   it("lista: il caller globale vede tutti", async () => {
@@ -719,7 +797,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([aA, aB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
+  it("GET /:id dello stesso magazzino resta leggibile fra Centri", async () => {
     const mag = await createMagazzino(scope, null, {
       areaOperativaId: areaOperativaA,
     });
@@ -730,10 +808,10 @@ describe("Approvvigionamenti — scoping per centro", () => {
     const res = await request(await supplyApp(centroA)).get(
       `/approvvigionamenti/${aB}`,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
-  it("POST auto-assegna il centro del caller", async () => {
+  it("POST non assegna il Centro storico dell’utente", async () => {
     const mag = await createMagazzino(scope, null, {
       areaOperativaId: areaOperativaA,
     });
@@ -750,7 +828,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
       });
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     scope.approvvigionamentoIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.body.centroAscoltoId).toBeNull();
   });
 
   it("PATCH IDOR: spostare l'ordine su un magazzino di un altro centro → 403", async () => {

@@ -1,4 +1,5 @@
 import React, { act } from "react";
+vi.mock("@/lib/i18n", () => ({ default: { addResourceBundle: vi.fn() } }));
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useUpdateEmporioAbilitazione: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useGetEmporioAbilitazioniRiepilogoBeneficiari: (
     params: unknown,
     options: unknown,

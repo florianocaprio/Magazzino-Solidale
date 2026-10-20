@@ -1,18 +1,29 @@
 import React, { act } from "react";
+vi.mock("@/lib/i18n", () => ({ default: { addResourceBundle: vi.fn() } }));
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createCardMutate, updateNucleoMutate } = vi.hoisted(() => ({
+const { createCardMutate, updateNucleoMutate, recoverCard, pdf, requests, getZone, patchPerson } = vi.hoisted(() => ({
   createCardMutate: vi.fn(),
   updateNucleoMutate: vi.fn(),
+  recoverCard: vi.fn(),
+  pdf: vi.fn(),
+  requests: vi.fn(),
+  getZone: vi.fn(),
+  patchPerson: vi.fn(),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
-  useListRichiesteMagazzino: () => ({
+  useGetBeneficiarioStatiServizi: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" }, tessera: { disponibile: true, stato: "attiva" } } }),
+  getGetBeneficiarioStatiServiziQueryKey: (id: number) => ["stati-servizi", id],
+  useGetBeneficiarioStatiServiziUds: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" } } }),
+  getGetBeneficiarioStatiServiziUdsQueryKey: (id: number) => ["stati-uds", id],
+  useGetOrCreateBeneficiarioTesseraDocumento: () => ({ mutateAsync: recoverCard, isPending: false }),
+  useListRichiesteMagazzino: (...args: unknown[]) => { requests(...args); return ({
     data: { items: [] },
     isLoading: false,
     isError: false,
-  }),
+  }); },
   getListRichiesteMagazzinoQueryKey: () => ["richieste-magazzino"],
   useGetBeneficiario: () => ({
     data: {
@@ -135,7 +146,7 @@ vi.mock("@workspace/api-client-react", () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
-  useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateBeneficiario: () => ({ mutate: vi.fn(), mutateAsync: patchPerson, isPending: false }),
   useUpdateCreditoSolidaleBeneficiarioConfigurazione: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -158,6 +169,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetBeneficiarioFseQueryKey: (id: number) => ["beneficiario-fse", id],
   useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
+  useGetZonaUds: (...args: unknown[]) => getZone(...args),
   useCalcolaCreditoSolidaleBeneficiario: () => ({
     data: undefined,
     isLoading: false,
@@ -185,7 +197,8 @@ vi.mock("@workspace/api-client-react", () => ({
   getListMenseQueryKey: () => ["mense"],
 }));
 
-vi.mock("wouter", () => ({
+vi.mock("wouter", async (importOriginal) => ({
+  ...await importOriginal<typeof import("wouter")>(),
   useParams: () => ({ id: "42" }),
   Link: ({
     children,
@@ -225,10 +238,10 @@ vi.mock("@/lib/use-moduli", () => ({
   useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }),
 }));
 vi.mock("@/lib/branding-ambiente", () => ({
-  loadTesseraBrandingForPdf: vi.fn(),
+  loadTesseraBrandingForPdf: vi.fn().mockResolvedValue({ branding: {}, logoDataUrl: null }),
 }));
 vi.mock("@/lib/tessera-pdf", () => ({
-  generateTesseraPdf: vi.fn(),
+  generateTesseraPdf: (...args: unknown[]) => pdf(...args),
   buildTesseraLabels: vi.fn(),
 }));
 vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));
@@ -236,6 +249,7 @@ vi.mock("@/components/scheda-export", () => ({
   SchedaExportButtons: () => null,
 }));
 
+import { UdsTerritoryFields } from "./beneficiario-uds-tools";
 import BeneficiarioDettaglio from "@/pages/beneficiario-dettaglio";
 
 describe("Tessera trasversale dal dettaglio beneficiario", () => {
@@ -246,6 +260,9 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    getZone.mockReturnValue({ data: undefined });
+    patchPerson.mockResolvedValue({});
+    window.history.replaceState(null, "", "/");
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -260,7 +277,11 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
   it("riconosce la tessera legacy attiva e richiede il motivo prima della sostituzione", async () => {
     await act(async () => root.render(<BeneficiarioDettaglio />));
     expect(document.body.textContent).toContain("Tessera attiva legacy");
-    expect(document.body.textContent).toContain("Stampa tessera attiva");
+    expect(document.body.textContent).not.toContain("blocco04.cardDownload");
+    expect(document.body.textContent).not.toContain("Sostituisci tessera");
+    const edit = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"));
+    await act(async () => edit?.click());
+    expect(document.body.textContent).toContain("blocco04.cardDownload");
     const replace = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Sostituisci tessera"),
     );
@@ -298,14 +319,58 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
 
     expect(
       document.querySelectorAll('[data-testid="beneficiario-mensa-card"]'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(document.body.textContent).toContain("Abilita alla Mensa");
+  });
+
+  it("BUG21: percorso UDS conserva soli stati anche in Modifica e recupera il PDF sullo stesso token dopo errore", async () => {
+    window.history.replaceState(null, "", "/uds/anagrafica/42?ritorno=%2Fuds%2Fanagrafica%3Fpage%3D3");
+    const card = { id: 19, codice: "MS-AbCd_Card", dataEmissione: "2024-03-07T11:00:00.000Z", stato: "sospesa", dataRevoca: null, dataScadenza: null };
+    recoverCard.mockResolvedValue(card);
+    pdf.mockRejectedValueOnce(new Error("PDF indisponibile")).mockResolvedValue(undefined);
+    await act(async () => root.render(<BeneficiarioDettaglio />));
+    expect(document.body.textContent).toContain("blocco04.udsPerson");
+    expect(document.querySelectorAll('[data-testid="beneficiario-mensa-card"]')).toHaveLength(0);
+    expect(requests).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }));
+    expect(document.body.textContent).not.toContain("Abilita alla Mensa");
+    expect(document.body.textContent).not.toContain("richiesteMagazzino.new");
+    expect(recoverCard).not.toHaveBeenCalled();
+    await act(async () => buttonByText("blocco04.cardDownload")?.click());
+    expect(document.body.textContent).toContain("blocco04.cardFailed");
+    expect(document.body.textContent).toContain("blocco04.cardInvalid");
+    await act(async () => buttonByText("blocco04.cardDownload")?.click());
+    expect(recoverCard).toHaveBeenCalledTimes(2);
+    expect(recoverCard).toHaveBeenLastCalledWith({ id: 42 });
+    expect(pdf).toHaveBeenLastCalledWith(expect.objectContaining({ beneficiario: expect.objectContaining({ codice: "BEN-42", codiceTessera: card.codice }), dataEmissione: card.dataEmissione }));
+    expect(createCardMutate).not.toHaveBeenCalled();
+    await act(async () => buttonByText("beneficiarioDettaglio.editAnagrafica")?.click());
+    expect(document.body.textContent).not.toContain("Abilita alla Mensa");
+    expect(document.querySelectorAll('[data-testid="beneficiario-mensa-card"]')).toHaveLength(0);
+  });
+
+  it("BUG21: conserva la Zona storica inattiva e invia soltanto Zona/null e versione", async () => {
+    getZone.mockReturnValue({ data: { id: 99, nome: "Zona storica", attivo: false, areaOperativaId: 1 } });
+    await act(async () => root.render(<UdsTerritoryFields b={{ id: 42, versione: 7, areaOperativaId: 1, centroAscoltoId: 7, zonaUdsId: 99 } as never} />));
+    expect(document.body.textContent).toContain("Zona storica");
+    expect(document.body.textContent).toContain("blocco04.historical");
+    expect(getZone).toHaveBeenCalledWith(99, expect.objectContaining({ query: expect.objectContaining({ enabled: true }) }));
+    const picker = document.querySelector<HTMLButtonElement>('button[aria-label="udsAnagrafica.fZona"]')!;
+    await act(async () => picker.click());
+    const none = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find((option) => option.textContent === "blocco04.noZone")!;
+    await act(async () => none.click());
+    const save = Array.from(picker.parentElement!.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent === "common.save")!;
+    await act(async () => save.click());
+    expect(patchPerson).toHaveBeenCalledWith({ id: 42, data: { zonaUdsId: null, versione: 7 } });
   });
 
   it("modifica un componente e mostra la fascia calcolata senza renderla editabile", async () => {
     await act(async () => root.render(<BeneficiarioDettaglio />));
     expect(document.body.textContent).toContain("Fascia: 18_29");
     expect(document.querySelector('[name="fasciaEta"]')).toBeNull();
+
+    expect(document.querySelector('button[aria-label="Modifica componente"]')).toBeNull();
+    const edit = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"));
+    await act(async () => edit?.click());
 
     const editMember = document.querySelector<HTMLButtonElement>(
       'button[aria-label="Modifica componente"]',

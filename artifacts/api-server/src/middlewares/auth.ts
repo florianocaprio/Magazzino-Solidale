@@ -1,10 +1,11 @@
 import type { Request, RequestHandler } from "express";
-import { eq } from "drizzle-orm";
-import { db, utentiTable, ruoliTable, centriAscoltoTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { db, utentiTable, ruoliTable, areeOperativeTable } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import type { PermissionKey } from "../lib/permissions";
+import { passwordSessionVersion } from "../lib/userAccess";
 
 export interface SessionUser {
   id: number;
@@ -30,11 +31,14 @@ export interface SessionUser {
   aree: string[];
   permessi: string[];
   mustChangePassword: boolean;
+  passwordVersion?: string;
+  legacyTerritoryWithoutArea?: boolean;
 }
 
 declare module "express-session" {
   interface SessionData {
     userId?: number;
+    passwordVersion?: string;
   }
 }
 
@@ -59,17 +63,13 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
       matricola: utentiTable.matricola,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
+      passwordHash: utentiTable.passwordHash,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
-      centroAscoltoId: utentiTable.centroAscoltoId,
-      centroAscoltoNome: centriAscoltoTable.nome,
-      centroAscoltoAttivo: centriAscoltoTable.attivo,
-      centroAscoltoAreaOperativaId: centriAscoltoTable.areaOperativaId,
       areaOperativaId: utentiTable.areaOperativaId,
+      legacyTerritoryWithoutArea: sql<boolean>`${utentiTable.areaOperativaId} is null and (${utentiTable.centroAscoltoId} is not null or ${utentiTable.zonaUdsId} is not null)`,
       areaOperativaNome: areeOperativeTable.nome,
       areaOperativaAttiva: areeOperativeTable.attivo,
-      zonaUdsId: utentiTable.zonaUdsId,
-      zonaUdsNome: zoneUdsTable.nome,
       isSuperAdmin: utentiTable.isSuperAdmin,
       isAdmin: ruoliTable.isAdmin,
       aree: ruoliTable.aree,
@@ -77,9 +77,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
-    .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(areeOperativeTable, eq(utentiTable.areaOperativaId, areeOperativeTable.id))
-    .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
     .where(eq(utentiTable.id, userId));
 
   if (!row || !row.attivo) return null;
@@ -94,20 +92,22 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     matricola: row.matricola ?? null,
     ruoloId: row.ruoloId ?? null,
     ruoloNome: row.ruoloNome ?? null,
-    centroAscoltoId: row.centroAscoltoId ?? null,
-    centroAscoltoNome: row.centroAscoltoNome ?? null,
-    centroAscoltoAttivo: row.centroAscoltoAttivo ?? null,
-    centroAscoltoAreaOperativaId: row.centroAscoltoAreaOperativaId ?? null,
+    centroAscoltoId: null,
+    centroAscoltoNome: null,
+    centroAscoltoAttivo: null,
+    centroAscoltoAreaOperativaId: null,
+    legacyTerritoryWithoutArea: row.legacyTerritoryWithoutArea,
     areaOperativaId: row.areaOperativaId ?? null,
     areaOperativaNome: row.areaOperativaNome ?? null,
     areaOperativaAttiva: row.areaOperativaAttiva ?? null,
-    zonaUdsId: row.zonaUdsId ?? null,
-    zonaUdsNome: row.zonaUdsNome ?? null,
+    zonaUdsId: null,
+    zonaUdsNome: null,
     isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
     permessi: row.permessi ?? [],
     mustChangePassword: row.mustChangePassword,
+    passwordVersion: passwordSessionVersion(row.passwordHash),
   };
 }
 
@@ -177,7 +177,19 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   const userId = req.session?.userId;
   if (userId) {
     const user = await loadSessionUser(userId);
-    if (user) {
+    if (user && req.session.passwordVersion === user.passwordVersion) {
+      // Identity and password recovery remain available before an Area is assigned.
+      const accountRequest =
+        (req.method === "GET" && req.path === "/auth/me") ||
+        (req.method === "POST" && req.path === "/auth/change-password");
+      if (
+        !accountRequest &&
+        user.areaOperativaId == null &&
+        ((!user.isAdmin && !user.isSuperAdmin) || user.legacyTerritoryWithoutArea)
+      ) {
+        res.status(403).json({ error: "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità." });
+        return;
+      }
       req.user = user;
       next();
       return;

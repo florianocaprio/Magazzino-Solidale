@@ -10,7 +10,8 @@ import {
 } from "@workspace/api-client-react";
 import { Footprints, Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
+import { udsPersonPath } from "@/lib/uds-persona-context";
 import { ExportButtons } from "@/components/export-buttons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,24 @@ export default function UdsAnagrafica() {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const isGlobal = user?.areaOperativaId == null;
-  const [filterAreaOperativa, setFilterAreaOperativa] = useState("");
-  const [filterZona, setFilterZona] = useState(ALL_ZONE);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [, navigate] = useLocation();
+  const locationSearch = useSearch();
+  const params = new URLSearchParams(locationSearch);
+  const filterAreaOperativa = params.get("areaOperativaId") ?? "";
+  const filterZona = params.get("zonaUdsId") ?? ALL_ZONE;
+  const search = params.get("search") ?? "";
+  const rawPage = Number(params.get("page"));
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(window.location.search);
+    if (!value || value === ALL_ZONE) next.delete(name); else next.set(name, value);
+    if (name !== "page") next.delete("page");
+    navigate(`/uds/anagrafica${next.size ? "?" + next.toString() : ""}`, { replace: true });
+  };
+  const setFilterAreaOperativa = (value: string) => setFilter("areaOperativaId", value);
+  const setFilterZona = (value: string) => setFilter("zonaUdsId", value);
+  const setSearch = (value: string) => setFilter("search", value);
+  const setPage = (value: number | ((current: number) => number)) => setFilter("page", String(typeof value === "function" ? value(page) : value));
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: areaOperativaList } = useListAreeOperative({
@@ -80,7 +95,6 @@ export default function UdsAnagrafica() {
     }),
     [effectiveAreaOperativa, filterZona, isGlobal, search],
   );
-  useEffect(() => setPage(1), [listFilters]);
   const { data: beneficiari, isLoading } = useListUdsDirectory({
     ...listFilters,
     page,
@@ -282,7 +296,7 @@ export default function UdsAnagrafica() {
                       <TableCell>
                         {beneficiario.accessoCompleto ? (
                           <Link
-                            href={`/beneficiari/${beneficiario.id}`}
+                            href={udsPersonPath(beneficiario.id, `/uds/anagrafica${locationSearch ? "?" + locationSearch : ""}`)}
                             className="flex items-center gap-2 font-medium text-primary hover:underline"
                           >
                             <Footprints className="h-4 w-4 text-muted-foreground" />{" "}

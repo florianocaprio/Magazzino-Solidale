@@ -59,7 +59,8 @@ vi.mock("@/components/uds-persona-sheet", () => ({
     return null;
   },
 }));
-vi.mock("wouter", () => ({
+vi.mock("wouter", async (importOriginal) => ({
+  ...await importOriginal<typeof import("wouter")>(),
   Link: ({
     children,
     href,
@@ -103,6 +104,7 @@ describe("paginazione UDS Anagrafica", () => {
     mocks.exportDirectory.mockResolvedValue([]);
     mocks.exportProps = null;
     mocks.personaSheetProps = null;
+    window.history.replaceState(null, "", "/");
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);

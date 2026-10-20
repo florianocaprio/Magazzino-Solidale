@@ -147,16 +147,16 @@ it("M67-02 scoped Admin stays in Area A", async () => {
   expect((await agent.get(`/api/magazzini/${shared}`)).status).toBe(200);
   expect((await agent.get(`/api/magazzini/${otherArea}`)).status).toBe(403);
 });
-it("M67-02 Centro A sees own and shared, not other Centre or Area", async () => {
+it("Area: old Centre assignment does not exclude other Centres in Area A", async () => {
   const { agent } = await actor(areaA, centroA);
   const body = await visible(agent);
   expect(
     body.items.map((row: { magazzinoId: number }) => row.magazzinoId).sort(),
-  ).toEqual([own, shared].sort());
-  expect(body.total).toBe(2);
+  ).toEqual([own, shared, otherCentre].sort());
+  expect(body.total).toBe(3);
   expect((await agent.get(`/api/magazzini/${own}`)).status).toBe(200);
   expect((await agent.get(`/api/magazzini/${shared}`)).status).toBe(200);
-  expect((await agent.get(`/api/magazzini/${otherCentre}`)).status).toBe(403);
+  expect((await agent.get(`/api/magazzini/${otherCentre}`)).status).toBe(200);
   expect((await agent.get(`/api/magazzini/${otherArea}`)).status).toBe(403);
 });
 it("M67-03 removing territory in the same HTTP session must not become global", async () => {
@@ -180,7 +180,7 @@ it("M67-03 current role grants are reloaded in the same HTTP session", async () 
 
 it("M67-03 removing only Centre retains Area A, never all Areas", async () => {
   const { agent, user } = await actor(areaA, centroA);
-  expect((await visible(agent)).total).toBe(2);
+  expect((await visible(agent)).total).toBe(3);
   await db
     .update(utentiTable)
     .set({ centroAscoltoId: null })
@@ -227,7 +227,7 @@ it("M67-01/03 common read boundary covers list, count, detail, export and projec
     const result = await agent.get(`/api${path}`);
     expect(result.status, path).toBe(403);
     expect(result.body.error, path).toBe(
-      "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+      "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
     );
     expect(result.headers).not.toHaveProperty("x-total-count");
   }

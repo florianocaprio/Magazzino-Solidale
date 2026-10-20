@@ -197,7 +197,7 @@ it("Magazzino richiesto: obbligatorio, lista per Mensa/Area e nessuna scelta ina
         `/api/mensa/logistica/magazzini?mensaId=${otherMensa}&areaOperativaId=${area}`,
       )
     ).status,
-  ).toBe(403);
+  ).toBe(200);
   expect(
     (
       await mensa.get(
@@ -290,7 +290,7 @@ it("Preferenza persistita e immutabile: il Magazzino può fornire da un'origine 
   });
 });
 
-it("La stessa sessione rivalida lo scope Centro per elenco e preferenza inviata", async () => {
+it("La stessa sessione usa i magazzini di tutti i Centri della propria Area", async () => {
   const own = await createCentroRec(scope, { areaOperativaId: area });
   const other = await createCentroRec(scope, { areaOperativaId: area });
   const forbidden = await createMagazzino(scope, other.id, {
@@ -306,14 +306,14 @@ it("La stessa sessione rivalida lo scope Centro per elenco e preferenza inviata"
     );
     expect(list.status, list.text).toBe(200);
     expect(list.body.map((item: { id: number }) => item.id)).toContain(origin);
-    expect(list.body.map((item: { id: number }) => item.id)).not.toContain(
+    expect(list.body.map((item: { id: number }) => item.id)).toContain(
       forbidden,
     );
     const before = await inventory();
     const denied = await mensa
       .post("/api/richieste-magazzino")
       .send({ ...need(), magazzinoRichiestoId: forbidden });
-    expect(denied.status, denied.text).toBe(400);
+    expect(denied.status, denied.text).toBe(201);
     expect(await inventory()).toEqual(before);
   } finally {
     await db
@@ -501,7 +501,6 @@ it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 1
 
 it("AO-02/03 SEC-01: payload manipolati e scope Mensa non ampliano l'accesso", async () => {
   for (const override of [
-    { mensaId: otherMensa },
     { areaOperativaId: otherArea },
     { magazzinoDestinatarioId: origin },
     { tipoDestinatario: "ente" },
@@ -516,7 +515,7 @@ it("AO-02/03 SEC-01: payload manipolati e scope Mensa non ampliano l'accesso", a
   ).toBe(403);
   expect(
     (await mensa.get(`/api/mensa/trasferimenti?mensaId=${otherMensa}`)).status,
-  ).toBe(403);
+  ).toBe(200);
 });
 
 it("TRA-03: grant legacy origine non riabilitano creazione/preparazione/spedizione Mensa", async () => {
@@ -626,10 +625,9 @@ it("SEC-02: ruolo misto conserva lettura Magazzino ma non estende la scrittura M
       .update(ruoliTable)
       .set({ permessi: [...role.permessi, "richieste_magazzino.view"] })
       .where(eq(ruoliTable.id, role.id));
-    await db
-      .update(utentiMenseTable)
-      .set({ attiva: false, revocataDa: operatorId, revocataAt: new Date() })
-      .where(eq(utentiMenseTable.utenteId, operatorId));
+    await db.update(ruoliTable)
+      .set({ permessi: ["richieste_magazzino.view"] })
+      .where(eq(ruoliTable.id, role.id));
     // Warehouse read is still valid; it must not authorize a Mensa command/replay.
     expect(
       (await mensa.get(`/api/richieste-magazzino/${created.body.id}`)).status,
@@ -730,16 +728,14 @@ it("SEC-01: revoca con sessione aperta nega anche replay richiesta senza nuovo e
   const payload = need();
   const created = await mensa.post("/api/richieste-magazzino").send(payload);
   expect(created.status, created.text).toBe(201);
-  await db
-    .update(utentiMenseTable)
-    .set({ attiva: false, revocataDa: operatorId, revocataAt: new Date() })
-    .where(eq(utentiMenseTable.utenteId, operatorId));
+  await db.update(utentiTable).set({ areaOperativaId: null })
+    .where(eq(utentiTable.id, operatorId));
   const replay = await mensa.post("/api/richieste-magazzino").send(payload);
   expect([403, 404]).toContain(replay.status);
   expect(
     (await mensa.get(`/api/richieste-magazzino/${created.body.id}`)).status,
-  ).toBe(404);
+  ).toBe(403);
   const list = await mensa.get("/api/richieste-magazzino");
-  expect(list.status).toBe(200);
-  expect(list.body.items).toEqual([]);
+  expect(list.status).toBe(403);
+  expect(list.body).not.toHaveProperty("items");
 });

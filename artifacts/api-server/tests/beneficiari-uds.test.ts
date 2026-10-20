@@ -910,7 +910,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
     expect(unchanged.uds).toBe(false);
   });
 
-  it("non trasforma il collegamento UDS in un bypass generico per una persona già UDS di un'altra zona", async () => {
+  it("consente di cambiare Zona a una persona UDS della stessa Area", async () => {
     const zonaOperatore = await createZona(areaOperativaA);
     const altraZona = await createZona(areaOperativaA);
     const [uds] = await db
@@ -931,12 +931,12 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .patch(`/beneficiari/${uds.id}`)
       .send({ uds: true, zonaUdsId: zonaOperatore });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
     const [unchanged] = await db
       .select({ zonaUdsId: beneficiariTable.zonaUdsId })
       .from(beneficiariTable)
       .where(eq(beneficiariTable.id, uds.id));
-    expect(unchanged.zonaUdsId).toBe(altraZona);
+    expect(unchanged.zonaUdsId).toBe(zonaOperatore);
   });
 
   it("un caller globale non può attivare uds su una persona senza area operativa (400)", async () => {
@@ -1204,7 +1204,7 @@ describe("GET /beneficiari?uds", () => {
     expect(idsOf(byCf.body)).not.toContain(other.body.id);
   });
 
-  it("un caller con zona vede solo beneficiari della propria zona", async () => {
+  it("la Zona storica dell’utente non limita i beneficiari dell’Area", async () => {
     const zonaA = await createZona(areaOperativaA);
     const zonaB = await createZona(areaOperativaA);
     const a = await request(appAs(areaOperativaA))
@@ -1237,7 +1237,7 @@ describe("GET /beneficiari?uds", () => {
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(a.body.id);
-    expect(ids).not.toContain(b.body.id);
+    expect(ids).toContain(b.body.id);
   });
 
   it("mostra le persone uds+centro ma MAI le persone solo-centro", async () => {

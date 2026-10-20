@@ -1,6 +1,7 @@
 const it = {
   titolo: "Emporio Solidale",
   non_abilitato: "NON ABILITATO",
+  non_emessa: "NON EMESSA",
   attivo: "ATTIVO",
   sospeso: "SOSPESO",
   revocato: "REVOCATO",
@@ -12,7 +13,7 @@ const it = {
   revoca: "Revoca abilitazione",
   motivo: "Motivo dell'abilitazione o della variazione",
   indipendente:
-    "Valida negli Empori della stessa Area. Tessera, Mensa e Credito Solidale sono servizi distinti. Nessun accredito automatico.",
+    "Valida negli Empori della stessa Area. La prima abilitazione attiva anche il Credito Solidale; saldo e storico restano conservati. Nessun accredito immediato.",
   creditoBloccato:
     "Abilita prima il servizio Emporio. Saldo e storico esistenti restano conservati.",
   nessunEmporio:

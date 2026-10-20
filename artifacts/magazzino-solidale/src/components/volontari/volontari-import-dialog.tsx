@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources } from "@/lib/logistica-cache";
 import { useMemo, useRef, useState } from "react";
 import {
   analyzeVolontariImport,
@@ -100,12 +101,14 @@ export function VolontariImportDialog({
   open,
   onOpenChange,
   centroAscoltoId,
+  areaOperativaId,
   ruoli,
   centri,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   centroAscoltoId?: number;
+  areaOperativaId?: number | null;
   ruoli: RuoloVolontario[];
   centri: Center[];
 }) {
@@ -140,7 +143,7 @@ export function VolontariImportDialog({
     try {
       const result = await analyzeVolontariImport(
         file,
-        centroAscoltoId ? { centroAscoltoId } : undefined,
+        { ...(centroAscoltoId ? { centroAscoltoId } : {}), ...(areaOperativaId ? { areaOperativaId } : {}) },
         { headers: { "x-file-name": file.name } },
       );
       setPreview(result);
@@ -246,9 +249,7 @@ export function VolontariImportDialog({
         }),
       });
       const summary = result as Record<string, unknown>;
-      await queryClient.invalidateQueries({
-        queryKey: getListVolontariQueryKey(),
-      });
+      await invalidateLogisticaResources(queryClient, "volontari");
       toast({
         title: summary.replayIdempotente
           ? "Importazione già applicata"

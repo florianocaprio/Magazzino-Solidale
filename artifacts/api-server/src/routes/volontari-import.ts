@@ -1,3 +1,4 @@
+import { validateVolunteerArea } from "../lib/volontariArea";
 import { createHash } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
 import {
@@ -177,6 +178,7 @@ function volunteerCandidateFingerprint(row: typeof volontariTable.$inferSelect):
     matricolaNormalizzata: normalizeVolunteerIdentifier(row.matricola),
     codiceFiscaleNormalizzato: row.codiceFiscaleNormalizzato,
     tipoVolontario: row.tipoVolontario,
+    areaOperativaId: row.areaOperativaId,
     centroAscoltoId: row.centroAscoltoId,
     ruoloVolontarioId: row.ruoloVolontarioId,
     dataInizioImportata: row.dataInizioImportata,
@@ -270,7 +272,11 @@ router.post(
       throw error;
     }
     const caller = callerCentroId(req);
-    const callerAreaId = callerAreaOperativaId(req);
+    const requestedArea = req.query.areaOperativaId == null ? null : Number(req.query.areaOperativaId);
+    if (requestedArea != null && (!Number.isSafeInteger(requestedArea) || requestedArea <= 0 || callerAreaOperativaId(req) != null && callerAreaOperativaId(req) !== requestedArea)) {
+      res.status(403).json({ error: "Area import non accessibile" }); return;
+    }
+    const callerAreaId = callerAreaOperativaId(req) ?? requestedArea;
     const requestedCenter = req.query.centroAscoltoId == null ? null : Number(req.query.centroAscoltoId);
     const [requestedCenterRow] = requestedCenter == null
       ? []
@@ -289,7 +295,7 @@ router.post(
       res.status(403).json({ error: "Centro import non accessibile" }); return;
     }
     const effectiveCenter = caller ?? requestedCenter;
-    const ownerScope = await resolveVolunteerOwnerScope(req, effectiveCenter);
+    const ownerScope = await resolveVolunteerOwnerScope(req, effectiveCenter, callerAreaId);
     const [roles, centers, volunteers, identifiers] = await Promise.all([
       db.select().from(ruoliVolontariTable),
       db.select().from(centriAscoltoTable),
@@ -307,8 +313,7 @@ router.post(
     const visibleVolunteers = volunteers.filter((volunteer) =>
       caller == null && callerAreaId == null
         ? true
-        : volunteer.centroAscoltoId != null &&
-          allowedCenterSet.has(volunteer.centroAscoltoId),
+        : volunteer.areaOperativaId === callerAreaId || callerAreaId == null && volunteer.centroAscoltoId != null && allowedCenterSet.has(volunteer.centroAscoltoId),
     );
     const normalized = parsed.rows.map((source) => {
       const row = normalizeRow(source);
@@ -559,6 +564,11 @@ router.post(
           continue;
         }
         const data = { ...(stored.datiNormalizzati as NormalizedImport), ...corrections } as NormalizedImport;
+        if (data.dataNascita != null && (!isDateOnly(data.dataNascita) || data.dataNascita > todayRome())) {
+          errori += 1;
+          await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_DATA_NASCITA", avvisi: [...stored.avvisi, "La data di nascita deve essere reale e non futura."] }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+          continue;
+        }
         data.matricola = typeof data.matricola === "string" ? data.matricola.trim() || null : null;
         data.codiceFiscaleNormalizzato = normalizeCodiceFiscale(
           data.codiceFiscale,
@@ -572,6 +582,15 @@ router.post(
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_CORREZIONE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
         }
+        const centroId = callerCentroId(req) ?? resolution?.centroAscoltoId ?? stored.centroPropostoId ?? batch.centroAscoltoId;
+        const assignment: Record<string, unknown> = { centroAscoltoId: centroId, areaOperativaId: batch.scopeTipo === "AREA" ? batch.scopeAreaOperativaId : undefined };
+        const areaErrors = await validateVolunteerArea(req, assignment, tx);
+        if (Object.keys(areaErrors).length) {
+          errori += 1;
+          await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_AREA", avvisi: [...stored.avvisi, ...Object.values(areaErrors)] }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+          continue;
+        }
+        const areaOperativaId = Number(assignment.areaOperativaId);
         let ruoloId = resolution?.ruoloVolontarioId ?? stored.ruoloPropostoId;
         const roleName = data.categoriaOriginale?.trim() ?? "";
         const roleKey = normalizeRoleName(roleName);
@@ -584,7 +603,7 @@ router.post(
           }
         }
         const [role] = ruoloId ? await tx.select().from(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, ruoloId)).limit(1) : [];
-        const centroId = callerCentroId(req) ?? resolution?.centroAscoltoId ?? stored.centroPropostoId ?? batch.centroAscoltoId;
+
         if (!role || !role.attivo || !scopeContainsCenter(batch, centroId)) {
           errori += 1;
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_MAPPING" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
@@ -727,7 +746,7 @@ router.post(
         let volunteer: typeof volontariTable.$inferSelect;
         let esito: "CREATO" | "AGGIORNATO" | "INVARIATO";
         if (target) {
-          if (!scopeContainsCenter(batch, target.centroAscoltoId)) {
+          if ((!scopeContainsCenter(batch, target.centroAscoltoId) || target.areaOperativaId !== areaOperativaId)) {
             errori += 1;
             await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_SCOPE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
             continue;
@@ -755,7 +774,7 @@ router.post(
           } else {
             [volunteer] = await tx.update(volontariTable).set({
               nome: data.nome, cognome: data.cognome, matricola: data.matricola ?? target.matricola,
-              tipoVolontario: data.tipoVolontario, centroAscoltoId: centroId,
+              tipoVolontario: data.tipoVolontario, areaOperativaId, centroAscoltoId: centroId,
               telefono: data.telefono, telefonoSecondario: data.telefonoSecondario,
               email: data.email, luogoNascita: data.luogoNascita, dataNascita: data.dataNascita,
               indirizzoResidenza: data.indirizzoResidenza,
@@ -806,7 +825,7 @@ router.post(
         } else {
           [volunteer] = await tx.insert(volontariTable).values({
             nome: data.nome, cognome: data.cognome, matricola: data.matricola,
-            tipoVolontario: data.tipoVolontario, centroAscoltoId: centroId,
+            tipoVolontario: data.tipoVolontario, areaOperativaId, centroAscoltoId: centroId,
             telefono: data.telefono, telefonoSecondario: data.telefonoSecondario,
             email: data.email, luogoNascita: data.luogoNascita, dataNascita: data.dataNascita,
             indirizzoResidenza: data.indirizzoResidenza,

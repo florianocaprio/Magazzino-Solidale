@@ -1,3 +1,4 @@
+import { lottiProduttoreTable } from "./lottiProduttore";
 import {
   pgTable,
   serial,
@@ -15,6 +16,10 @@ import { lottiLogiciTable } from "./lottiLogici";
 
 export const lottiTable = pgTable("lotti", {
   id: serial("id").primaryKey(),
+  lottoProduttoreId: integer("lotto_produttore_id").references(
+    () => lottiProduttoreTable.id,
+    { onDelete: "restrict" },
+  ),
   lottoLogicoId: integer("lotto_logico_id").references(
     () => lottiLogiciTable.id,
     { onDelete: "restrict" },

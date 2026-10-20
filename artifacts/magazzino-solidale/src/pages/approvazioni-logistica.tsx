@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources } from "@/lib/logistica-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,20 +41,18 @@ export default function ApprovazioniLogistica() {
   const approvaMezzo = useApprovaMezzoLogistica();
   const respingiMezzo = useRespingiMezzoLogistica();
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: getListApprovazioniLogisticaQueryKey() });
-  };
+  const refresh = () => Promise.all([invalidateLogisticaResources(queryClient, "volontari"), invalidateLogisticaResources(queryClient, "mezzi")]);
 
-  const onDone = (message: string) => {
-    refresh();
+  const onDone = async (message: string) => {
+    await refresh();
     toast({ description: message });
   };
 
-  const onError = (e: unknown) => {
+  const onError = async (e: unknown) => {
     const error = e as { status?: number; data?: { error?: string }; response?: { status?: number; data?: { error?: string } } };
     const status = error.status ?? error.response?.status;
     const msg = error.data?.error ?? error.response?.data?.error;
-    if (status === 409) refresh();
+    if (status === 409) await refresh();
     toast({
       variant: "destructive",
       description: status === 409

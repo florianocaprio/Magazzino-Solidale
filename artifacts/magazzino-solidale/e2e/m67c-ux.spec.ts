@@ -300,7 +300,8 @@ test("M67-13 browser back/reload stay and menu discard protect the draft", async
       page.getByRole("dialog", { name: "Sidebar", exact: true }),
     ).toBeVisible();
   }
-  await page.getByText("Magazzino", { exact: true }).click();
+  const warehouseGroup = page.getByRole("button", { name: "Magazzino", exact: true });
+  if (await warehouseGroup.getAttribute("aria-expanded") === "false") await warehouseGroup.click();
   await page.getByRole("link", { name: "Movimenti", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page

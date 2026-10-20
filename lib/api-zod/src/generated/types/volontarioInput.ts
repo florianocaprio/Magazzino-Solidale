@@ -8,6 +8,8 @@
 import type { VolontarioInputTipoVolontario } from "./volontarioInputTipoVolontario";
 
 export type VolontarioInput = unknown & {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;

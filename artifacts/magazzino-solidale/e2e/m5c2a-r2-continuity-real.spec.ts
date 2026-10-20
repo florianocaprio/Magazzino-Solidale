@@ -259,7 +259,7 @@ test("M5C2-A/R2 reale: Sheet contestuale, due righe e Richiesta conclusa", async
   );
   await expect(
     sheet
-      .getByRole("button", { name: "Torna alla richiesta", exact: true })
+      .getByRole("button", { name: "Ritorna alle Richieste", exact: true })
       .first(),
   ).toBeVisible();
   for (const name of ["R1 prodotto", "R2 altro"]) {
@@ -295,13 +295,14 @@ test("M5C2-A/R2 reale: Sheet contestuale, due righe e Richiesta conclusa", async
   await expect(sheet.getByText("R1 prodotto", { exact: true })).toBeVisible();
   await expect(sheet.getByText("R2 altro", { exact: true })).toBeVisible();
   await sheet
-    .getByRole("button", { name: "Torna alla richiesta", exact: true })
+    .getByRole("button", { name: "Ritorna alle Richieste", exact: true })
     .first()
     .click();
-  await expect(page).toHaveURL(
-    new RegExp("richieste-magazzino.*richiestaId=" + rm.id),
-  );
+  await expect(page).toHaveURL(/\/richieste-magazzino/);
+  expect(new URL(page.url()).searchParams.has("richiestaId")).toBe(false);
   expect(new URL(page.url()).searchParams.has("documento")).toBe(false);
+  expect(new URL(page.url()).searchParams.get("filter")).toBe("keep");
+  await page.getByRole("button").filter({ hasText: rm.codice }).click();
   await sheet
     .getByRole("button", { name: "Apri documento", exact: true })
     .click();

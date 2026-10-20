@@ -11,6 +11,17 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
       ),
       "Flusso UX verificato su desktop, tablet e mobile simulati",
     );
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: () =>
+            Promise.reject(
+              new DOMException("Camera denied in fixture", "NotAllowedError"),
+            ),
+        },
+      });
+    });
     await login(page);
     const suffix = `${Date.now()}-${testInfo.project.name}`;
     const areasResponse = await page.request.get("/api/aree-operative");
@@ -137,7 +148,7 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
 
     await page.goto("/carico-merce");
     await page.getByRole("button", { name: "Nuova pratica" }).click();
-    await page.getByRole("button", { name: "Salva bozza" }).click();
+    await page.getByRole("button", { name: "Apertura Pratica" }).click();
     await expect(page.getByText("Inserisci la Descrizione.")).toBeVisible();
     await expect(page.getByLabel("Descrizione")).toHaveAttribute(
       "aria-invalid",
@@ -155,12 +166,40 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     );
     await page.getByLabel("Descrizione").fill(`Pratica UX ${suffix}`);
     await expect(page.getByText("Inserisci la Descrizione.")).toHaveCount(0);
-    await page.getByRole("button", { name: "Salva bozza" }).click();
+    await page.getByRole("button", { name: "Apertura Pratica" }).click();
     await expect(
-      page.getByText("Aggiungi prodotto", { exact: true }),
+      page.getByLabel("Descrizione", { exact: true }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByText("Prodotti caricati a magazzino", { exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "Inserimento prodotti" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Aggiungi prodotto", exact: true }),
     ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Scansiona codice a barre", exact: true })
+      .click();
+    const scanner = page.getByRole("dialog", {
+      name: "Scansiona codice a barre",
+      exact: true,
+    });
+    await expect(scanner).toContainText("Accesso alla fotocamera negato");
+    await scanner.getByRole("button", { name: "Annulla", exact: true }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Aggiungi prodotto", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Scansiona codice a barre",
+        exact: true,
+      }),
+    ).toBeFocused();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
-    await page.getByLabel("Cerca per nome o codice").fill(required.codice);
+    await page
+      .getByLabel("Cerca per nome, codice o barcode")
+      .fill(required.codice);
     const requiredChoice = page.getByRole("button", {
       name: new RegExp(required.codice),
     });
@@ -174,7 +213,9 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     await page
       .getByRole("button", { name: new RegExp(required.codice) })
       .click();
-    await page.getByLabel("Cerca per nome o codice").fill(optional.codice);
+    await page
+      .getByLabel("Cerca per nome, codice o barcode")
+      .fill(optional.codice);
     const optionalChoice = page.getByRole("button", {
       name: new RegExp(optional.codice),
     });
@@ -185,8 +226,14 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     await page
       .getByRole("button", { name: new RegExp(optional.codice) })
       .click();
-    await page.getByLabel("Cerca per nome o codice").fill(empty.codice);
+    await page
+      .getByLabel("Cerca per nome, codice o barcode")
+      .fill(empty.codice);
     await page.getByRole("button", { name: new RegExp(empty.codice) }).click();
+    await expect(page.getByRole("dialog")).toContainText(empty.nome);
+    await page
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
+      .click();
     const rowA = page
       .locator('[data-testid^="carico-row-"]')
       .filter({ hasText: required.nome });
@@ -208,7 +255,7 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     await expect(
       rowB.getByText("Codice lotto produttore", { exact: true }),
     ).toBeVisible();
-    await rowA.getByRole("button", { name: "Salva bozza" }).click();
+    await rowA.getByRole("button", { name: "Inserisci Prodotto" }).click();
     await expect(rowA.getByText("Inserisci la quantità.")).toBeVisible();
     await expect(
       rowA.getByText("Per questo prodotto è obbligatorio il codice lotto."),
@@ -230,9 +277,51 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     await expect(rowA.getByText("Inserisci la quantità.")).toHaveCount(0);
     await expect(rowA.getByText("Inserisci la scadenza.")).toBeVisible();
 
+    // Il pannello e un'aggiunta fallita non cancellano i valori locali di A.
+    await page.getByRole("button", { name: "Inserimento prodotti" }).click();
+    await expect(
+      page.getByLabel("Cerca per nome, codice o barcode"),
+    ).toBeFocused();
+    await page
+      .getByLabel("Cerca per nome, codice o barcode")
+      .fill(optional.codice);
+    await page.route("**/api/carico-pratiche/*/righe", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Aggiunta non disponibile" }),
+      });
+    });
+    await page
+      .getByRole("button", { name: new RegExp(optional.codice) })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "Aggiunta non disponibile",
+    );
+    await expect(
+      page.getByLabel("Cerca per nome, codice o barcode"),
+    ).toHaveValue(optional.codice);
+    await page.unroute("**/api/carico-pratiche/*/righe");
+    await page
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
+      .click();
+    await expect(rowA.getByLabel(/Quantità/)).toHaveValue("7");
+
     await rowB.getByLabel(/Quantità/).fill("3");
-    await rowB.getByRole("button", { name: "Salva bozza" }).click();
+    await rowB.getByRole("button", { name: "Inserisci Prodotto" }).click();
     await expect(rowB.getByRole("checkbox")).toBeChecked();
+    await expect(
+      rowB.getByRole("button", { name: "Prodotto salvato" }),
+    ).toBeDisabled();
+    const remove = rowB.getByRole("button", { name: "Rimuovi Prodotto" });
+    await expect(remove).toBeEnabled();
+    const bounds = await remove.boundingBox();
+    const cardBounds = await rowB.boundingBox();
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(
+      cardBounds!.x + cardBounds!.width,
+    );
+    expect(bounds!.height).toBeGreaterThanOrEqual(40);
     await expect(rowA.getByLabel(/Quantità/)).toHaveValue("7");
     await expect(
       rowA.getByText("Per questo prodotto è obbligatorio il codice lotto."),
@@ -242,6 +331,9 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
       page.getByRole("button", { name: "Conferma carico a magazzino" }),
     ).toBeEnabled();
 
+    await page
+      .getByRole("button", { name: "Dati pratica", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Nuova raccolta / attività" })
       .click();
@@ -299,7 +391,7 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
         "Salva le modifiche alla testata prima di caricare a magazzino.",
       ),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Salva bozza" }).first().click();
+    await page.getByRole("button", { name: "Salva modifiche" }).first().click();
     await expect(rowA.getByLabel(/Quantità/)).toHaveValue("7");
     await expect(rowB.getByRole("checkbox")).toBeChecked();
 
@@ -313,21 +405,21 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     await expect(
       page.getByRole("button", { name: "Conferma carico a magazzino" }),
     ).toBeDisabled();
-    await rowB.getByRole("button", { name: "Salva bozza" }).click();
+    await rowB.getByRole("button", { name: "Inserisci Prodotto" }).click();
     await expect(rowB.getByRole("checkbox")).toBeChecked();
     await expect(
       page.getByRole("button", { name: "Conferma carico a magazzino" }),
     ).toBeEnabled();
 
     await rowB.getByLabel(/Quantità/).fill("");
-    await rowB.getByRole("button", { name: "Salva bozza" }).click();
+    await rowB.getByRole("button", { name: "Inserisci Prodotto" }).click();
     await expect(rowB.getByText(/Bozza salvata\. Completa/i)).toBeVisible();
     await expect(rowB.getByRole("checkbox")).not.toBeChecked();
     await expect(
       page.getByRole("button", { name: "Conferma carico a magazzino" }),
     ).toBeDisabled();
     await rowB.getByLabel(/Quantità/).fill("3");
-    await rowB.getByRole("button", { name: "Salva bozza" }).click();
+    await rowB.getByRole("button", { name: "Inserisci Prodotto" }).click();
     await expect(rowB.getByRole("checkbox")).toBeChecked();
     await expect(rowA.getByLabel(/Quantità/)).toHaveValue("7");
 
@@ -397,18 +489,27 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
     expect(
       stock.find((item) => item.prodottoId === empty.id)?.giacenzaFisica ?? 0,
     ).toBe(0);
-    await rowA.getByRole("button", { name: "Rimuovi riga" }).click();
-    await rowC.getByRole("button", { name: "Rimuovi riga" }).click();
+    await rowA.getByRole("button", { name: "Rimuovi Prodotto" }).click();
+    await rowC.getByRole("button", { name: "Rimuovi Prodotto" }).click();
     await page.getByRole("button", { name: "Chiudi carico" }).click();
     await expect(
-      page.getByRole("button", { name: "Salva bozza" }),
-    ).toBeDisabled();
+      page.getByRole("button", { name: "Nuova pratica" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "Area Operativa", exact: true }),
+    ).toContainText(area.nome);
+    await expect(
+      page.getByRole("combobox", {
+        name: "Magazzino destinazione",
+        exact: true,
+      }),
+    ).toContainText(warehouse.nome);
     await expect(
       page.getByRole("button", { name: "Nuova raccolta / attività" }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Conferma carico a magazzino" }),
-    ).toBeDisabled();
+    ).toHaveCount(0);
     expect(
       await page.evaluate(
         () =>
@@ -417,4 +518,107 @@ test.describe("UX-CARICO-01 — bozza e conferma carico", () => {
       ),
     ).toBeLessThanOrEqual(1);
   });
+});
+
+test("BUG16: Aggiungi resta nel pannello stretto e salva la bozza Approvvigionamenti", async ({
+  page,
+}, info) => {
+  test.skip(
+    !["mobile-390x844", "tablet-820x1180"].includes(info.project.name),
+    "Pannello stretto e tablet",
+  );
+  await login(page);
+  const areas = await (await page.request.get("/api/aree-operative")).json();
+  const area = areas.find((a: { attivo: boolean }) => a.attivo);
+  const warehouses = await (await page.request.get("/api/magazzini")).json();
+  const warehouse = warehouses.find(
+    (w: { stato: string; areaOperativaId: number }) =>
+      w.stato === "attivo" && w.areaOperativaId === area.id,
+  );
+  const suffix = Date.now();
+  const supplierResponse = await page.request.post("/api/fornitori", {
+    data: {
+      nome: `Fornitore BUG16 ${suffix}`,
+      tipo: "altro",
+      areaOperativaId: area.id,
+    },
+  });
+  expect(supplierResponse.status()).toBe(201);
+  const supplier = await supplierResponse.json();
+  const productResponse = await page.request.post("/api/prodotti", {
+    data: {
+      nome: `Prodotto con descrizione lunga per il pannello Approvvigionamenti BUG16 ${suffix}`,
+      tipoProdotto: "alimentare",
+      unitaMisura: "pz",
+      quantitaFrazionabile: false,
+    },
+  });
+  expect(productResponse.status()).toBe(201);
+  const product = await productResponse.json();
+  await page.goto("/approvvigionamenti");
+  await page.getByRole("button", { name: "Nuovo Ordine", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Nuovo Ordine", exact: true });
+  await selectOption(
+    page,
+    panel.getByRole("combobox", { name: "Area", exact: true }),
+    area.nome,
+  );
+  await selectOption(
+    page,
+    panel.getByRole("combobox", { name: "Fornitore / Donatore", exact: true }),
+    supplier.nome,
+  );
+  await selectOption(
+    page,
+    panel.getByRole("combobox", {
+      name: "Magazzino",
+      exact: true,
+    }),
+    warehouse.nome,
+  );
+  await selectOption(
+    page,
+    panel.getByRole("combobox", { name: "Prodotto richiesto", exact: true }),
+    product.nome,
+  );
+  await panel.getByLabel("Quantità richiesta").fill("12");
+  const add = panel.getByRole("button", { name: "Aggiungi", exact: true });
+  await add.scrollIntoViewIfNeeded();
+  const buttonBox = await add.boundingBox();
+  const panelBox = await panel.boundingBox();
+  expect(buttonBox!.x).toBeGreaterThanOrEqual(panelBox!.x);
+  expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(
+    panelBox!.x + panelBox!.width,
+  );
+  expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  expect(buttonBox!.width).toBeGreaterThanOrEqual(44);
+  expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
+  await add.click();
+  await expect(panel).toContainText(`${product.nome}`);
+  await expect(panel).toContainText("12 pz");
+  await panel
+    .getByRole("combobox", { name: "Prodotto richiesto", exact: true })
+    .click();
+  await expect(
+    page.getByRole("option", { name: product.nome, exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const saving = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/approvvigionamenti") &&
+      r.request().method() === "POST",
+  );
+  await panel.getByRole("button", { name: "Salva bozza", exact: true }).click();
+  const saved = await saving;
+  expect(saved.status(), await saved.text()).toBe(201);
+  expect(await saved.json()).toMatchObject({ stato: "bozza" });
+  expect(saved.request().postDataJSON().righe).toEqual([
+    expect.objectContaining({
+      prodottoId: product.id,
+      quantitaRichiesta: "12",
+    }),
+  ]);
+  await expect(panel).toBeHidden();
 });

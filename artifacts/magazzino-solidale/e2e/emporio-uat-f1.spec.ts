@@ -871,6 +871,7 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
   const f = await fixture(1, false, true);
   await login(page, f);
   await page.goto(`/beneficiari/${f.beneficiary}`);
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   const card = page.getByRole("region", {
     name: "Emporio Solidale",
     exact: true,
@@ -925,6 +926,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   const row = page.getByRole("row").filter({ hasText: f.code });
   await expect(row.getByText("NON ABILITATO", { exact: true })).toBeVisible();
   await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   const card = page.getByRole("region", {
     name: "Emporio Solidale",
     exact: true,
@@ -947,6 +949,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await page.goBack();
   await expect(row.getByText("ATTIVO", { exact: true })).toBeVisible();
   await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   await planning.click();
   await page
     .getByRole("button", { name: "Nuovo Accesso Emporio", exact: true })
@@ -965,6 +968,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
     dialog.getByRole("button", { name: "Salva", exact: true }),
   ).toBeEnabled();
   await page.goBack();
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   for (const state of ["sospeso", "attivo", "revocato"]) {
     await card
       .getByRole("textbox", {
@@ -990,6 +994,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
       row.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();
     await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   }
   await expect(planning).toHaveCount(0);
   await page.goto(`/emporio/accessi?beneficiarioId=${f.beneficiary}`);

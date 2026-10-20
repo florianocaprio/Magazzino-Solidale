@@ -26,6 +26,7 @@ import {
   importazioniAgeaTable,
   lottiLogiciTable,
   lottiTable,
+  lottiProduttoreTable,
   magazziniTable,
   mappatureProdottiEsterniTable,
   movimentiEsterniAgeaTable,
@@ -865,6 +866,26 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         "DROP TRIGGER r64_stock_batch_failure ON fse_import_stock_rows; DROP FUNCTION r64_stock_batch_failure()",
       );
     }
+  });
+
+  it("configura automaticamente un solo registro per Area, serializza il primo accesso e non sostituisce registri disattivati", async () => {
+    const [{ id: autoArea }] = await db.insert(areeOperativeTable).values({ nome: `Auto FSE ${suffix}` }).returning();
+    const [{ id: autoWarehouse }] = await db.insert(magazziniTable).values({ codice: `AUTO-${suffix}`.slice(0, 20), nome: "Auto FSE", areaOperativaId: autoArea }).returning();
+    const payload = { magazzinoId: autoWarehouse };
+    expect((await request(appFor()).post("/fse-importazioni/sorgenti/automatica").send(payload)).status).toBe(403);
+    await db.update(utentiTable).set({ areaOperativaId: autoArea }).where(eq(utentiTable.id, actorId));
+    try {
+      const app = appFor({ areaOperativaId: autoArea });
+      const calls = await Promise.all([request(app).post("/fse-importazioni/sorgenti/automatica").send(payload), request(app).post("/fse-importazioni/sorgenti/automatica").send(payload)]);
+      expect(calls.map((r) => r.status)).toEqual([200, 200]);
+      expect(calls[0].body.id).toBe(calls[1].body.id);
+      expect(calls[0].body.areaOperativaId).toBe(autoArea);
+      await db.update(fseSourceRegistriesTable).set({ attiva: 0 }).where(eq(fseSourceRegistriesTable.id, calls[0].body.id));
+      const disabled = await request(app).post("/fse-importazioni/sorgenti/automatica").send(payload);
+      expect(disabled.status).toBe(409); expect(disabled.body.code).toBe("REGISTRO_DISATTIVATO");
+    } finally { await db.update(utentiTable).set({ areaOperativaId: areaId }).where(eq(utentiTable.id, actorId)); }
+    const ambiguous = await request(appFor()).post("/fse-importazioni/sorgenti/automatica").send({ magazzinoId: ordinaryWarehouseId });
+    expect(ambiguous.status).toBe(409); expect(ambiguous.body.code).toBe("REGISTRO_DA_SCEGLIERE");
   });
 
   it("riserva la configurazione sorgente agli amministratori e serializza i codici duplicati", async () => {
@@ -3291,6 +3312,16 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         idempotencyKey: `m3b-register-balance-${suffix}`,
       });
     expect(registered.status).toBe(201);
+    const importedMasters = await db
+      .select({ origine: lottiProduttoreTable.origine })
+      .from(lottiTable)
+      .innerJoin(
+        lottiProduttoreTable,
+        eq(lottiTable.lottoProduttoreId, lottiProduttoreTable.id),
+      )
+      .where(eq(lottiTable.magazzinoId, initialWarehouseId));
+    expect(importedMasters).toHaveLength(1);
+    expect(importedMasters[0].origine).toBe("IMPORTATO");
 
     const movements = await db
       .select()
@@ -3317,8 +3348,16 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
   });
 
   it.runIf(originalsAvailable)(
-    "T25 registra i sette saldi originali per 1177 pezzi e copre gli 80 carichi storici senza duplicarli",
+    "T25 registra i saldi degli originali e copre lo storico senza duplicarlo",
     async () => {
+      const rawStock = XLSX.utils.sheet_to_json<Record<string, unknown>>(XLSX.read(readFileSync(originalStockPath!), { type: "buffer", cellDates: false }).Sheets.Table1);
+      const expectedPieces = rawStock.reduce((sum, row) => sum + Number(row.GiacenzaPezzi), 0);
+      const rawRegistry = XLSX.utils.sheet_to_json<Record<string, unknown>>(XLSX.read(readFileSync(originalRegistryPath!), { type: "buffer" }).Sheets.Table1);
+      const dateHeader = Object.keys(rawRegistry[0]).find((key) => /^Giacenza al .* Pezzi$/.test(key))!;
+      const [day, month, year] = dateHeader.match(/(\d{2}\/\d{2}\/\d{4})/)![1].split("/");
+      const referenceDate = `${year}-${month}-${day}`;
+      const expectedClaims = rawRegistry.filter((row) => Number(row["Carico / scarico pezzi"]) > 0).length;
+      if (referenceDate === "2026-10-20") expect({ rows: rawStock.length, pieces: expectedPieces, claims: expectedClaims }).toEqual({ rows: 11, pieces: 3244, claims: 89 });
       const app = appFor();
       const [{ id: warehouseId }] = await db
         .insert(magazziniTable)
@@ -3348,7 +3387,7 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         mode: "SALDO_INIZIALE",
         profile: "REGISTRO",
         fileName:
-          "Registro Feliciangeli_in_Moto_ODV_Dal_01-09-2024_Al_17-09-2026.xlsx",
+          "Registro-originale.xlsx",
       });
       expect(registry.status).toBe(201);
       const stock = await upload(app, {
@@ -3357,17 +3396,18 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         warehouseId,
         practiceId: practiceCreated.body.id,
         mode: "SALDO_INIZIALE",
+        referenceDate,
         profile: "GIACENZE",
         sessionId: registry.body.sessionId,
         fileName:
-          "Giacenza Feliciangeli in Moto ODV al giorno 17_09_2026_escluse_DdCBozza_escluse_GiacenzaZero.xlsx",
+          "Giacenze-originali.xlsx",
       });
       expect(stock.status).toBe(201);
 
       let detail = await request(app).get(
         `/fse-importazioni/sessioni/${registry.body.sessionId}`,
       );
-      expect(detail.body.stockRows).toHaveLength(7);
+      expect(detail.body.stockRows).toHaveLength(rawStock.length);
       const externalProducts = [
         ...new Set(
           detail.body.stockRows.map(
@@ -3375,7 +3415,7 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
           ),
         ),
       ] as string[];
-      expect(externalProducts).toHaveLength(7);
+      expect(externalProducts).toHaveLength(new Set(rawStock.map((row) => String(row.Prodotto))).size);
       for (const [index, externalDescription] of externalProducts.entries()) {
         const [{ id: mappedProductId }] = await db
           .insert(prodottiTable)
@@ -3407,7 +3447,7 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       }
       expect(detail.body).toMatchObject({
         stato: "PRONTA",
-        summary: { stockRows: 7, stockPieces: "1177.000000" },
+        summary: { stockRows: rawStock.length, stockPieces: expectedPieces.toFixed(6) },
       });
       expect(
         await db
@@ -3445,7 +3485,7 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       const practice = await request(app).get(
         `/carico-pratiche/${practiceCreated.body.id}`,
       );
-      expect(practice.body.righe).toHaveLength(7);
+      expect(practice.body.righe).toHaveLength(rawStock.length);
       expect(
         await db
           .select()
@@ -3465,13 +3505,13 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         .select()
         .from(movimentiTable)
         .where(eq(movimentiTable.magazzinoId, warehouseId));
-      expect(movements).toHaveLength(7);
+      expect(movements).toHaveLength(rawStock.length);
       expect(
         movements.reduce(
           (total, movement) => total + Number(movement.quantita),
           0,
         ),
-      ).toBe(1_177);
+      ).toBe(expectedPieces);
       expect(
         movements.every(
           (movement) => movement.naturaContabile === "SALDO_INIZIALE",
@@ -3497,70 +3537,17 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
           factor: Number(row.factor),
         })),
       ).toEqual(
-        expect.arrayContaining([
-          {
-            lot: "25332L3P02",
-            pieces: 384,
-            weight: 30.72,
-            factor: 0.08,
-            expiry: "2027-12-31",
-            fund: "FSE_PLUS",
-          },
-          {
-            lot: "LB111456",
-            pieces: 274,
-            weight: 137,
-            factor: 0.5,
-            expiry: "2028-05-25",
-            fund: "FSE_PLUS",
-          },
-          {
-            lot: "LA081316",
-            pieces: 200,
-            weight: 100,
-            factor: 0.5,
-            expiry: "2028-05-11",
-            fund: "FSE_PLUS",
-          },
-          {
-            lot: "LB111426",
-            pieces: 26,
-            weight: 13,
-            factor: 0.5,
-            expiry: "2028-05-22",
-            fund: "FSE_PLUS",
-          },
-          {
-            lot: "L154642",
-            pieces: 160,
-            weight: 160,
-            factor: 1,
-            expiry: "2026-12-30",
-            fund: "FSE_PLUS",
-          },
-          {
-            lot: "7829294",
-            pieces: 80,
-            weight: 80,
-            factor: 1,
-            expiry: "2028-05-21",
-            fund: "FONDO_NAZIONALE",
-          },
-          {
-            lot: "006544",
-            pieces: 53,
-            weight: 17.04586,
-            factor: 0.32162,
-            expiry: "2026-11-08",
-            fund: "FONDO_NAZIONALE",
-          },
-        ]),
+        expect.arrayContaining(rawStock.map((row) => ({
+          lot: String(row.Lotto), pieces: Number(row.GiacenzaPezzi), weight: Number(row.GiacenzaPesoVolume),
+          factor: Number(String(row.PesoUnita).replace(",", ".")), expiry: (() => { const d = XLSX.SSF.parse_date_code(Number(row.Scadenza)); return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`; })(),
+          fund: row.Fondo === "FSE+" ? "FSE_PLUS" : "FONDO_NAZIONALE",
+        }))),
       );
       const coveredClaims = await db
         .select()
         .from(fseMovementClaimsTable)
         .where(eq(fseMovementClaimsTable.sourceRegistryId, sourceId));
-      expect(coveredClaims).toHaveLength(80);
+      expect(coveredClaims).toHaveLength(expectedClaims);
       expect(
         coveredClaims.every((claim) => claim.stato === "COPERTA_SALDO"),
       ).toBe(true);
@@ -3581,7 +3568,7 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
           .select()
           .from(movimentiTable)
           .where(eq(movimentiTable.magazzinoId, warehouseId)),
-      ).toHaveLength(7);
+      ).toHaveLength(rawStock.length);
     },
   );
 });

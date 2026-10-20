@@ -7,7 +7,6 @@ import {
   ruoliTable,
   utentiTable,
   menseTable,
-  utentiMenseTable,
   magazziniTable,
 } from "@workspace/db";
 import { initDbExtensions } from "../../src/lib/dbInit";
@@ -96,10 +95,6 @@ export async function m67aMensaFixture() {
       })
       .where(eq(utentiTable.id, id))
       .returning();
-    if (areas.includes("mensa") && !isAdmin)
-      await db
-        .insert(utentiMenseTable)
-        .values({ utenteId: id, mensaId: canteens[0].id, assegnataDa: id });
     return { id, roleId: role.id, username: record.username, password };
   }
   const report = "mensa.reports.view";

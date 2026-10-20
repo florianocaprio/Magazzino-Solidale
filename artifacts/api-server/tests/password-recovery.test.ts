@@ -1,3 +1,4 @@
+import { sessionStub } from "./helpers/session-stub";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
@@ -27,10 +28,7 @@ function publicAuthApp(): Express {
 function appAs(userId: number): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
-    (req as unknown as { session: { userId: number } }).session = { userId };
-    next();
-  });
+  app.use(sessionStub(userId));
   app.use(utentiRouter);
   return app;
 }

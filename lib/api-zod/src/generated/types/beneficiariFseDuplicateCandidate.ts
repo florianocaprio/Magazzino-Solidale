@@ -5,10 +5,19 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BeneficiariFseComparisonField } from "./beneficiariFseComparisonField";
 
 export interface BeneficiariFseDuplicateCandidate {
   id: number;
   codice: string;
+  nome?: string;
+  cognome?: string;
+  /** @nullable */
+  dataNascita?: Date | null;
+  collegabile?: boolean;
+  /** @minimum 1 */
+  versione?: number;
+  confronto?: BeneficiariFseComparisonField[];
   /** @nullable */
   centroAscoltoId: number | null;
 }

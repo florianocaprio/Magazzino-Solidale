@@ -1259,6 +1259,58 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     expect(serviceRow.esitoCommit).toBe("CONFLITTO_GIORNATA_ESISTENTE");
   });
 
+  it("Area volontario: importa senza Centro di riferimento nell’Area scelta", async () => {
+    const [centre] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, defaultCenterId));
+    const [role] = await db.select().from(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, ruoloId));
+    const surname = unique("AreaImport");
+    const preview = await request(app()).post(`/volontari/import/analizza?areaOperativaId=${centre.areaOperativaId}`)
+      .set("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .set("x-file-name", "area-senza-centro.xlsx")
+      .send(workbook([[1, "", `${surname} Ada`, "Roma", "1980-01-02", "Via Area 1", "", todayRome(), "2099-12-31", "", "", "", "", role.nome]]));
+    expect(preview.status, preview.text).toBe(201);
+    scope.importazioneVolontariIds.push(preview.body.importazioneId);
+    const commit = await request(app()).post("/volontari/import/conferma").send({ importazioneId: preview.body.importazioneId, righe: [{ numeroRiga: preview.body.righe[0].numeroRiga, ruoloVolontarioId: ruoloId }] });
+    const [created] = await db.select().from(volontariTable).where(eq(volontariTable.cognome, surname));
+    if (created) scope.volontarioIds.push(created.id);
+    expect(commit.body, commit.text).toMatchObject({ creati: 1, errori: 0 });
+    expect(created).toMatchObject({ areaOperativaId: centre.areaOperativaId, centroAscoltoId: null });
+    expect(created.matricola).toBeTruthy();
+  });
+
+  it("Area volontario: la giornata temporanea permette servizio anche in altri Centri della stessa Area", async () => {
+    const day = addCalendarDays(todayRome(), 1);
+    const volunteer = await approve(await createVolunteer({ tipo: "TEMPORANEO", dataServizio: day }));
+    await db.update(volontariTable).set({ centroAscoltoId: null }).where(eq(volontariTable.id, volunteer.id));
+    const [center] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, defaultCenterId));
+    const otherCentre = (await createCentroRec(scope, { areaOperativaId: center.areaOperativaId })).id;
+    const available = await request(app()).get("/volontari").query({ centroAscoltoId: defaultCenterId, dataRiferimento: day, stato: "attivi" });
+    expect(available.status).toBe(200);
+    expect(available.body.map((v: { id: number }) => v.id)).toContain(volunteer.id);
+    const unavailable = await request(app()).get("/volontari").query({ centroAscoltoId: otherCentre, dataRiferimento: day, stato: "attivi" });
+    expect(unavailable.status).toBe(200);
+    expect(unavailable.body.map((v: { id: number }) => v.id)).toContain(volunteer.id);
+  });
+
+  it("BUG02: preview respinge nascite future e la conferma non accetta correzioni future", async () => {
+    const [role] = await db.select().from(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, ruoloId));
+    const row = (birth: string) => [1, unique("BIRTH"), "Bianchi Beatrice", "Roma", birth, "Via Test 1", "", "2020-01-01", "2028-01-31", "", "", "", "", role.nome];
+    const invalid = await analyze(workbook([row(addCalendarDays(todayRome(), 1))]), defaultCenterId);
+    expect(invalid.status, invalid.text).toBe(201);
+    scope.importazioneVolontariIds.push(invalid.body.importazioneId);
+    expect(invalid.body.righe[0].stato).toBe("ERRORE");
+    expect(invalid.body.righe[0].errori.join(" ")).toMatch(/nascita.*futura/i);
+    const invalidCommit = await request(app()).post("/volontari/import/conferma").send({ importazioneId: invalid.body.importazioneId, righe: [{ numeroRiga: 2, ruoloVolontarioId: ruoloId }] });
+    expect(invalidCommit.body).toMatchObject({ creati: 0, aggiornati: 0, errori: 1 });
+    const valid = await analyze(workbook([row("1985-02-03")]), defaultCenterId);
+    expect(valid.status, valid.text).toBe(201);
+    scope.importazioneVolontariIds.push(valid.body.importazioneId);
+    expect(valid.body.righe[0].stato).not.toBe("ERRORE");
+    const corrected = await request(app()).post("/volontari/import/conferma").send({ importazioneId: valid.body.importazioneId, righe: [{ numeroRiga: 2, ruoloVolontarioId: ruoloId, correzioni: { dataNascita: addCalendarDays(todayRome(), 1) } }] });
+    expect(corrected.body).toMatchObject({ creati: 0, aggiornati: 0, errori: 1 });
+    const [stored] = await db.select().from(importazioniVolontariRigheTable).where(eq(importazioniVolontariRigheTable.importazioneId, valid.body.importazioneId));
+    expect(stored.esitoCommit).toBe("ERRORE_DATA_NASCITA");
+  });
+
   it("classifica email/telefono come possibile duplicato e non effettua merge automatici", async () => {
     const centroId = await createCentro(scope, unique("Centro Duplicati"));
     const existing = await createVolunteer({

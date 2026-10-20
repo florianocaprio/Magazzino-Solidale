@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import i18nInstance from "@/lib/i18n";
+import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
+import { earliestPlanningDate, todayDateOnly } from "@/lib/date-only";
+import { invalidateLogisticaResources } from "@/lib/logistica-cache";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +12,8 @@ import {
   useCreateTurnoVolontarioPending,
   useCreateTurnoMezzoPending,
   useListCentriAscolto,
+  useListAreeOperative,
+  type CentroAscolto,
   useListVolontari,
   getListVolontariQueryKey,
   useListMezzi,
@@ -92,19 +98,59 @@ function addDays(d: Date, n: number): Date {
 
 type VolRow = { volontarioId: number | ""; ruolo: string };
 
+registerLogisticaCampaign(i18nInstance);
+
 export default function Turni() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const { data: centri = [] } = useListCentriAscolto();
+  const { data: aree = [] } = useListAreeOperative();
+  const [selectedArea, setSelectedArea] = useState<number | null>(null);
+  const [selectedCentro, setSelectedCentro] = useState<number | null>(null);
+  const lockedCentro = user?.centroAscoltoId ?? null;
+  const lockedArea = user?.areaOperativaId ?? (lockedCentro == null ? null : centri.find((c) => c.id === lockedCentro)?.areaOperativaId) ?? null;
+  const areaId = lockedArea ?? selectedArea;
+  const allowedCenters = centri.filter((c) => c.attivo && c.areaOperativaId === areaId);
+  const requestedCentro = lockedCentro ?? selectedCentro;
+  const centroId = allowedCenters.some((c) => c.id === requestedCentro) ? requestedCentro : null;
+  return <div className="space-y-6">
+    <div>
+      <h1 className="text-2xl font-bold">{t("turni.title")}</h1>
+      <p className="text-muted-foreground text-sm">{t("turni.subtitle")}</p>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor="turni-area">{t("logisticaCampaign.area")}</Label>
+        <Select value={areaId == null ? "" : String(areaId)} disabled={lockedArea != null || lockedCentro != null} onValueChange={(v) => { setSelectedArea(Number(v)); setSelectedCentro(null); }}>
+          <SelectTrigger id="turni-area"><SelectValue placeholder={t("logisticaCampaign.selectArea")} /></SelectTrigger>
+          <SelectContent>{aree.filter((a) => a.attivo && (lockedArea == null || a.id === lockedArea)).map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="turni-centro">{t("turni.centro")}</Label>
+        <Select value={centroId == null ? "" : String(centroId)} disabled={areaId == null || lockedCentro != null} onValueChange={(v) => setSelectedCentro(Number(v))}>
+          <SelectTrigger id="turni-centro"><SelectValue placeholder={t("turni.centroPlaceholder")} /></SelectTrigger>
+          <SelectContent>{allowedCenters.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+    </div>
+    {areaId == null || centroId == null
+      ? <Card><CardContent className="py-12 text-center text-muted-foreground">{t("logisticaCampaign.selectContext")}</CardContent></Card>
+      : <TurniPlanner key={`${areaId}:${centroId}`} effectiveCentro={centroId} selectedArea={areaId} centri={centri} />}
+  </div>;
+}
+
+/** Context key remounts the planner: drafts and dependent queries cannot cross Area/Centre. */
+function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCentro: number; selectedArea: number; centri: CentroAscolto[] }) {
+
   const { t, i18n } = useTranslation();
   const { user, hasPermission } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const isScoped = user?.centroAscoltoId != null;
   const canManage = hasPermission("logistica.turni.manage");
   const canManageVolontari = hasPermission("logistica.volontari.manage");
   const canManageMezzi = hasPermission("logistica.mezzi.manage");
-  const [selectedCentro, setSelectedCentro] = useState<number | null>(
-    user?.centroAscoltoId ?? null,
-  );
   const [pendingVolontari, setPendingVolontari] = useState<Volontario[]>([]);
   const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
   const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
@@ -125,9 +171,10 @@ export default function Turni() {
     descrizione: "",
     note: "",
   });
-  const effectiveCentro = isScoped ? user!.centroAscoltoId! : selectedCentro;
+  const currentContext = useRef(true);
+  useEffect(() => { currentContext.current = true; return () => { currentContext.current = false; }; }, []);
 
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekMonday(new Date(`${todayDateOnly()}T12:00:00`)));
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
@@ -135,38 +182,37 @@ export default function Turni() {
   const da = toISODate(days[0]);
   const a = toISODate(days[6]);
 
-  const { data: centri } = useListCentriAscolto();
   const { data: ruoliVolontari } = useListRuoliVolontari();
-  const { data: volontari } = useListVolontari();
+  const volunteersParams = { centroAscoltoId: effectiveCentro, stato: "tutti" as const };
+  const { data: volontari } = useListVolontari(volunteersParams, { query: { queryKey: getListVolontariQueryKey(volunteersParams) } });
   const volontariCentro = useMemo(
     () =>
       (volontari ?? []).filter((v, idx, all) => {
         if (all.findIndex((x) => x.id === v.id) !== idx) return false;
         const centroOk =
-          v.centroAscoltoId == null ||
-          effectiveCentro == null ||
-          v.centroAscoltoId === effectiveCentro;
+          v.areaOperativaId === selectedArea &&
+          (v.centroAscoltoId == null || v.centroAscoltoId === effectiveCentro);
         const approved = (v.statoApprovazione ?? "approvato") === "approvato";
         return centroOk && approved;
       }),
-    [volontari, effectiveCentro],
+    [volontari, selectedArea, effectiveCentro],
   );
 
-  const { data: mezzi } = useListMezzi();
+  const { data: mezzi, isFetching: fetchingMezzi, isError: errorMezzi } = useListMezzi();
   const mezziCentro = useMemo(
     () =>
       (mezzi ?? []).filter((m, idx, all) => {
         if (all.findIndex((x) => x.id === m.id) !== idx) return false;
         const centroOk =
-          m.effectiveCentroId == null ||
-          effectiveCentro == null ||
-          m.effectiveCentroId === effectiveCentro;
+          m.volontarioId != null ? m.areaOperativaId === selectedArea &&
+            (m.effectiveCentroId == null || m.effectiveCentroId === effectiveCentro) :
+          m.effectiveCentroId == null || m.effectiveCentroId === effectiveCentro;
         const approved =
           (m.statoApprovazione ?? "approvato") === "approvato" &&
           m.stato === "disponibile";
         return centroOk && approved;
       }),
-    [mezzi, effectiveCentro],
+    [mezzi, effectiveCentro, selectedArea],
   );
 
   const { data: turni } = useListTurni(
@@ -177,10 +223,13 @@ export default function Turni() {
   // All turni visible to the caller for this week (no centro filter) — used for the
   // allocation views and the cross-centro mezzo conflict detection. For a centro-scoped
   // caller the server still limits this to their own centro.
-  const { data: allTurni } = useListTurni(
+  const { data: allAreaTurni, isFetching: fetchingTurni, isError: errorTurni } = useListTurni(
     { da, a },
     { query: { queryKey: getListTurniQueryKey({ da, a }) } },
   );
+
+  const allTurni = useMemo(() => (allAreaTurni ?? []).filter((turno) =>
+    centri.some((centro) => centro.id === turno.centroAscoltoId && centro.areaOperativaId === selectedArea)), [allAreaTurni, centri, selectedArea]);
 
   const turnoMap = useMemo(() => {
     const m = new Map<string, NonNullable<typeof turni>[number]>();
@@ -191,7 +240,7 @@ export default function Turni() {
   // key `data|fascia` → set of mezzoId already booked by ANOTHER centro in that slot.
   const bookedElsewhere = useMemo(() => {
     const m = new Map<string, Set<number>>();
-    for (const turno of allTurni ?? []) {
+    for (const turno of allAreaTurni ?? []) {
       if (turno.stato === "annullato") continue;
       if (turno.mezzoId == null) continue;
       if (turno.centroAscoltoId === effectiveCentro) continue;
@@ -201,7 +250,7 @@ export default function Turni() {
       m.set(k, s);
     }
     return m;
-  }, [allTurni, effectiveCentro]);
+  }, [allAreaTurni, effectiveCentro]);
 
   const upsert = useUpsertTurno();
   const createPendingVolontario = useCreateTurnoVolontarioPending();
@@ -219,7 +268,7 @@ export default function Turni() {
     data: dialog?.data ?? "",
     fascia: (dialog?.fascia ?? "09-13") as "09-13" | "14-18" | "18-20",
   };
-  const { data: caricoTurno } = useGetVolontariCarico(caricoParams, {
+  const { data: caricoTurno, isFetching: fetchingCarico, isError: errorCarico } = useGetVolontariCarico(caricoParams, {
     query: {
       enabled: dialog != null,
       queryKey: getGetVolontariCaricoQueryKey(caricoParams),
@@ -228,8 +277,9 @@ export default function Turni() {
   const volontariOperativiParams = {
     dataRiferimento: dialog?.data ?? da,
     stato: "attivi" as const,
+    centroAscoltoId: effectiveCentro,
   };
-  const { data: volontariOperativiDialog } = useListVolontari(
+  const { data: volontariOperativiDialog, isFetching: fetchingVolontari, isError: errorVolontari } = useListVolontari(
     volontariOperativiParams,
     {
       query: {
@@ -255,14 +305,14 @@ export default function Turni() {
   const bookedVolontari = useMemo(() => {
     if (!dialog) return new Set<number>();
     const result = new Set<number>();
-    for (const turno of allTurni ?? []) {
+    for (const turno of allAreaTurni ?? []) {
       if (turno.stato === "annullato") continue;
       if (turno.data !== dialog.data || turno.fascia !== dialog.fascia) continue;
       if (turno.centroAscoltoId === effectiveCentro) continue;
       for (const volontario of turno.volontari) result.add(volontario.volontarioId);
     }
     return result;
-  }, [allTurni, dialog, effectiveCentro]);
+  }, [allAreaTurni, dialog, effectiveCentro]);
 
   // Mezzi selectable for the open cell: hide those already booked by another centro
   // in this exact data+fascia, but always keep the currently selected mezzo visible.
@@ -285,9 +335,14 @@ export default function Turni() {
     [bookedVolontari, caricoMap, volontariCentro, volontariOperativiIds],
   );
 
+  const checkingAvailability = fetchingMezzi || fetchingCarico || fetchingVolontari || fetchingTurni;
+  const availabilityError = errorMezzi || errorCarico || errorVolontari || errorTurni;
+  const minimumDate = earliestPlanningDate();
+
   function openCell(dataISO: string, fascia: string) {
     if (effectiveCentro == null) return;
     const existing = turnoMap.get(`${dataISO}|${fascia}`);
+    if (dataISO < earliestPlanningDate() && !existing) return;
     setRows(
       existing && existing.volontari.length
         ? existing.volontari.map((v) => ({ volontarioId: v.volontarioId, ruolo: v.ruolo ?? "" }))
@@ -297,24 +352,36 @@ export default function Turni() {
     setDialog({ data: dataISO, fascia });
   }
 
-  function save() {
-    if (!dialog || effectiveCentro == null) return;
-    const volontari = rows
+  const historicalDialog = dialog != null && dialog.data < minimumDate;
+
+  function save(clearHistorical = false) {
+    if (!dialog || effectiveCentro == null || (!clearHistorical && (checkingAvailability || availabilityError))) return;
+    if (dialog.data < earliestPlanningDate() && !clearHistorical) {
+      toast({ variant: "destructive", description: t("logisticaCampaign.planningWindow", { date: earliestPlanningDate() }) });
+      return;
+    }
+    const volontari = clearHistorical ? [] : rows
       .filter((r) => r.volontarioId !== "")
       .map((r) => ({ volontarioId: Number(r.volontarioId), ruolo: r.ruolo.trim() || undefined }));
     const existing = turnoMap.get(`${dialog.data}|${dialog.fascia}`);
     upsert.mutate(
-      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia as "09-13" | "14-18" | "18-20", mezzoId, volontari, ...(existing ? { versione: existing.versione } : {}) } },
+      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia as "09-13" | "14-18" | "18-20", mezzoId: clearHistorical ? null : mezzoId, volontari, ...(existing ? { versione: existing.versione } : {}) } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
+          if (!currentContext.current) return;
           toast({ description: t("turni.saved") });
           setDialog(null);
         },
         onError: (err: unknown) => {
+          if (!currentContext.current) return;
           const error = err as { status?: number; response?: { status?: number } };
           const status = error.status ?? error.response?.status;
-          if (status === 409) queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
+          if (status === 409) {
+            queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
+            invalidateLogisticaResources(queryClient, "volontari");
+            setDialog(null);
+          }
           toast({
             variant: "destructive",
             description: status === 409
@@ -345,6 +412,8 @@ export default function Turni() {
       },
       {
         onSuccess: (created) => {
+          invalidateLogisticaResources(queryClient, "volontari");
+          if (!currentContext.current) return;
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
@@ -353,6 +422,7 @@ export default function Turni() {
           setVolontarioDialogOpen(false);
         },
         onError: (e: unknown) => {
+          if (!currentContext.current) return;
           const message = apiErrorMessage(e);
           setVolontarioError(message);
           toast({ variant: "destructive", description: message });
@@ -376,13 +446,15 @@ export default function Turni() {
       },
       {
         onSuccess: (created) => {
+          invalidateLogisticaResources(queryClient, "mezzi");
+          if (!currentContext.current) return;
           setPendingMezzi((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ description: t("turni.pendingMezzoCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }) });
           setNuovoMezzo({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
           setMezzoDialogOpen(false);
         },
-        onError: (e: unknown) => toast({ variant: "destructive", description: apiErrorMessage(e) }),
+        onError: (e: unknown) => { if (currentContext.current) toast({ variant: "destructive", description: apiErrorMessage(e) }); },
       },
     );
   }
@@ -453,38 +525,12 @@ export default function Turni() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t("turni.title")}</h1>
-          <p className="text-muted-foreground text-sm">{t("turni.subtitle")}</p>
-        </div>
-        {!isScoped && (
-          <div className="w-64">
-            <Label className="text-xs">{t("turni.centro")}</Label>
-            <Select
-              value={selectedCentro != null ? String(selectedCentro) : ""}
-              onValueChange={(v) => setSelectedCentro(v ? Number(v) : null)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("turni.centroPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {(centri ?? []).map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
-
+      <p className="text-sm text-muted-foreground">{t("logisticaCampaign.planningWindow", { date: minimumDate })}</p>
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label={t("turni.prevWeek")}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" onClick={() => setWeekStart(startOfWeekMonday(new Date()))}>
+        <Button variant="outline" onClick={() => setWeekStart(startOfWeekMonday(new Date(`${todayDateOnly()}T12:00:00`)))}>
           {t("turni.today")}
         </Button>
         <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label={t("turni.nextWeek")}>
@@ -514,7 +560,7 @@ export default function Turni() {
               <div className="grid min-w-[900px] grid-cols-[140px_repeat(7,1fr)] gap-px rounded-lg border bg-border">
                 <div className="bg-muted p-2" />
                 {days.map((d) => {
-                  const isToday = toISODate(d) === toISODate(new Date());
+                  const isToday = toISODate(d) === todayDateOnly();
                   return (
                     <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium ${isToday ? "text-primary" : ""}`}>
                       {d.toLocaleDateString(i18n.language, { weekday: "short" })}
@@ -536,7 +582,8 @@ export default function Turni() {
                         <button
                           key={`${iso}|${f.key}`}
                           onClick={() => openCell(iso, f.key)}
-                          disabled={!canManage || turno?.stato === "completato"}
+                          disabled={!canManage || turno?.stato === "completato" || (iso < minimumDate && !turno)}
+                          title={iso < minimumDate ? t("logisticaCampaign.historyReadonly") : undefined}
                           className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors disabled:cursor-default disabled:hover:bg-background"
                         >
                           {turno && <div className="mb-1 text-[9px] uppercase tracking-wide text-muted-foreground">{turno.stato}</div>}
@@ -609,7 +656,7 @@ export default function Turni() {
                   <div className="grid min-w-[900px] grid-cols-[160px_repeat(7,1fr)] gap-px rounded-lg border bg-border">
                     <div className="bg-muted p-2 text-xs font-medium">{t("turni.colMezzo")}</div>
                     {days.map((d) => {
-                      const isToday = toISODate(d) === toISODate(new Date());
+                      const isToday = toISODate(d) === todayDateOnly();
                       return (
                         <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium ${isToday ? "text-primary" : ""}`}>
                           {d.toLocaleDateString(i18n.language, { weekday: "short" })}
@@ -714,6 +761,15 @@ export default function Turni() {
             </DialogDescription>
           </DialogHeader>
 
+          {historicalDialog && <div className="space-y-2 text-sm">
+            <p>{t("logisticaCampaign.historyReadonly")}</p>
+            <ul>{turnoMap.get(`${dialog?.data}|${dialog?.fascia}`)?.volontari.map((v) => <li key={v.volontarioId}>{v.volontarioNome}</li>)}</ul>
+          </div>}
+          <fieldset disabled={historicalDialog} className="space-y-3">
+          <legend className="sr-only">{t("turni.addTitle")}</legend>
+          <p className="text-sm text-muted-foreground">{t("logisticaCampaign.availabilityHelp")}</p>
+          {checkingAvailability && <p role="status">{t("logisticaCampaign.loadingAvailability")}</p>}
+          {availabilityError && <p role="alert" className="text-destructive">{t("logisticaCampaign.error")}</p>}
           <div className="space-y-3">
             {rows.length === 0 && (
               <p className="text-muted-foreground text-sm">{t("turni.noVolontari")}</p>
@@ -733,7 +789,7 @@ export default function Turni() {
                     </SelectTrigger>
                     <SelectContent>
                       {volontariCentro.filter((v) => volontariDisponibili.some((available) => available.id === v.id) || v.id === row.volontarioId).map((v) => (
-                        <SelectItem key={v.id} value={String(v.id)}>
+                        <SelectItem key={v.id} value={String(v.id)} disabled={!volontariDisponibili.some((available) => available.id === v.id)}>
                           {volontarioLabel(v)}
                         </SelectItem>
                       ))}
@@ -782,9 +838,9 @@ export default function Turni() {
                 <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontarioNonCensito", { defaultValue: "Nuovo Volontario" })}
               </Button>}
             </div>
-            {pendingVolontari.length > 0 && (
+            {pendingVolontari.some((v) => (volontari ?? []).find((current) => current.id === v.id)?.statoApprovazione === "in_attesa") && (
               <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
-                {pendingVolontari.map(volontarioLabel).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+                {pendingVolontari.filter((v) => (volontari ?? []).find((current) => current.id === v.id)?.statoApprovazione === "in_attesa").map(volontarioLabel).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
               </p>
             )}
 
@@ -819,21 +875,25 @@ export default function Turni() {
               >
                 <Plus className="me-1 h-4 w-4" /> {t("turni.addMezzoNonCensito", { defaultValue: "Nuovo Mezzo" })}
               </Button>}
-              {pendingMezzi.length > 0 && (
+              {pendingMezzi.some((m) => (mezzi ?? []).find((current) => current.id === m.id)?.statoApprovazione === "in_attesa") && (
                 <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
-                  {pendingMezzi.map((m) => m.codice).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+                  {pendingMezzi.filter((m) => (mezzi ?? []).find((current) => current.id === m.id)?.statoApprovazione === "in_attesa").map((m) => m.codice).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
                 </p>
               )}
             </div>
           </div>
 
+          </fieldset>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>
               {t("turni.cancel")}
             </Button>
-            <Button onClick={save} disabled={upsert.isPending || !canManage}>
-              {t("turni.save")}
-            </Button>
+            {historicalDialog
+              ? <Button variant="destructive" onClick={() => save(true)} disabled={upsert.isPending || !canManage}>{t("logisticaCampaign.cancelShift")}</Button>
+              : <Button onClick={() => save()} disabled={upsert.isPending || !canManage || checkingAvailability || availabilityError}>
+                  {t("turni.save")}
+                </Button>}
+
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -145,20 +145,12 @@ async function directoryActor(f: Fixture) {
     .where(eq(utentiTable.id, f.user.id));
 }
 async function enable(f: Fixture, stato = "attivo") {
-  // Il diritto è concesso dal Sociale nel suo Centro; poi il cassiere torna
-  // al Centro 1, distinto sia dal beneficiario (2) sia dall'Emporio (3).
-  await db
-    .update(utentiTable)
-    .set({ centroAscoltoId: f.centers[1].id })
-    .where(eq(utentiTable.id, f.user.id));
+  // Il Sociale abilita il servizio anche dal Centro 1 per il beneficiario
+  // del Centro 2 nella stessa Area; il Centro del profilo non va cambiato.
   const r = await f.agent
     .post(`/api/emporio/beneficiari/${f.beneficiary.id}/abilitazione`)
     .send({ stato, motivo: `Decisione esplicita ${stato}` });
   expect(r.status, r.text).toBe(200);
-  await db
-    .update(utentiTable)
-    .set({ centroAscoltoId: f.centers[0].id })
-    .where(eq(utentiTable.id, f.user.id));
   return r;
 }
 const search = (f: Fixture, search: string, extra = {}) =>
@@ -180,6 +172,31 @@ async function facts() {
   ).rows[0];
 }
 describe("M6.2-A-F1 UAT", () => {
+  it("abilita il primo Credito con l’Emporio senza accrediti e conserva una revoca esplicita; il riepilogo è solo lettura", async () => {
+    const f = await fixture();
+    await db.update(beneficiariTable).set({ creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleDataAbilitazione: null }).where(eq(beneficiariTable.id, f.beneficiary.id));
+    const [before] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, f.beneficiary.id));
+    await enable(f);
+    const [enabled] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, f.beneficiary.id));
+    expect(enabled.creditoSolidaleAbilitato).toBe(true);
+    expect(enabled.creditoSolidaleStato).toBe("attivo");
+    expect(enabled.creditoSolidaleSaldo).toBe(before.creditoSolidaleSaldo);
+    expect(enabled.creditoSolidaleMensileAssegnato).toBe(before.creditoSolidaleMensileAssegnato);
+    await directoryActor(f);
+    const states = await f.agent.get(`/api/beneficiari/${f.beneficiary.id}/stati-servizi`);
+    expect(states.status).toBe(200);
+    expect(Object.keys(states.body).sort()).toEqual(["emporio", "mensa", "tessera"]);
+    expect(states.body.emporio).toMatchObject({ disponibile: true, stato: "attivo" });
+    expect(Object.keys(states.body.tessera).sort()).toEqual(["disponibile", "stato"]);
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, f.beneficiary.id)))[0]).toEqual(enabled);
+    await f.agent.post(`/api/emporio/beneficiari/${f.beneficiary.id}/abilitazione`).send({ stato: "sospeso", motivo: "Test sospensione" });
+    await db.update(beneficiariTable).set({ creditoSolidaleAbilitato: false, creditoSolidaleStato: "revocato" }).where(eq(beneficiariTable.id, f.beneficiary.id));
+    await enable(f);
+    const [reactivated] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, f.beneficiary.id));
+    expect(reactivated.creditoSolidaleAbilitato).toBe(false);
+    expect(reactivated.creditoSolidaleStato).toBe("revocato");
+    expect(reactivated.creditoSolidaleSaldo).toBe(before.creditoSolidaleSaldo);
+  });
   it("F3: luca returns the actual matching IDs across Centers; ID lookup does not invent a name", async () => {
     const f = await fixture();
     await enable(f);
@@ -415,7 +432,7 @@ describe("M6.2-A-F1 UAT", () => {
           .get(endpoint)
           .query({ beneficiarioIds: String(f.beneficiary.id) })
       ).body,
-    ).toEqual([]);
+    ).toEqual(result.body);
     expect(
       (await f.agent.get(endpoint).query({ beneficiarioIds: "1,bad" })).status,
     ).toBe(400);

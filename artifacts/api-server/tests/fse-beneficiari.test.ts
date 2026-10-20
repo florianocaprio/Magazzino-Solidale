@@ -56,17 +56,45 @@ function exportedRow() {
 }
 
 describe("contratto Beneficiari FSE+", () => {
-  it("richiede i 17 header nello stesso ordine", () => {
+  it("richiede i 17 header per nome, indipendentemente dall’ordine", () => {
     expect(validateFseHeaders([...FSE_BENEFICIARI_HEADERS]).errori).toEqual([]);
     const reversed = [...FSE_BENEFICIARI_HEADERS];
     [reversed[0], reversed[1]] = [reversed[1], reversed[0]];
-    expect(validateFseHeaders(reversed).errori).toHaveLength(2);
+    expect(validateFseHeaders(reversed).errori).toEqual([]);
   });
 
   it("rifiuta header mancante o duplicato e segnala extra finali", () => {
     expect(validateFseHeaders(FSE_BENEFICIARI_HEADERS.slice(1)).errori.length).toBeGreaterThan(0);
     expect(validateFseHeaders([...FSE_BENEFICIARI_HEADERS, FSE_BENEFICIARI_HEADERS[0]]).errori.join(" ")).toContain("duplicata");
     expect(validateFseHeaders([...FSE_BENEFICIARI_HEADERS, "Extra"]).warning).toEqual(["Colonna extra ignorata: Extra."]);
+  });
+
+  it("legge il tracciato corrente con le due date intermedie e intestazioni normalizzate", () => {
+    const source = validRow();
+    const headers = [...FSE_BENEFICIARI_HEADERS];
+    const full = [...headers.slice(0, 4), "Data Cambio Stato", "Data Ultimo Aggiornamento", ...headers.slice(4)];
+    const sheet = XLSX.utils.aoa_to_sheet([full.map((h) => ` ${h.toUpperCase()} `), full.map((h) => source[h] ?? "20/10/2026")]);
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "Table1");
+    const parsed = parseFseBeneficiariWorkbook(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
+    expect(parsed.header.errori).toEqual([]);
+    expect(parsed.header.warning).toHaveLength(2);
+    expect(parsed.rows[0].errori).toEqual([]);
+    expect(parsed.rows[0].row).toMatchObject({ codiceFascicolo: "FSE-AbC", numeroComponenti: 1 });
+  });
+
+  it.each([false, true])("conserva la data civile Excel anche con sistema 1904=%s e fuso Europe/Rome", (date1904) => {
+    const raw = validRow({ "Data di presa in carico": date1904 ? 44076 : 45538 });
+    const sheet = XLSX.utils.aoa_to_sheet([[...FSE_BENEFICIARI_HEADERS], FSE_BENEFICIARI_HEADERS.map((h) => raw[h])]);
+    sheet.D2.z = "dd/mm/yyyy";
+    const book = XLSX.utils.book_new(); book.Workbook = { WBProps: { date1904 } };
+    XLSX.utils.book_append_sheet(book, sheet, "Table1");
+    const parsed = parseFseBeneficiariWorkbook(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
+    expect(parsed.rows[0].row?.dataPresaInCarico).toBe("2024-09-03");
+    expect(validateFseRows(parsed.rawRows)[0].row?.dataPresaInCarico).toBe("2024-09-03");
+  });
+
+  it("spiega di scegliere ElencoFascicoliSociali quando viene allegato Registro o Giacenze", () => {
+    expect(validateFseHeaders(["Fondo", "Prodotto", "GiacenzaPezzi"]).errori).toEqual(["Questo è un file di magazzino (Registro o Giacenze). Per importare i beneficiari seleziona il file ElencoFascicoliSociali di FSE+."]);
   });
 
   it("normalizza il codice soltanto per confronto", () => {

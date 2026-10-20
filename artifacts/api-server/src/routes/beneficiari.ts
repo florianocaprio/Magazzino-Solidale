@@ -1,4 +1,11 @@
-import { randomInt } from "node:crypto";
+import { readBeneficiarioFascicolo, saveBeneficiarioFascicolo, BeneficiarioFascicoloError } from "../lib/beneficiarioFascicolo";
+import { isModuloAttivo } from "../lib/featureFlags";
+import { requireCurrentCommandActor, CurrentCommandActorError } from "../lib/currentCommandActor";
+import { beneficiarioAccessScopeFromRequest, canAccessBeneficiarioScope } from "../lib/beneficiarioPolicy";
+import { emporioAbilitazioniTable, mensaAbilitazioniTable } from "@workspace/db";
+import { emporioEligibilityState } from "../lib/emporioScope";
+import { riepilogoAbilitazioneMensa, type MensaRiepilogoHistoryRow } from "../lib/mensaEligibilitySummary";
+import { allocateBeneficiaryCode, BeneficiaryCodeError } from "../lib/beneficiariCodice";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter, type Request } from "express";
 import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, areeOperativeTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
@@ -20,7 +27,8 @@ import {
   beneficiarioCentroId,
   beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
-} from "../lib/centroScope";
+  serviceAreaCentroScopeFilter,
+} from "../lib/serviceScope";
 import {
   EMPORIO_DISABLED_MSG,
   UNITA_STRADA_DISABLED_MSG,
@@ -51,6 +59,22 @@ import {
 
 const router: IRouter = Router();
 router.use("/beneficiari", requireCurrentUdsScope);
+router.use("/beneficiari/:id", async (req, res, next) => {
+  const id = Number(req.params.id);
+  const boundary = serviceAreaCentroScopeFilter(
+    beneficiariTable.centroAscoltoId, req,
+  );
+  if (Number.isSafeInteger(id) && id > 0 && boundary) {
+    const [outside] = await db.select({ id: beneficiariTable.id })
+      .from(beneficiariTable)
+      .where(and(eq(beneficiariTable.id, id), sql`not (${boundary})`));
+    if (outside) {
+      res.status(403).json({ error: "Beneficiario fuori dall'Area autorizzata" });
+      return;
+    }
+  }
+  next();
+});
 
 const SOCIAL_SENSITIVE_FIELDS = new Set([
   "restrizioniAlimentari",
@@ -219,14 +243,6 @@ async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Pro
     : eq(beneficiariTable.codice, codice);
   const [hit] = await db.select({ id: beneficiariTable.id }).from(beneficiariTable).where(where).limit(1);
   return hit != null;
-}
-
-async function generaCodiceBeneficiario(): Promise<string> {
-  for (let i = 0; i < 100; i++) {
-    const codice = `BEN-${String(randomInt(0, 10_000_000_000_000)).padStart(13, "0")}`;
-    if (!(await codiceBeneficiarioEsiste(codice))) return codice;
-  }
-  throw new Error("Impossibile generare un codice beneficiario univoco");
 }
 
 function isCodiceBeneficiarioUniqueViolation(error: unknown): boolean {
@@ -403,6 +419,7 @@ function fmtBenef(
     creditoSolidaleStato: r.creditoSolidaleStato ?? "non_abilitato",
     creditoSolidaleDataAbilitazione: r.creditoSolidaleDataAbilitazione?.toISOString() ?? null,
     creditoSolidaleNote: r.creditoSolidaleNote ?? null,
+    politicaCreditoSolidaleId: r.politicaCreditoSolidaleId ?? null,
     magazzinoEmporioPreferitoId: r.magazzinoEmporioPreferitoId ?? null,
     magazzinoEmporioPreferitoNome: magazzinoEmporioPreferitoNome ?? null,
     creditoSolidaleMensileAssegnato: r.creditoSolidaleMensileAssegnato == null ? null : Number(r.creditoSolidaleMensileAssegnato),
@@ -437,7 +454,7 @@ function fmtBenefForRequest(
   }
   if (!hasPermission(req, "credito.view")) {
     for (const key of Object.keys(result)) {
-      if (key.startsWith("creditoSolidale")) delete result[key];
+      if (key.startsWith("creditoSolidale") || key === "politicaCreditoSolidaleId") delete result[key];
     }
   }
   return result;
@@ -531,6 +548,8 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   }
   const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
+  const centreAreaFilter = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);
+  if (centreAreaFilter) conditions.push(centreAreaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
@@ -564,7 +583,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
 
 type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 interface BeneficiarioCreationOptions {
-  executor?: typeof db | BeneficiarioTx;
+  executor?: BeneficiarioTx;
   areaOperativaId?: number;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
@@ -579,7 +598,7 @@ export async function createBeneficiarioOne(
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const parsed = CreateBeneficiarioInput.safeParse(body);
   if (!parsed.success) return { error: zodErrorMessage(parsed.error), status: 400 };
-  const b = parsed.data;
+  const { fascicolo, versioneFascicolo, ...b } = parsed.data;
   if (!options.allowSensitiveFields && !hasPermission(req, "beneficiari.sensitive.view")
     && Object.keys(b).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
     return { error: "Non hai il permesso di modificare i dati sociali sensibili.", status: 403 };
@@ -587,8 +606,8 @@ export async function createBeneficiarioOne(
   const caller = callerCentroId(req);
   const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
-  const codice = trimOrUndefined(b.codice) ?? await generaCodiceBeneficiario();
-  if (await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
+  const codice = trimOrUndefined(b.codice);
+  if (codice && await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
   const values: Record<string, any> = {
@@ -661,9 +680,11 @@ export async function createBeneficiarioOne(
   });
   if (completeError) return { error: completeError, status: 400 };
 
-  const persist = async (executor: typeof db | BeneficiarioTx) => {
+  const persist = async (executor: BeneficiarioTx) => {
+    if (!codice) values.codice = await allocateBeneficiaryCode(executor, values.areaOperativaId ?? null);
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
+    if (fascicolo?.trim()) await saveBeneficiarioFascicolo(executor, row.id, fascicolo, 0, req.user?.id ?? null);
     await executor.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `beneficiario:${row.id}`,
@@ -686,6 +707,8 @@ export async function createBeneficiarioOne(
       : await db.transaction((tx) => persist(tx));
     return { row };
   } catch (e) {
+    if (e instanceof BeneficiarioFascicoloError || (e as { constraint?: string }).constraint === "fse_fascicoli_sociali_codice_norm_uidx") return { error: "Fascicolo già associato a un altro beneficiario.", status: 409 };
+    if (e instanceof BeneficiaryCodeError) return { error: e.message, status: 409 };
     if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
     throw e;
   }
@@ -694,13 +717,13 @@ export async function createBeneficiarioOne(
 router.post("/beneficiari", requirePermission("beneficiari.manage"), async (req, res) => {
   const r = await createBeneficiarioOne(req.body, req);
   if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
-  res.status(201).json(fmtBenefForRequest(
+  res.status(201).json({ ...await readBeneficiarioFascicolo(r.row.id), ...fmtBenefForRequest(
     r.row,
     req,
     null,
     null,
     await magazzinoEmporioNomeOf(r.row.magazzinoEmporioPreferitoId),
-  ));
+  ) });
 });
 
 router.post("/beneficiari/bulk", requirePermission("beneficiari.manage"), async (req, res) => {
@@ -816,6 +839,82 @@ router.post("/beneficiari/export/authorize", requirePermission("beneficiari.expo
   res.json({ autorizzato: true, auditId: audit.id });
 });
 
+// Minimal read-only service status; no card tokens, financial or social data.
+router.get("/beneficiari/:id/stati-servizi", requirePermission("beneficiari.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  const [emporioEnabled, mensaEnabled] = await Promise.all([isModuloAttivo("EMPORIO_SOLIDALE"), isModuloAttivo("MENSA")]);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.view");
+      const [person] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, id)).for("share");
+      if (!person || !canAccessBeneficiarioRecord(person, req) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
+      const [right] = emporioEnabled ? await tx.select({ stato: emporioEligibilityState() }).from(emporioAbilitazioniTable).where(and(eq(emporioAbilitazioniTable.beneficiarioId, id), eq(emporioAbilitazioniTable.areaOperativaId, person.areaOperativaId ?? -1))) : [];
+      const history = mensaEnabled ? await tx.select().from(mensaAbilitazioniTable).where(eq(mensaAbilitazioniTable.beneficiarioId, id)).orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id)) : [];
+      const cards = await tx.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, id)).orderBy(desc(tessereBeneficiariTable.id));
+      const today = dataCivileEuropeRome(new Date());
+      const card = cards.find((c) => c.stato === "attiva" && !c.dataRevoca && (!c.dataScadenza || c.dataScadenza >= today)) ?? cards[0];
+      return {
+        emporio: { disponibile: emporioEnabled, stato: emporioEnabled ? right?.stato ?? "non_abilitato" : null },
+        mensa: { disponibile: mensaEnabled, stato: mensaEnabled ? riepilogoAbilitazioneMensa(history as MensaRiepilogoHistoryRow[], today).stato : null },
+        tessera: { disponibile: true, stato: card ? (card.dataRevoca ? "revocata" : card.dataScadenza && card.dataScadenza < today ? "scaduta" : card.stato) : "non_emessa" },
+      };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+});
+
+// Le capacità UDS aggiungono solo stati minimizzati e prima tessera/recupero.
+router.get("/beneficiari/:id/stati-servizi-uds", requirePermission("beneficiari.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  if (!(await isModuloAttivo("UDS"))) { res.status(403).json({ error: "Modulo UDS disabilitato" }); return; }
+  const [emporioEnabled, mensaEnabled] = await Promise.all([isModuloAttivo("EMPORIO_SOLIDALE"), isModuloAttivo("MENSA")]);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.view");
+      const [person] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+      if (!actor.isAdmin && !actor.aree.includes("uds")) throw new TesseraBeneficiarioError(403, "Contesto UDS non autorizzato");
+      if (!person || !person.uds || !canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Persona UDS non accessibile");
+      const [right] = emporioEnabled ? await tx.select({ stato: emporioEligibilityState() }).from(emporioAbilitazioniTable).where(and(eq(emporioAbilitazioniTable.beneficiarioId, id), eq(emporioAbilitazioniTable.areaOperativaId, person.areaOperativaId ?? -1))) : [];
+      const history = mensaEnabled ? await tx.select({ id: mensaAbilitazioniTable.id, stato: mensaAbilitazioniTable.stato, dataInizio: mensaAbilitazioniTable.dataInizio, dataFine: mensaAbilitazioniTable.dataFine, mensaPrincipale: mensaAbilitazioniTable.mensaPrincipale }).from(mensaAbilitazioniTable).where(eq(mensaAbilitazioniTable.beneficiarioId, id)).orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id)) : [];
+      return {
+        emporio: { disponibile: emporioEnabled, stato: emporioEnabled ? right?.stato ?? "non_abilitato" : null },
+        mensa: { disponibile: mensaEnabled, stato: mensaEnabled ? riepilogoAbilitazioneMensa(history as MensaRiepilogoHistoryRow[], dataCivileEuropeRome(new Date())).stato : null },
+      };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+});
+
+router.post("/beneficiari/:id/tessera-documento", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0 || Object.keys(req.body ?? {}).length) { res.status(400).json({ error: "Richiesta tessera non valida" }); return; }
+  const fullManager = hasPermission(req, "beneficiari.cards.manage");
+  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view") || !req.user?.aree.includes("uds") || !(await isModuloAttivo("UDS")))) { res.status(403).json({ error: "Tessera non autorizzata" }); return; }
+  try {
+    const card = await issueTesseraBeneficiario({
+      beneficiarioId: id, dataScadenza: null, motivoSostituzione: null,
+      operatoreId: req.user!.id, ip: req.ip ?? null, areaAudit: "beneficiari", recoverExisting: true,
+      authorize: async (tx, person) => {
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, fullManager ? "beneficiari.cards.manage" : "beneficiari.manage");
+        if (!fullManager && (!person.uds || (!actor.isAdmin && (!actor.aree.includes("uds") || !actor.permessi.includes("beneficiari.view"))))) throw new TesseraBeneficiarioError(403, "Gestione persona UDS non autorizzata");
+        if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
+      },
+    });
+    res.json(formatTesseraBeneficiario(card));
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+});
+
 router.get("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
@@ -843,9 +942,6 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
   if (!beneficiario.attivo) { res.status(409).json({ error: "Il beneficiario non è attivo" }); return; }
-  if (beneficiario.statoAnagrafica !== "completa" || beneficiario.centroAscoltoId == null) {
-    res.status(409).json({ error: "Completa l'anagrafica prima di emettere la tessera" }); return;
-  }
   const dataScadenza = req.body?.dataScadenza;
   if (dataScadenza != null && dataScadenza !== "" && (typeof dataScadenza !== "string" || !isDateOnly(dataScadenza))) {
     res.status(400).json({ error: "La scadenza non è valida" }); return;
@@ -871,7 +967,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   const id = Number(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessBeneficiarioRecord(row, req)) {
+  if (!canAccessBeneficiarioRecord(row, req, callerCentroId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
     return;
   }
@@ -921,6 +1017,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   );
   res.json({
     ...anagrafica,
+    ...await readBeneficiarioFascicolo(id),
     nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
@@ -975,7 +1072,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   const id = Number(req.params.id);
   const parsed = UpdateBeneficiarioInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
-  const input = parsed.data;
+  const { fascicolo, versioneFascicolo, ...input } = parsed.data;
   if (!hasPermission(req, "beneficiari.sensitive.view")
     && Object.keys(input).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
     res.status(403).json({ error: "Non hai il permesso di modificare i dati sociali sensibili." });
@@ -1065,6 +1162,13 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     }
   }
   if (cid != null) delete updates.areaOperativaId;
+  if (cid != null && updates.centroAscoltoId != null) {
+    const [targetCentre] = await db.select({ area: centriAscoltoTable.areaOperativaId })
+      .from(centriAscoltoTable).where(eq(centriAscoltoTable.id, Number(updates.centroAscoltoId)));
+    if (!targetCentre || targetCentre.area !== cid) {
+      res.status(403).json({ error: "Centro fuori dall'Area autorizzata" }); return;
+    }
+  }
   if (zid != null) updates.zonaUdsId = zid;
 
   if ("statoAnagrafica" in updates) {
@@ -1209,15 +1313,19 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     }, { requireArea: true, requireActiveArea: true });
     if (assignmentError) { res.status(assignmentError.status).json({ error: assignmentError.error }); return; }
   }
-  const changedFields = Object.keys(inputUpdates);
+  const changedFields = [...Object.keys(inputUpdates), ...(fascicolo !== undefined ? ["fascicolo"] : [])];
   updates.versione = sql`${beneficiariTable.versione} + 1`;
   try {
     const row = await db.transaction(async (tx) => {
+      if (fascicolo !== undefined) await saveBeneficiarioFascicolo(tx, id, fascicolo, versioneFascicolo ?? 0, req.user?.id ?? null);
       const [updated] = await tx.update(beneficiariTable).set(updates).where(and(
         eq(beneficiariTable.id, id),
         eq(beneficiariTable.versione, versione),
       )).returning();
-      if (!updated) return null;
+      if (!updated) {
+        if (fascicolo !== undefined) throw new BeneficiarioFascicoloError("Il beneficiario è stato modificato. Ricarica la scheda e riprova.");
+        return null;
+      }
       await tx.insert(auditConfigurazioniTable).values({
         area: "beneficiari",
         chiave: `beneficiario:${id}`,
@@ -1246,14 +1354,17 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
       return updated;
     });
     if (!row) { res.status(409).json({ error: "Il Beneficiario è stato modificato da un altro utente. Ricarica la scheda e riprova." }); return; }
-    res.json(fmtBenefForRequest(
+    res.json({ ...await readBeneficiarioFascicolo(row.id), ...fmtBenefForRequest(
       row,
       req,
       null,
       null,
       await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId),
-    ));
+    ) });
   } catch (e) {
+    if (e instanceof BeneficiarioFascicoloError || (e as { constraint?: string }).constraint === "fse_fascicoli_sociali_codice_norm_uidx") {
+      res.status(409).json({ error: e instanceof BeneficiarioFascicoloError ? e.message : "Fascicolo già associato a un altro beneficiario." }); return;
+    }
     if (isCodiceBeneficiarioUniqueViolation(e)) {
       res.status(409).json({ error: CODICE_BENEFICIARIO_DUPLICATO_MSG });
       return;
@@ -1271,7 +1382,7 @@ router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate
   }
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Beneficiario non trovato." }); return; }
-  if (!canAccessBeneficiarioRecord(existing, req)) { res.status(403).json({ error: "Beneficiario non accessibile." }); return; }
+  if (!canAccessBeneficiarioRecord(existing, req, callerCentroId(req))) { res.status(403).json({ error: "Beneficiario non accessibile." }); return; }
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx.update(beneficiariTable).set({
       attivo: parsed.data.attivo,
@@ -1342,7 +1453,7 @@ async function scopedBeneficiario(
 > {
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) return { status: 404, error: "Beneficiario non trovato." } as const;
-  if (!canAccessBeneficiarioRecord(beneficiario, req)) return { status: 403, error: "Beneficiario non accessibile." } as const;
+  if (!canAccessBeneficiarioRecord(beneficiario, req, callerCentroId(req))) return { status: 403, error: "Beneficiario non accessibile." } as const;
   return { beneficiario } as const;
 }
 

@@ -12,7 +12,6 @@ import { dashboard } from "./namespaces/dashboard";
 import { magazzini } from "./namespaces/magazzini";
 import { prodotti } from "./namespaces/prodotti";
 import { lotti } from "./namespaces/lotti";
-import { caricoPratiche } from "./namespaces/caricoPratiche";
 import { uxCaricoLotti } from "./namespaces/uxCaricoLotti";
 import { movimenti } from "./namespaces/movimenti";
 import { giacenze } from "./namespaces/giacenze";
@@ -80,7 +79,6 @@ const PAGE_NAMESPACES = {
   magazzini,
   prodotti,
   lotti,
-  caricoPratiche,
   uxCaricoLotti,
   movimenti,
   giacenze,

@@ -8,6 +8,11 @@
 import type { LottoInputCausale } from "./lottoInputCausale";
 
 export interface LottoInput {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   prodottoId: number;
   /** @nullable */
   lottoLogicoId?: number | null;

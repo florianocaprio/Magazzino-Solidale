@@ -1,5 +1,6 @@
 import {
   beneficiariTable,
+  fseFascicoliSocialiTable,
   bolleTable,
   bollaRigheTable,
   centriAscoltoTable,
@@ -1264,6 +1265,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
     .select({
       beneficiarioNome: sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
       beneficiarioCodice: beneficiariTable.codice,
+      beneficiarioFascicolo: fseFascicoliSocialiTable.codiceFascicolo,
       beneficiarioCodiceFiscale: beneficiariTable.codiceFiscale,
       centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoNome: magazziniTable.nome,
@@ -1277,6 +1279,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
       beneficiariTable,
       eq(speseEmporioTable.beneficiarioId, beneficiariTable.id),
     )
+    .leftJoin(fseFascicoliSocialiTable, eq(speseEmporioTable.beneficiarioId, fseFascicoliSocialiTable.beneficiarioId))
     .leftJoin(
       centriAscoltoTable,
       eq(speseEmporioTable.centroAscoltoId, centriAscoltoTable.id),
@@ -1302,6 +1305,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
     beneficiario: dati?.beneficiarioNome ?? spesa.beneficiarioNome,
     beneficiarioCodice: dati?.beneficiarioCodice ?? spesa.beneficiarioCodice,
     beneficiarioCodiceFiscale: dati?.beneficiarioCodiceFiscale ?? null,
+    beneficiarioFascicolo: dati?.beneficiarioFascicolo ?? null,
     centroAscolto: dati?.centroAscoltoNome ?? spesa.centroAscoltoNome,
     emporio: dati?.magazzinoNome ?? spesa.magazzinoEmporioNome,
     emporioIndirizzo: dati?.magazzinoIndirizzo ?? null,

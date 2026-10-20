@@ -1111,7 +1111,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
     expect(unchangedOrigin.bollaId).toBeNull();
   });
 
-  it("LEDGER-M5B-ENTE: la consegna collegata a Ente scarica una volta sola", async () => {
+  it.each([false, true])("LEDGER-M5B-ENTE: consegna Ente (globale=%s) scarica e chiude una volta sola", async (globalEntity) => {
     const entityProductId = await createProdotto(scope, {
       unitaMisura: "pz",
       quantitaFrazionabile: false,
@@ -1127,7 +1127,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .values({
         denominazione: `Ente M5B ${randomUUID().slice(0, 8)}`,
         indirizzo: "Via sintetica 1",
-        areaOperativaId: areaId,
+        areaOperativaId: globalEntity ? null : areaId,
       })
       .returning();
     scope.enteDestinatarioIds.push(entity.id);
@@ -1149,7 +1149,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
         presoInCaricoCodiceSnapshot: `m5b-${suffix}`,
       })
       .returning();
-    const created = await request(app())
+    let created = await request(app())
       .post(`/richieste-magazzino/${row.id}/documento`)
       .send({
         idempotencyKey: randomUUID(),
@@ -1157,7 +1157,15 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
         magazzinoId: originId,
       });
     expect(created.status, created.text).toBe(201);
-    const bollaId = created.body.documentoId as number;
+    let bollaId = created.body.documentoId as number;
+    if (globalEntity) {
+      const cancelled = await request(app()).post(`/bolle/${bollaId}/annulla`).send({ idempotencyKey: randomUUID(), versione: created.body.versioneDocumento, motivo: "Riapertura sintetica Ente globale" });
+      expect(cancelled.status, cancelled.text).toBe(200);
+      const [current] = await db.select().from(richiesteMagazzinoTable).where(eq(richiesteMagazzinoTable.id, row.id));
+      created = await request(app()).post(`/richieste-magazzino/${row.id}/documento`).send({ idempotencyKey: randomUUID(), versione: current.versione, magazzinoId: originId });
+      expect(created.status, created.text).toBe(201);
+      bollaId = created.body.documentoId as number;
+    }
     const line = await request(app()).post(`/bolle/${bollaId}/righe`).send({
       idempotencyKey: randomUUID(),
       versione: created.body.versioneDocumento,
@@ -1198,8 +1206,11 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .select()
       .from(richiesteMagazzinoDocumentiTable)
       .where(eq(richiesteMagazzinoDocumentiTable.richiestaId, row.id));
-    expect(links).toHaveLength(1);
-    expect(links[0]).toMatchObject({ bollaId, corrente: true });
+    expect(links).toHaveLength(globalEntity ? 2 : 1);
+    expect(links.find((link) => link.corrente)).toMatchObject({ bollaId, corrente: true });
+    const [closed] = await db.select().from(richiesteMagazzinoTable).where(eq(richiesteMagazzinoTable.id, row.id));
+    expect(closed).toMatchObject({ stato: "chiusa", areaOperativaId: areaId });
+    expect(delivered.body.areaOperativaIdSnapshot).toBe(areaId);
   });
 
   it("LEDGER-M5B-RETURN: affidamento Ente e rientro 3 idonee + 1 mancante conservano il collegamento", async () => {

@@ -631,6 +631,7 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
               prodottoId: riga.prodottoId,
               dataCarico,
               quantita: InventoryDecimal.parse(p.quantita).toDb(),
+              lottoProduttoreId: p.lottoProduttoreId,
               codiceLotto: p.codiceLotto,
               dataScadenza: p.dataScadenza,
               magazzinoId: current.magazzinoId!,

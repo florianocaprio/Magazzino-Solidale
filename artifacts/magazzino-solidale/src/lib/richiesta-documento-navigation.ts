@@ -30,3 +30,13 @@ export function requestAllowsDocument(
     );
   });
 }
+
+/** Ritorno locale alla coda: conserva i filtri, chiude soltanto i dettagli. */
+export function requestListReturnUrl(path: string): string {
+  let url: URL;
+  try { url = new URL(path, "http://local.invalid"); } catch { return "/richieste-magazzino"; }
+  if (url.origin !== "http://local.invalid" || url.pathname !== "/richieste-magazzino") return "/richieste-magazzino";
+  url.searchParams.delete("richiestaId");
+  url.searchParams.delete("documento");
+  return url.pathname + url.search;
+}

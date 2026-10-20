@@ -1,3 +1,7 @@
+import { useLocation } from "wouter";
+import { udsPersonPath } from "@/lib/uds-persona-context";
+import { registerBlocco04 } from "@/lib/i18n/namespaces/blocco04";
+import i18n from "@/lib/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getCercaBeneficiariSimiliQueryKey,
@@ -67,10 +71,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { operationalCentroId } from "@/lib/service-scope";
 import { useAuth } from "@/lib/auth";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
+
+registerBlocco04(i18n);
 
 const NO_ZONE = "__none__";
 const NO_CENTRO = "__nocentro__";
@@ -211,6 +218,7 @@ export function UdsPersonaSheet({
   initialZonaUdsId,
   onPersonReady,
 }: UdsPersonaSheetProps) {
+  const [, navigate] = useLocation();
   const { t } = useTranslation();
   const { user } = useAuth();
   const canViewSensitive = Boolean(
@@ -245,14 +253,14 @@ export function UdsPersonaSheet({
     resolver: zodResolver(schema),
     defaultValues: emptyFormValues(
       initialAreaOperativaId,
-      initialZonaUdsId ?? user?.zonaUdsId,
+      user?.zonaUdsId ?? initialZonaUdsId,
     ),
   });
   const { reset } = form;
   const wasOpenRef = useRef(false);
 
   const { data: areaOperativaList } = useListAreeOperative({
-    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
+    query: { queryKey: getListAreeOperativeQueryKey() },
   });
   const { data: centri } = useListCentriAscolto();
   const createBenef = useCreateBeneficiario();
@@ -272,12 +280,10 @@ export function UdsPersonaSheet({
     wasOpenRef.current = open;
     if (!hasJustOpened) return;
 
-    reset(
-      emptyFormValues(
-        initialAreaOperativaId,
-        initialZonaUdsId ?? user?.zonaUdsId,
-      ),
-    );
+    reset({
+      ...emptyFormValues(initialAreaOperativaId ?? user?.areaOperativaId, user?.zonaUdsId ?? initialZonaUdsId),
+      centroAscoltoId: String(operationalCentroId(user) ?? NO_CENTRO),
+    });
     setDupDismissed(false);
     setDupParams({});
     setExistingSearch("");
@@ -423,6 +429,8 @@ export function UdsPersonaSheet({
     onPersonReady?.(person, outcome);
     onOpenChange(false);
     resetLookup();
+    void queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/uds/directory") });
+    if (!onPersonReady) navigate(udsPersonPath(person.id, window.location.pathname + window.location.search));
   };
 
   const handleSuggestion = (suggestion: BeneficiarioSimile) => {
@@ -622,6 +630,7 @@ export function UdsPersonaSheet({
                           onValueChange={(value) => {
                             field.onChange(value);
                             form.setValue("zonaUdsId", NO_ZONE);
+                            form.setValue("centroAscoltoId", NO_CENTRO);
                             setExistingSearch("");
                             setDebouncedExistingSearch("");
                             setDupDismissed(false);
@@ -637,7 +646,7 @@ export function UdsPersonaSheet({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {areaOperativaList?.map((areaOperativa) => (
+                            {areaOperativaList?.filter((area) => area.attivo).map((areaOperativa) => (
                               <SelectItem
                                 key={areaOperativa.id}
                                 value={String(areaOperativa.id)}
@@ -653,6 +662,42 @@ export function UdsPersonaSheet({
                   />
                 )}
 
+                {!isGlobal && <p><strong>{t("udsAnagrafica.fAreaOperativa")}:</strong> {areaOperativaList?.find((area) => area.id === user?.areaOperativaId)?.nome ?? user?.areaOperativaId}</p>}
+                <FormField
+                  control={form.control}
+                  name="centroAscoltoId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t("beneficiari.centroRiferimento")}
+                      </FormLabel>
+                      <Select
+                        value={field.value || NO_CENTRO}
+                        onValueChange={field.onChange}
+                        disabled={operationalCentroId(user) != null || formAreaOperativa == null}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("common.none")} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_CENTRO}>
+                            {t("common.none")}
+                          </SelectItem>
+                          {centri?.filter((centro) => centro.attivo && centro.areaOperativaId === formAreaOperativa).map((centro) => (
+                            <SelectItem
+                              key={centro.id}
+                              value={String(centro.id)}
+                            >
+                              {centro.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
                 <div className="rounded-md border bg-muted/30 p-3 space-y-2">
                   <Label htmlFor="uds-persona-existing-search">
                     {t("udsAnagrafica.existingSearchLabel")}
@@ -1229,40 +1274,6 @@ export function UdsPersonaSheet({
                   />
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="centroAscoltoId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t("beneficiari.centroRiferimento")}
-                      </FormLabel>
-                      <Select
-                        value={field.value || NO_CENTRO}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("common.none")} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={NO_CENTRO}>
-                            {t("common.none")}
-                          </SelectItem>
-                          {centri?.map((centro) => (
-                            <SelectItem
-                              key={centro.id}
-                              value={String(centro.id)}
-                            >
-                              {centro.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
                   </div>
                 </details>
 
@@ -1300,20 +1311,21 @@ export function UdsPersonaSheet({
                           <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
                           <Select
                             value={field.value || NO_ZONE}
+                            disabled={user?.zonaUdsId != null || formAreaOperativa == null}
                             onValueChange={field.onChange}
                           >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue
-                                  placeholder={t("udsAnagrafica.allZone")}
+                                  placeholder={t("blocco04.noZone")}
                                 />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               <SelectItem value={NO_ZONE}>
-                                {t("udsAnagrafica.allZone")}
+                                {t("blocco04.noZone")}
                               </SelectItem>
-                              {formZone?.map((zona) => (
+                              {formZone?.filter((zona) => zona.attivo).map((zona) => (
                                 <SelectItem
                                   key={zona.id}
                                   value={String(zona.id)}

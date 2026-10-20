@@ -1,3 +1,4 @@
+import { callerCentroId } from "../serviceScope";
 import {
   areeOperativeTable,
   centriAscoltoTable,
@@ -63,7 +64,7 @@ export async function buildReportFilterOptions(
   const db = reportExecutor();
   const user = req.user;
   const ownAreaOperativaId = user?.areaOperativaId ?? null;
-  const ownCentreId = user?.centroAscoltoId ?? filters?.centroAscoltoId ?? null;
+  const ownCentreId = callerCentroId(req) ?? filters?.centroAscoltoId ?? null;
   const ownZoneId = user?.zonaUdsId ?? null;
   const effectiveAreaOperativaId =
     ownAreaOperativaId ?? requestedAreaOperativaId;

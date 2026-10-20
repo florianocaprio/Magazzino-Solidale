@@ -1,3 +1,6 @@
+import { canAccessPersonalVehicle } from "../lib/volontariArea";
+import { canAccessVolunteer, volunteerAreaFilter, volunteerCallerArea } from "../lib/volontariArea";
+import { volontarioNotRemoved } from "../lib/volontarioRemoval";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, mezziTable, centriAscoltoTable } from "@workspace/db";
@@ -50,6 +53,7 @@ const fmtVolontario = (r: {
   nome: string;
   cognome: string;
   matricola: string | null;
+  areaOperativaId: number | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
   telefono: string | null;
@@ -65,6 +69,7 @@ const fmtVolontario = (r: {
   nome: r.nome,
   cognome: r.cognome,
   matricola: r.matricola ?? null,
+  areaOperativaId: r.areaOperativaId,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: r.centroAscoltoNome ?? null,
   telefono: r.telefono ?? null,
@@ -121,8 +126,7 @@ router.get("/approvazioni-logistica", requirePermission("logistica.approvazioni.
   ]);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const scope = andScoped(
-    centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
-    idSetScopeFilter(volontariTable.centroAscoltoId, areaOperativaCentroIds),
+    volunteerAreaFilter(await volunteerCallerArea(req)),
   );
   const volontari = volontariAttivi ? await db
     .select({
@@ -130,6 +134,7 @@ router.get("/approvazioni-logistica", requirePermission("logistica.approvazioni.
       nome: volontariTable.nome,
       cognome: volontariTable.cognome,
       matricola: volontariTable.matricola,
+      areaOperativaId: volontariTable.areaOperativaId,
       centroAscoltoId: volontariTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
       telefono: volontariTable.telefono,
@@ -143,12 +148,12 @@ router.get("/approvazioni-logistica", requirePermission("logistica.approvazioni.
     })
     .from(volontariTable)
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id))
-    .where(andScoped(eq(volontariTable.statoApprovazione, PENDING), scope))
+    .where(andScoped(eq(volontariTable.statoApprovazione, PENDING), scope, volontarioNotRemoved(volontariTable.id)))
     .orderBy(desc(volontariTable.dataCreazione)) : [];
 
   const mezzoScope = andScoped(
     effectiveCentroFilter(callerCentroId(req)),
-    effectiveAreaOperativaFilter(areaOperativaCentroIds),
+    effectiveAreaOperativaFilter(areaOperativaCentroIds, callerAreaOperativaId(req)),
   );
   const mezzi = mezziAttivi ? await db
     .select({
@@ -180,7 +185,7 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
+  if (!(await canAccessVolunteer(req, existing))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
@@ -201,7 +206,7 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
       const [row] = await tx
         .update(volontariTable)
         .set({ matricola, statoApprovazione: "approvato", attivo: true, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() })
-        .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING)))
+        .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING), volontarioNotRemoved(id)))
         .returning({ versione: volontariTable.versione });
       if (!row) return [];
       await auditLogistica(tx, req, { entita: "volontario", id, azione: "approvazione", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "approvato", attivo: true, versione: row.versione } });
@@ -222,7 +227,7 @@ router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOL
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
+  if (!(await canAccessVolunteer(req, existing))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
@@ -230,7 +235,7 @@ router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOL
   if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
   const [updated] = await db.transaction(async (tx) => {
-    const [row] = await tx.update(volontariTable).set({ statoApprovazione: "respinto", attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING))).returning({ versione: volontariTable.versione });
+    const [row] = await tx.update(volontariTable).set({ statoApprovazione: "respinto", attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING), volontarioNotRemoved(id))).returning({ versione: volontariTable.versione });
     if (!row) return [];
     await auditLogistica(tx, req, { entita: "volontario", id, azione: "rifiuto", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "respinto", attivo: false, versione: row.versione } });
     return [row];
@@ -244,7 +249,7 @@ router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"),
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const effectiveCentro = await db.transaction((tx) => effectiveCentroMezzoTx(tx, existing));
-  if (!(await ensureVisibleCentro(effectiveCentro, req))) {
+  if (!(await canAccessPersonalVehicle(req, existing)) || !(await ensureVisibleCentro(effectiveCentro, req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
@@ -254,7 +259,7 @@ router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"),
   let updated;
   try { [updated] = await db.transaction(async (tx) => {
     const locked = await loadAndLockEffectiveMezzoTx(tx, id);
-    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (!(await canAccessPersonalVehicle(req, locked.mezzo, tx)) || !(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
     if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
     const [row] = await tx.update(mezziTable).set({ statoApprovazione: "approvato", stato: "disponibile", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
     if (!row) return [];
@@ -273,7 +278,7 @@ router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI")
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const effectiveCentro = await db.transaction((tx) => effectiveCentroMezzoTx(tx, existing));
-  if (!(await ensureVisibleCentro(effectiveCentro, req))) {
+  if (!(await canAccessPersonalVehicle(req, existing)) || !(await ensureVisibleCentro(effectiveCentro, req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
@@ -283,7 +288,7 @@ router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI")
   let updated;
   try { [updated] = await db.transaction(async (tx) => {
     const locked = await loadAndLockEffectiveMezzoTx(tx, id);
-    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (!(await canAccessPersonalVehicle(req, locked.mezzo, tx)) || !(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
     if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
     const [row] = await tx.update(mezziTable).set({ statoApprovazione: "respinto", stato: "respinto", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
     if (!row) return [];

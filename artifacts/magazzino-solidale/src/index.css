@@ -2,6 +2,51 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* App navigation: current route and expanded group remain independent. */
+.app-nav-link[data-sidebar="menu-button"],
+.app-nav-group[data-sidebar="group-label"] {
+  height: auto;
+  min-height: 2.75rem;
+  border-inline-start: 3px solid transparent;
+  text-align: start;
+  color: hsl(var(--sidebar-foreground));
+}
+.app-nav-link[data-sidebar="menu-button"] {
+  padding-block: .625rem;
+  align-items: flex-start;
+}
+.app-nav-link > svg { margin-block-start: .125rem; }
+.app-nav-link > span,
+.app-nav-group > span {
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.app-nav-group[data-sidebar="group-label"] {
+  gap: .5rem;
+  font-weight: 600;
+  padding-block: .625rem;
+}
+.app-nav-group > span { flex: 1; }
+.app-nav-link[data-active="true"] {
+  background: hsl(var(--sidebar-primary) / .14);
+  border-inline-start-color: hsl(var(--sidebar-primary));
+  font-weight: 700;
+}
+.app-nav-group[data-current="true"] {
+  background: hsl(var(--sidebar-accent));
+  border-inline-start-color: hsl(var(--sidebar-primary));
+  font-weight: 700;
+}
+.app-nav-link:focus-visible,
+.app-nav-group:focus-visible {
+  outline: 2px solid hsl(var(--sidebar-ring));
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
 .maps-leaflet-marker {
   display: grid;
   width: 44px;

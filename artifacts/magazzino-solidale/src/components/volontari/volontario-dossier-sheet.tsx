@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources } from "@/lib/logistica-cache";
 import { useEffect, useState } from "react";
 import {
   customFetch,
@@ -314,7 +315,7 @@ export function VolontarioDossierSheet({
         queryClient.invalidateQueries({
           queryKey: ["volontario-dossier", volontario.id],
         }),
-        queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() }),
+        invalidateLogisticaResources(queryClient, "volontari"),
       ]);
       toast({
         title:
@@ -401,7 +402,7 @@ export function VolontarioDossierSheet({
         queryClient.invalidateQueries({
           queryKey: ["volontario-identificativi", volontario.id],
         }),
-        queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() }),
+        invalidateLogisticaResources(queryClient, "volontari"),
       ]);
       toast({
         title: "Conversione completata",

@@ -1,3 +1,4 @@
+import { sessionStub } from "./helpers/session-stub";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
@@ -16,12 +17,7 @@ const createdUserIds: number[] = [];
 function makeApp(sessionUserId: number): Express {
   const a = express();
   a.use(express.json());
-  a.use((req, _res, next) => {
-    (req as unknown as { session: { userId: number } }).session = {
-      userId: sessionUserId,
-    };
-    next();
-  });
+  a.use(sessionStub(sessionUserId));
   a.use(utentiRouter);
   return a;
 }
@@ -172,7 +168,7 @@ describe("POST /utenti — accesso immediato", () => {
     expect(row.mustChangePassword).toBe(true);
   });
 
-  it("persiste e restituisce area operativa e zona UDS", async () => {
+  it("persiste l’Area e ignora il parametro legacy Zona UDS", async () => {
     const res = await request(app)
       .post("/utenti")
       .send({
@@ -189,8 +185,8 @@ describe("POST /utenti — accesso immediato", () => {
     createdUserIds.push(res.body.id);
     expect(res.body.areaOperativaId).toBe(areaOperativaId);
     expect(res.body.areaOperativaNome).toContain("Milano Test");
-    expect(res.body.zonaUdsId).toBe(zonaUdsId);
-    expect(res.body.zonaUdsNome).toContain("Zona Test");
+    expect(res.body.zonaUdsId).toBeNull();
+    expect(res.body.zonaUdsNome).toBeNull();
 
     const [row] = await db
       .select({
@@ -200,7 +196,7 @@ describe("POST /utenti — accesso immediato", () => {
       .from(utentiTable)
       .where(eq(utentiTable.id, res.body.id));
     expect(row.areaOperativaId).toBe(areaOperativaId);
-    expect(row.zonaUdsId).toBe(zonaUdsId);
+    expect(row.zonaUdsId).toBeNull();
   });
 });
 

@@ -148,8 +148,7 @@ describe("M63 sviluppo — sessioni reali e transazioni", () => {
     const list = await x.session
       .get("/api/interventi")
       .query({ ambito: "sociale" });
-    expect(list.status, list.text).toBe(200);
-    expect(list.body).toEqual([]);
+    expect(list.status, list.text).toBe(403);
     for (const path of [
       "",
       "/operativita",
@@ -192,20 +191,20 @@ describe("M63 sviluppo — sessioni reali e transazioni", () => {
       (await noGrant.session.get(`/api/interventi/${row.id}`)).status,
     ).toBe(403);
   });
-  it("T03 Centro incoerente, Area e Centro inattivi", async () => {
+  it("T03 il Centro storico non vincola l’utente; Area inattiva nega", async () => {
     const row = await intervention(),
       x = await user("wrong", {
         areaOperativaId: area,
         centroAscoltoId: otherCentre,
       });
-    expect((await x.session.get(`/api/interventi/${row.id}`)).status).toBe(403);
+    expect((await x.session.get(`/api/interventi/${row.id}`)).status).toBe(200);
     for (const table of [areeOperativeTable, centriAscoltoTable]) {
       const id = table === areeOperativeTable ? area : centre;
       await db.update(table).set({ attivo: false }).where(eq(table.id, id));
       try {
         expect(
           (await actor.session.get(`/api/interventi/${row.id}`)).status,
-        ).toBe(403);
+        ).toBe(table === areeOperativeTable ? 403 : 200);
       } finally {
         await db.update(table).set({ attivo: true }).where(eq(table.id, id));
       }

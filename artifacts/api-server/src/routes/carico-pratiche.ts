@@ -1,3 +1,7 @@
+import {
+  validateProducerLotSelection,
+  verifiedFseLotOrigin,
+} from "../lib/producerLots";
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Response } from "express";
 import {
@@ -5,6 +9,7 @@ import {
   FONDI_ORIGINE,
   ORIGINI_CARICO_MANUALI,
   areeOperativeTable,
+  auditEventiTable,
   caricoIntegrazioneRigheTable,
   caricoIntegrazioniTable,
   caricoPraticaRettificheTable,
@@ -320,6 +325,7 @@ async function validateHeader(
 async function normalizeDraftLine(
   tx: InventoryTransaction,
   input: Record<string, unknown>,
+  areaOperativaId?: number,
 ) {
   const prodottoId = positiveId(input.prodottoId, "prodottoId");
   const [prodotto] = await tx
@@ -362,7 +368,23 @@ async function normalizeDraftLine(
       throw error;
     }
   }
+  const lottoProduttoreId =
+    input.lottoProduttoreId == null
+      ? null
+      : positiveId(input.lottoProduttoreId, "lottoProduttoreId");
+  if (lottoProduttoreId != null) {
+    if (areaOperativaId == null)
+      throw new CaricoPraticaError(400, "Area richiesta per il lotto");
+    await validateProducerLotSelection(tx, {
+      areaOperativaId,
+      prodottoId,
+      lottoProduttoreId,
+      codiceLotto: input.codiceLottoProduttore as string | null,
+      dataScadenza: input.dataScadenza as string | null,
+    });
+  }
   return {
+    lottoProduttoreId,
     prodottoId,
     fondoOrigine,
     quantita,
@@ -447,6 +469,27 @@ function requireManualPracticeEdit(practice: CaricoPratica) {
     );
 }
 
+async function hasClosedPractice(
+  reader: Pick<InventoryTransaction, "select">,
+  id: number,
+) {
+  const [event] = await reader
+    .select({ id: auditEventiTable.id })
+    .from(auditEventiTable)
+    .where(
+      and(
+        eq(auditEventiTable.entitaTipo, "carico_pratica"),
+        eq(auditEventiTable.entitaId, id),
+        inArray(auditEventiTable.azione, [
+          "CARICO_PRATICA_CHIUDI",
+          "CARICO_PRATICA_RIAPRI",
+        ]),
+      ),
+    )
+    .limit(1);
+  return event != null;
+}
+
 async function detail(id: number) {
   const [header] = await db
     .select({
@@ -487,6 +530,7 @@ async function detail(id: number) {
       gestioneScadenza: prodottiTable.gestioneScadenza,
       integrazioneId: caricoIntegrazioneRigheTable.caricoIntegrazioneId,
       caricoMagazzinoRigaId: caricoIntegrazioneRigheTable.caricoMagazzinoRigaId,
+      quantitaRettificata: sql<string>`(select coalesce(sum(r.quantita), 0)::text from ${caricoPraticaRettificheTable} r where r.carico_pratica_riga_id = ${caricoPraticaRigheTable.id})`,
     })
     .from(caricoPraticaRigheTable)
     .innerJoin(
@@ -515,6 +559,8 @@ async function detail(id: number) {
     .orderBy(caricoIntegrazioniTable.id);
   return {
     ...header.pratica,
+    soloAggiunte:
+      header.pratica.stato === "chiusa" || (await hasClosedPractice(db, id)),
     areaOperativaNome: header.areaOperativaNome,
     magazzinoNome: header.magazzinoNome,
     lottoLogicoDescrizione: header.lottoLogicoDescrizione,
@@ -525,6 +571,7 @@ async function detail(id: number) {
     righe: rows.map((row) => ({
       ...row.riga,
       quantita: row.riga.quantita,
+      quantitaRettificata: row.quantitaRettificata,
       prodottoNome: row.prodottoNome,
       prodottoCodice: row.prodottoCodice,
       unitaMisura: row.riga.unitaMisuraSnapshot ?? row.unitaMisura,
@@ -726,7 +773,9 @@ router.post(
         const { magazzino: _magazzino, ...headerValues } = header;
         const normalizedRows = [];
         for (const row of body.righe as Record<string, unknown>[]) {
-          normalizedRows.push(await normalizeDraftLine(tx, row));
+          normalizedRows.push(
+            await normalizeDraftLine(tx, row, header.areaOperativaId),
+          );
         }
         const [practice] = await tx
           .insert(caricoPraticheTable)
@@ -740,6 +789,7 @@ router.post(
         for (const row of normalizedRows) {
           await tx.insert(caricoPraticaRigheTable).values({
             caricoPraticaId: practice.id,
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -828,6 +878,18 @@ router.patch(
             ...practice,
             ...body,
           });
+          if (header.areaOperativaId !== practice.areaOperativaId) {
+            // A deliberate territorial change invalidates a pending registry choice, never its raw code.
+            await tx
+              .update(caricoPraticaRigheTable)
+              .set({ lottoProduttoreId: null })
+              .where(
+                and(
+                  eq(caricoPraticaRigheTable.caricoPraticaId, id),
+                  sql`${caricoPraticaRigheTable.registrataAt} is null`,
+                ),
+              );
+          }
           values = header;
           delete (values as Record<string, unknown>).magazzino;
         }
@@ -874,11 +936,16 @@ router.post(
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
         requireManualPracticeEdit(practice);
-        const row = await normalizeDraftLine(tx, req.body ?? {});
+        const row = await normalizeDraftLine(
+          tx,
+          req.body ?? {},
+          practice.areaOperativaId,
+        );
         const [created] = await tx
           .insert(caricoPraticaRigheTable)
           .values({
             caricoPraticaId: id,
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -951,10 +1018,15 @@ router.patch(
           );
         if (existing.registrataAt)
           throw new CaricoPraticaError(409, "Una riga registrata è immutabile");
-        const row = await normalizeDraftLine(tx, { ...existing, ...req.body });
+        const row = await normalizeDraftLine(
+          tx,
+          { ...existing, ...req.body },
+          practice.areaOperativaId,
+        );
         await tx
           .update(caricoPraticaRigheTable)
           .set({
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -1217,6 +1289,15 @@ router.post(
               `La riga ${riga.id} è incompleta: quantità mancante`,
             );
           return {
+            lottoProduttoreId: riga.lottoProduttoreId,
+            trustedImport:
+              practice.origineCarico === "AGEA_SIFEAD" ||
+              (practice.tipoPratica === "SALDO_INIZIALE" &&
+                initialCoverage?.stato === "PROPOSTA")
+                ? verifiedFseLotOrigin(
+                    `FSE+ pratica #${practice.id}, riga #${riga.id}`,
+                  )
+                : undefined,
             prodottoId: riga.prodottoId,
             fondoOrigine: riga.fondoOrigine as FondoOrigine,
             quantitaOperativa: riga.quantita,
@@ -1419,6 +1500,24 @@ router.post(
       const requestedVersion = version(req.body?.versione);
       const key = requiredText(req.body?.idempotencyKey, "idempotencyKey", 100);
       const motivo = requiredText(req.body?.motivo, "motivo", 1000);
+      if (
+        req.body?.ripristinaBozza != null &&
+        typeof req.body.ripristinaBozza !== "boolean"
+      )
+        throw new CaricoPraticaError(
+          400,
+          "ripristinaBozza deve essere booleano",
+        );
+      const ripristinaBozza = req.body?.ripristinaBozza === true;
+      if (
+        ripristinaBozza &&
+        !req.user!.isAdmin &&
+        !(req.user!.permessi ?? []).includes("magazzino.stock.receive")
+      )
+        throw new CaricoPraticaError(
+          403,
+          "Permesso di carico richiesto per creare la riga sostitutiva",
+        );
       let quantita: InventoryDecimal;
       try {
         quantita = InventoryDecimal.parse(req.body?.quantita);
@@ -1438,6 +1537,7 @@ router.post(
         versione: requestedVersion,
         quantita: quantita.toCanonical(),
         motivo,
+        ...(ripristinaBozza ? { ripristinaBozza: true } : {}),
       });
       const command = auditContextFromRequest(req, {
         operationKey: `m3a-rettifica:${key}`,
@@ -1476,6 +1576,15 @@ router.post(
         }
 
         requireVersion(practice, requestedVersion);
+        if (practice.stato === "chiusa" || (await hasClosedPractice(tx, id)))
+          throw new CaricoPraticaError(
+            409,
+            "Dopo la chiusura la pratica consente solo nuove aggiunte: le righe contabilizzate non sono più modificabili o rimovibili",
+          );
+        if (ripristinaBozza) {
+          requireWorkingState(practice);
+          requireManualPracticeEdit(practice);
+        }
         const [source] = await tx
           .select({
             riga: caricoPraticaRigheTable,
@@ -1566,6 +1675,11 @@ router.post(
         const remainingSource = InventoryDecimal.parse(
           source.quantitaOriginale,
         ).subtract(InventoryDecimal.parse(prior?.total ?? "0"));
+        if (ripristinaBozza && quantita.compare(remainingSource) !== 0)
+          throw new CaricoPraticaError(
+            409,
+            "Per modificare la riga occorre stornare tutta la quantità ancora rettificabile",
+          );
         if (quantita.compare(remainingSource) > 0)
           throw new CaricoPraticaError(
             409,
@@ -1612,6 +1726,26 @@ router.post(
             "Audit obbligatorio della rettifica non registrato",
           );
         const nextVersion = practice.versione + 1;
+        let rigaSostitutivaId: number | undefined;
+        if (ripristinaBozza) {
+          const [replacement] = await tx
+            .insert(caricoPraticaRigheTable)
+            .values({
+              caricoPraticaId: id,
+              lottoProduttoreId: source.riga.lottoProduttoreId,
+              prodottoId: source.riga.prodottoId,
+              fondoOrigine: source.riga.fondoOrigine,
+              quantita: remainingSource.toDb(),
+              codiceLottoProduttore: source.riga.codiceLottoProduttore,
+              dataScadenza: source.riga.dataScadenza,
+              fattoreKgLtPezzo: source.riga.fattoreKgLtPezzo,
+              note: source.riga.note,
+              creatoDa: req.user!.id,
+              aggiornatoDa: req.user!.id,
+            })
+            .returning({ id: caricoPraticaRigheTable.id });
+          rigaSostitutivaId = replacement.id;
+        }
         const snapshot = {
           praticaId: id,
           rigaId,
@@ -1620,6 +1754,7 @@ router.post(
           quantita: quantita.toDb(),
           versione: nextVersion,
           replay: false,
+          ...(rigaSostitutivaId == null ? {} : { rigaSostitutivaId }),
         };
         const [rectification] = await tx
           .insert(caricoPraticaRettificheTable)

@@ -221,7 +221,9 @@ export const CreateRichiestaMagazzinoBody = zod.object({
     .number()
     .min(1)
     .optional()
-    .describe("Mensa assegnata; destinazione derivata dal server."),
+    .describe(
+      "Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.",
+    ),
   idempotencyKey: zod
     .string()
     .min(1)
@@ -1145,6 +1147,8 @@ export const ListCarichiResponse = zod.array(ListCarichiResponseItem);
 
 export const createCaricoBodyIdempotencyKeyMax = 120;
 
+export const createCaricoBodyRigheItemProduttoreMax = 200;
+
 export const createCaricoBodyRigheItemQuantitaOperativaRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
@@ -1182,6 +1186,11 @@ export const CreateCaricoBody = zod.object({
   righe: zod
     .array(
       zod.object({
+        produttore: zod
+          .string()
+          .max(createCaricoBodyRigheItemProduttoreMax)
+          .nullish(),
+        lottoProduttoreId: zod.number().min(1).nullish(),
         prodottoId: zod.number().min(1),
         fondoOrigine: zod.enum([
           "FSE_PLUS",
@@ -1691,6 +1700,7 @@ export const CreateCaricoPraticaBody = zod.object({
   righe: zod
     .array(
       zod.object({
+        lottoProduttoreId: zod.number().min(1).nullish(),
         clientId: zod
           .string()
           .max(createCaricoPraticaBodyRigheItemClientIdMax)
@@ -1742,6 +1752,8 @@ export const GetCaricoPraticaParams = zod.object({
 export const getCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
+export const getCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const getCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -1783,11 +1795,18 @@ export const GetCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -1811,6 +1830,15 @@ export const GetCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              getCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -1890,6 +1918,8 @@ export const UpdateCaricoPraticaBody = zod.object({
 
 export const updateCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const updateCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const updateCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -1931,11 +1961,18 @@ export const UpdateCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -1959,6 +1996,15 @@ export const UpdateCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              updateCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2019,6 +2065,7 @@ export const addCaricoPraticaRigaBodyOneFattoreKgLtPezzoOneRegExp = new RegExp(
 
 export const AddCaricoPraticaRigaBody = zod
   .object({
+    lottoProduttoreId: zod.number().min(1).nullish(),
     clientId: zod
       .string()
       .max(addCaricoPraticaRigaBodyOneClientIdMax)
@@ -2082,6 +2129,7 @@ export const updateCaricoPraticaRigaBodyOneFattoreKgLtPezzoOneRegExp =
 
 export const UpdateCaricoPraticaRigaBody = zod
   .object({
+    lottoProduttoreId: zod.number().min(1).nullish(),
     clientId: zod
       .string()
       .max(updateCaricoPraticaRigaBodyOneClientIdMax)
@@ -2130,6 +2178,8 @@ export const UpdateCaricoPraticaRigaBody = zod
 
 export const updateCaricoPraticaRigaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const updateCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const updateCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -2171,11 +2221,18 @@ export const UpdateCaricoPraticaRigaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2201,6 +2258,15 @@ export const UpdateCaricoPraticaRigaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              updateCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2255,6 +2321,8 @@ export const DeleteCaricoPraticaRigaBody = zod.object({
 
 export const deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const deleteCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -2296,11 +2364,18 @@ export const DeleteCaricoPraticaRigaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2326,6 +2401,15 @@ export const DeleteCaricoPraticaRigaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2422,6 +2506,12 @@ export const RectifyCaricoPraticaRigaBody = zod.object({
     .string()
     .min(1)
     .max(rectifyCaricoPraticaRigaBodyIdempotencyKeyMax),
+  ripristinaBozza: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico.",
+    ),
 });
 
 export const rectifyCaricoPraticaRigaResponseQuantitaRegExp = new RegExp(
@@ -2432,6 +2522,7 @@ export const RectifyCaricoPraticaRigaResponse = zod.object({
   praticaId: zod.number(),
   rigaId: zod.number(),
   rettificaId: zod.number().optional(),
+  rigaSostitutivaId: zod.number().optional(),
   lottoId: zod.number(),
   movimentoId: zod.number(),
   quantita: zod
@@ -2453,6 +2544,8 @@ export const CloseCaricoPraticaBody = zod.object({
 });
 
 export const closeCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const closeCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const closeCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
@@ -2495,11 +2588,18 @@ export const CloseCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2523,6 +2623,15 @@ export const CloseCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              closeCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2579,6 +2688,8 @@ export const ReopenCaricoPraticaBody = zod.object({
 
 export const reopenCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const reopenCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const reopenCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -2620,11 +2731,18 @@ export const ReopenCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2648,6 +2766,15 @@ export const ReopenCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              reopenCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2704,6 +2831,8 @@ export const CancelCaricoPraticaBody = zod.object({
 
 export const cancelCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const cancelCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const cancelCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -2745,11 +2874,18 @@ export const CancelCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2773,6 +2909,15 @@ export const CancelCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              cancelCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2837,6 +2982,24 @@ export const CreateFseImportSourceBody = zod.object({
   codice: zod.string().min(1).max(createFseImportSourceBodyCodiceMax),
   descrizione: zod.string().min(1).max(createFseImportSourceBodyDescrizioneMax),
   areaOperativaId: zod.number().min(1),
+});
+
+/**
+ * Riusa il registro FSE+ dell’Area del magazzino o lo configura al primo import. Più registri richiedono una scelta esplicita; i registri disattivati non vengono sostituiti.
+ */
+
+export const ResolveAutomaticFseImportSourceBody = zod.object({
+  magazzinoId: zod.number().min(1),
+});
+
+export const ResolveAutomaticFseImportSourceResponse = zod.object({
+  id: zod.number(),
+  codice: zod.string(),
+  descrizione: zod.string(),
+  areaOperativaId: zod.number(),
+  attiva: zod.union([zod.literal(0), zod.literal(1)]),
+  creatoDa: zod.number(),
+  dataCreazione: zod.coerce.date(),
 });
 
 export const analyzeFsePracticeImportQueryNomeFileMax = 255;
@@ -5314,6 +5477,392 @@ export const ArchiveLottoLogicoResponse = zod.object({
     ),
 });
 
+/**
+ * @summary Anagrafiche territoriali, incluse le preregistrazioni senza merce
+ */
+
+export const listLottiProduttoreQueryLimitMax = 100;
+
+export const ListLottiProduttoreQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().optional(),
+  prodottoId: zod.coerce.number().optional(),
+  origine: zod.enum(["MANUALE", "AUTOMATICO", "IMPORTATO"]).optional(),
+  q: zod.coerce.string().optional(),
+  page: zod.coerce.number().min(1).optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listLottiProduttoreQueryLimitMax)
+    .optional(),
+});
+
+export const listLottiProduttoreResponseItemsItemPartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemPartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemPartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const listLottiProduttoreResponseItemsItemPrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const listLottiProduttoreResponseItemsItemDisponibileRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+
+export const ListLottiProduttoreResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      areaOperativaId: zod.number(),
+      prodottoId: zod.number(),
+      prodottoNome: zod.string(),
+      prodottoCodice: zod.string(),
+      unitaMisura: zod.string(),
+      codiceOriginale: zod.string().nullish(),
+      codiceCanonico: zod.string().nullish(),
+      riferimentoInterno: zod.string(),
+      dataScadenza: zod.coerce.date().nullish(),
+      produttore: zod.string().nullish(),
+      produttoreCanonico: zod.string().nullish(),
+      note: zod.string().nullish(),
+      origine: zod
+        .union([
+          zod.literal("MANUALE"),
+          zod.literal("AUTOMATICO"),
+          zod.literal("IMPORTATO"),
+          zod.literal(null),
+        ])
+        .nullish(),
+      fonte: zod.string().nullish(),
+      primoAutoreId: zod.number().nullish(),
+      autore: zod.string().nullish(),
+      primaCreazioneAt: zod.coerce.date().nullish(),
+      dataAssociazione: zod.coerce.date(),
+      partite: zod.array(
+        zod.object({
+          id: zod.number(),
+          magazzinoId: zod.number(),
+          magazzinoNome: zod.string(),
+          fondoOrigine: zod.enum([
+            "FSE_PLUS",
+            "FONDO_NAZIONALE",
+            "FONDO_NAZIONALE_COFINANZIATO",
+            "NESSUN_FONDO",
+          ]),
+          lottoLogicoId: zod.number().nullish(),
+          dataScadenza: zod.coerce.date().nullish(),
+          quantitaResidua: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemQuantitaResiduaRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+          quantitaPrenotata: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemQuantitaPrenotataRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+          disponibile: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemDisponibileRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+        }),
+      ),
+      numeroPartiteVisibili: zod.number(),
+      residuo: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemResiduoRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      prenotato: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemPrenotatoRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      disponibile: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemDisponibileRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      statoPartite: zod.enum([
+        "PARTITE_VISIBILI",
+        "MAI_CARICATO",
+        "NESSUNA_PARTITA_VISIBILE",
+      ]),
+    }),
+  ),
+  page: zod.number(),
+  hasMore: zod.boolean(),
+});
+
+/**
+ * @summary Pre-registra un lotto senza stock, origine assegnata dal server
+ */
+
+export const preregisterLottoProduttoreBodyCodiceLottoMax = 80;
+
+export const preregisterLottoProduttoreBodyProduttoreMax = 200;
+
+export const preregisterLottoProduttoreBodyNoteMax = 4000;
+
+export const preregisterLottoProduttoreBodyIdempotencyKeyMax = 100;
+
+export const PreregisterLottoProduttoreBody = zod.object({
+  areaOperativaId: zod.number().min(1),
+  prodottoId: zod.number().min(1),
+  codiceLotto: zod
+    .string()
+    .max(preregisterLottoProduttoreBodyCodiceLottoMax)
+    .nullish(),
+  dataScadenza: zod.coerce.date().nullish(),
+  produttore: zod
+    .string()
+    .max(preregisterLottoProduttoreBodyProduttoreMax)
+    .nullish(),
+  note: zod.string().max(preregisterLottoProduttoreBodyNoteMax).nullish(),
+  idempotencyKey: zod
+    .string()
+    .min(1)
+    .max(preregisterLottoProduttoreBodyIdempotencyKeyMax),
+});
+
+export const preregisterLottoProduttoreResponseOnePartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOnePartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOnePartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOneResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const preregisterLottoProduttoreResponseOnePrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const preregisterLottoProduttoreResponseOneDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+
+export const PreregisterLottoProduttoreResponse = zod
+  .object({
+    id: zod.number(),
+    areaOperativaId: zod.number(),
+    prodottoId: zod.number(),
+    prodottoNome: zod.string(),
+    prodottoCodice: zod.string(),
+    unitaMisura: zod.string(),
+    codiceOriginale: zod.string().nullish(),
+    codiceCanonico: zod.string().nullish(),
+    riferimentoInterno: zod.string(),
+    dataScadenza: zod.coerce.date().nullish(),
+    produttore: zod.string().nullish(),
+    produttoreCanonico: zod.string().nullish(),
+    note: zod.string().nullish(),
+    origine: zod
+      .union([
+        zod.literal("MANUALE"),
+        zod.literal("AUTOMATICO"),
+        zod.literal("IMPORTATO"),
+        zod.literal(null),
+      ])
+      .nullish(),
+    fonte: zod.string().nullish(),
+    primoAutoreId: zod.number().nullish(),
+    autore: zod.string().nullish(),
+    primaCreazioneAt: zod.coerce.date().nullish(),
+    dataAssociazione: zod.coerce.date(),
+    partite: zod.array(
+      zod.object({
+        id: zod.number(),
+        magazzinoId: zod.number(),
+        magazzinoNome: zod.string(),
+        fondoOrigine: zod.enum([
+          "FSE_PLUS",
+          "FONDO_NAZIONALE",
+          "FONDO_NAZIONALE_COFINANZIATO",
+          "NESSUN_FONDO",
+        ]),
+        lottoLogicoId: zod.number().nullish(),
+        dataScadenza: zod.coerce.date().nullish(),
+        quantitaResidua: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemQuantitaResiduaRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+        quantitaPrenotata: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemQuantitaPrenotataRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+        disponibile: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemDisponibileRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+      }),
+    ),
+    numeroPartiteVisibili: zod.number(),
+    residuo: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOneResiduoRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    prenotato: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOnePrenotatoRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    disponibile: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOneDisponibileRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    statoPartite: zod.enum([
+      "PARTITE_VISIBILI",
+      "MAI_CARICATO",
+      "NESSUNA_PARTITA_VISIBILE",
+    ]),
+  })
+  .and(
+    zod.object({
+      creato: zod.boolean(),
+    }),
+  );
+
+/**
+ * @summary Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+ */
+export const GetLottoProduttoreParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const getLottoProduttoreResponsePartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponsePartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponsePartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponseResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const getLottoProduttoreResponsePrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const getLottoProduttoreResponseDisponibileRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+
+export const GetLottoProduttoreResponse = zod.object({
+  id: zod.number(),
+  areaOperativaId: zod.number(),
+  prodottoId: zod.number(),
+  prodottoNome: zod.string(),
+  prodottoCodice: zod.string(),
+  unitaMisura: zod.string(),
+  codiceOriginale: zod.string().nullish(),
+  codiceCanonico: zod.string().nullish(),
+  riferimentoInterno: zod.string(),
+  dataScadenza: zod.coerce.date().nullish(),
+  produttore: zod.string().nullish(),
+  produttoreCanonico: zod.string().nullish(),
+  note: zod.string().nullish(),
+  origine: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  fonte: zod.string().nullish(),
+  primoAutoreId: zod.number().nullish(),
+  autore: zod.string().nullish(),
+  primaCreazioneAt: zod.coerce.date().nullish(),
+  dataAssociazione: zod.coerce.date(),
+  partite: zod.array(
+    zod.object({
+      id: zod.number(),
+      magazzinoId: zod.number(),
+      magazzinoNome: zod.string(),
+      fondoOrigine: zod.enum([
+        "FSE_PLUS",
+        "FONDO_NAZIONALE",
+        "FONDO_NAZIONALE_COFINANZIATO",
+        "NESSUN_FONDO",
+      ]),
+      lottoLogicoId: zod.number().nullish(),
+      dataScadenza: zod.coerce.date().nullish(),
+      quantitaResidua: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemQuantitaResiduaRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      quantitaPrenotata: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemQuantitaPrenotataRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      disponibile: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemDisponibileRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+    }),
+  ),
+  numeroPartiteVisibili: zod.number(),
+  residuo: zod
+    .string()
+    .regex(getLottoProduttoreResponseResiduoRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  prenotato: zod
+    .string()
+    .regex(getLottoProduttoreResponsePrenotatoRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  disponibile: zod
+    .string()
+    .regex(getLottoProduttoreResponseDisponibileRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  statoPartite: zod.enum([
+    "PARTITE_VISIBILI",
+    "MAI_CARICATO",
+    "NESSUNA_PARTITA_VISIBILE",
+  ]),
+});
+
 export const ListLottiQueryParams = zod.object({
   prodottoId: zod.coerce.number().optional(),
   magazzinoId: zod.coerce.number().optional(),
@@ -5366,6 +5915,16 @@ export const listLottiResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const ListLottiResponseItem = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5472,6 +6031,7 @@ export const ListLottiResponse = zod.array(ListLottiResponseItem);
 export const createLottoBodyQuantitaCaricataExclusiveMin = 0;
 
 export const CreateLottoBody = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
   codiceLotto: zod.string().optional(),
@@ -5508,6 +6068,16 @@ export const getLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const GetLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5637,6 +6207,16 @@ export const updateLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const UpdateLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5783,6 +6363,16 @@ export const rettificaLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const RettificaLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -7308,7 +7898,19 @@ export const GetScaricoResponse = zod.object({
 });
 
 export const ListFornitoriQueryParams = zod.object({
-  areaOperativaId: zod.coerce.number().optional(),
+  ambito: zod
+    .enum(["tutti", "globali"])
+    .optional()
+    .describe(
+      "Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).",
+    ),
+  areaOperativaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.",
+    ),
 });
 
 export const ListFornitoriResponseItem = zod.object({
@@ -8051,7 +8653,25 @@ export const ListBeneficiariResponseItem = zod
   );
 export const ListBeneficiariResponse = zod.array(ListBeneficiariResponseItem);
 
+export const createBeneficiarioBodyFascicoloMax = 255;
+
+export const createBeneficiarioBodyVersioneFascicoloMin = 0;
+
 export const CreateBeneficiarioBody = zod.object({
+  fascicolo: zod
+    .string()
+    .max(createBeneficiarioBodyFascicoloMax)
+    .nullish()
+    .describe(
+      "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+    ),
+  versioneFascicolo: zod
+    .number()
+    .min(createBeneficiarioBodyVersioneFascicoloMin)
+    .optional()
+    .describe(
+      "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+    ),
   codice: zod.string().optional(),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod.enum(["provvisoria", "completa"]).optional(),
@@ -8152,9 +8772,27 @@ export const CercaBeneficiariSimiliResponse = zod.array(
   CercaBeneficiariSimiliResponseItem,
 );
 
+export const bulkBeneficiariBodyRigheItemFascicoloMax = 255;
+
+export const bulkBeneficiariBodyRigheItemVersioneFascicoloMin = 0;
+
 export const BulkBeneficiariBody = zod.object({
   righe: zod.array(
     zod.object({
+      fascicolo: zod
+        .string()
+        .max(bulkBeneficiariBodyRigheItemFascicoloMax)
+        .nullish()
+        .describe(
+          "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+        ),
+      versioneFascicolo: zod
+        .number()
+        .min(bulkBeneficiariBodyRigheItemVersioneFascicoloMin)
+        .optional()
+        .describe(
+          "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+        ),
       codice: zod.string().optional(),
       codiceFiscale: zod.string().nullish(),
       statoAnagrafica: zod.enum(["provvisoria", "completa"]).optional(),
@@ -8223,6 +8861,13 @@ export const BulkBeneficiariResponse = zod.object({
  */
 
 export const PreviewBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce
     .date()
@@ -8231,7 +8876,9 @@ export const PreviewBeneficiariFseBody = zod.object({
     ),
   file: zod
     .custom<Uint8Array>((value) => value instanceof Uint8Array)
-    .describe("Workbook XLSX reale; non viene conservato dal server."),
+    .describe(
+      "Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server.",
+    ),
 });
 
 export const PreviewBeneficiariFseResponse = zod.object({
@@ -8255,11 +8902,40 @@ export const PreviewBeneficiariFseResponse = zod.object({
       errori: zod.array(zod.string()),
       warning: zod.array(zod.string()),
       beneficiarioId: zod.number().optional(),
+      versioneBeneficiario: zod.number().min(1).optional(),
+      versioneFascicolo: zod.number().min(1).optional(),
+      confronto: zod
+        .array(
+          zod.object({
+            campo: zod.string(),
+            attuale: zod.string().nullable(),
+            importato: zod.string().nullable(),
+            esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+            differente: zod.boolean().optional(),
+          }),
+        )
+        .optional(),
       duplicati: zod
         .array(
           zod.object({
             id: zod.number(),
             codice: zod.string(),
+            nome: zod.string().optional(),
+            cognome: zod.string().optional(),
+            dataNascita: zod.coerce.date().nullish(),
+            collegabile: zod.boolean().optional(),
+            versione: zod.number().min(1).optional(),
+            confronto: zod
+              .array(
+                zod.object({
+                  campo: zod.string(),
+                  attuale: zod.string().nullable(),
+                  importato: zod.string().nullable(),
+                  esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+                  differente: zod.boolean().optional(),
+                }),
+              )
+              .optional(),
             centroAscoltoId: zod.number().nullable(),
           }),
         )
@@ -8268,6 +8944,7 @@ export const PreviewBeneficiariFseResponse = zod.object({
   ),
   conteggi: zod.record(zod.string(), zod.number()),
   numeroRighe: zod.number(),
+  formatoFile: zod.enum(["ELENCO", "MASSIVO"]).optional(),
   dataRiferimento: zod.coerce.date(),
 });
 
@@ -8277,13 +8954,20 @@ export const PreviewBeneficiariFseResponse = zod.object({
  */
 
 export const ImportBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce
     .date()
     .describe("Data confermata nella preview e rivalidata dal server."),
   file: zod
     .custom<Uint8Array>((value) => value instanceof Uint8Array)
-    .describe("Lo stesso workbook XLSX reale viene rivalidato dal server."),
+    .describe("Lo stesso workbook XLSX o XLSM viene rivalidato dal server."),
   risoluzioni: zod
     .string()
     .optional()
@@ -8298,6 +8982,7 @@ export const ImportBeneficiariFseResponse = zod.object({
   collegati: zod.number(),
   aggiornati: zod.number(),
   invariati: zod.number(),
+  saltati: zod.number().optional(),
   conflitti: zod.number(),
   errori: zod.number(),
   dettagli: zod.array(
@@ -8311,6 +8996,7 @@ export const ImportBeneficiariFseResponse = zod.object({
         "invariato",
         "conflitto",
         "errore",
+        "saltato",
       ]),
       errori: zod.array(zod.string()),
     }),
@@ -8325,6 +9011,13 @@ export const ImportBeneficiariFseResponse = zod.object({
 export const preflightBeneficiariFseExportBodySoloAttiviDefault = true;
 
 export const PreflightBeneficiariFseExportBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce.date(),
   soloAttivi: zod
@@ -8365,6 +9058,13 @@ export const PreflightBeneficiariFseExportResponse = zod.object({
 export const exportBeneficiariFseBodySoloAttiviDefault = true;
 
 export const ExportBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce.date(),
   soloAttivi: zod.boolean().default(exportBeneficiariFseBodySoloAttiviDefault),
@@ -8538,7 +9238,23 @@ export const GetBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getBeneficiarioResponseFascicoloMax = 255;
+
+export const getBeneficiarioResponseVersioneFascicoloMin = 0;
+
 export const GetBeneficiarioResponse = zod.object({
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+    ),
+  fascicolo: zod.string().max(getBeneficiarioResponseFascicoloMax).nullish(),
+  versioneFascicolo: zod
+    .number()
+    .min(getBeneficiarioResponseVersioneFascicoloMin)
+    .optional(),
   id: zod.number(),
   codice: zod.string(),
   codiceFiscale: zod.string().nullish(),
@@ -8772,7 +9488,25 @@ export const UpdateBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateBeneficiarioBodyFascicoloMax = 255;
+
+export const updateBeneficiarioBodyVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioBody = zod.object({
+  fascicolo: zod
+    .string()
+    .max(updateBeneficiarioBodyFascicoloMax)
+    .nullish()
+    .describe(
+      "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+    ),
+  versioneFascicolo: zod
+    .number()
+    .min(updateBeneficiarioBodyVersioneFascicoloMin)
+    .optional()
+    .describe(
+      "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+    ),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod
     .enum(["provvisoria", "completa"])
@@ -8827,8 +9561,33 @@ export const UpdateBeneficiarioBody = zod.object({
   versione: zod.number().min(1),
 });
 
+export const updateBeneficiarioResponseFascicoloMax = 255;
+
+export const updateBeneficiarioResponseVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioResponse = zod
   .object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
+    fascicolo: zod
+      .string()
+      .max(updateBeneficiarioResponseFascicoloMax)
+      .nullish()
+      .describe(
+        "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+      ),
+    versioneFascicolo: zod
+      .number()
+      .min(updateBeneficiarioResponseVersioneFascicoloMin)
+      .optional()
+      .describe(
+        "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+      ),
     id: zod.number(),
     codice: zod.string(),
     codiceFiscale: zod.string().nullish(),
@@ -8915,8 +9674,33 @@ export const UpdateBeneficiarioStatoBody = zod.object({
   versione: zod.number().min(1),
 });
 
+export const updateBeneficiarioStatoResponseFascicoloMax = 255;
+
+export const updateBeneficiarioStatoResponseVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioStatoResponse = zod
   .object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
+    fascicolo: zod
+      .string()
+      .max(updateBeneficiarioStatoResponseFascicoloMax)
+      .nullish()
+      .describe(
+        "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+      ),
+    versioneFascicolo: zod
+      .number()
+      .min(updateBeneficiarioStatoResponseVersioneFascicoloMin)
+      .optional()
+      .describe(
+        "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+      ),
     id: zod.number(),
     codice: zod.string(),
     codiceFiscale: zod.string().nullish(),
@@ -14167,6 +14951,7 @@ export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornataMin = 0;
 export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornabileMin = 0;
 
 export const GetBollaStampaSpesaEmporioResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   intestazione: zod.string(),
   numeroBolla: zod.string().nullish(),
   numeroSpesa: zod.string(),
@@ -14626,6 +15411,7 @@ export const GetEsitoRettificaSpesaEmporioResponse = zod.object({
   }),
 });
 
+export const listEntiDestinatariQueryAmbitoDefault = `tutti`;
 export const listEntiDestinatariQueryAttivoDefault = true;
 export const listEntiDestinatariQuerySearchMin = 2;
 export const listEntiDestinatariQuerySearchMax = 100;
@@ -14637,6 +15423,14 @@ export const listEntiDestinatariQueryOffsetDefault = 0;
 export const listEntiDestinatariQueryOffsetMin = 0;
 
 export const ListEntiDestinatariQueryParams = zod.object({
+  areaOperativaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("Enti dell’Area e globali; intersecato con l’Area del profilo."),
+  ambito: zod
+    .enum(["tutti", "globali"])
+    .default(listEntiDestinatariQueryAmbitoDefault),
   attivo: zod.coerce.boolean().default(listEntiDestinatariQueryAttivoDefault),
   search: zod.coerce
     .string()
@@ -14671,7 +15465,12 @@ export const ListEntiDestinatariResponseItem = zod.object({
   indirizzo: zod.string().max(listEntiDestinatariResponseIndirizzoMax),
   telefono: zod.string().max(listEntiDestinatariResponseTelefonoMax).nullish(),
   email: zod.string().max(listEntiDestinatariResponseEmailMax).nullish(),
-  areaOperativaId: zod.number(),
+  areaOperativaId: zod
+    .number()
+    .nullable()
+    .describe(
+      "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.",
+    ),
   attivo: zod.boolean(),
   versione: zod.number().min(1),
   dataCreazione: zod.coerce.date(),
@@ -14703,7 +15502,13 @@ export const CreateEnteDestinatarioBody = zod.object({
   indirizzo: zod.string().min(1).max(createEnteDestinatarioBodyIndirizzoMax),
   telefono: zod.string().max(createEnteDestinatarioBodyTelefonoMax).nullish(),
   email: zod.string().max(createEnteDestinatarioBodyEmailMax).nullish(),
-  areaOperativaId: zod.number().min(1),
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .nullable()
+    .describe(
+      "Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale.",
+    ),
 });
 
 export const UpdateEnteDestinatarioParams = zod.object({
@@ -14760,7 +15565,12 @@ export const UpdateEnteDestinatarioResponse = zod.object({
     .max(updateEnteDestinatarioResponseTelefonoMax)
     .nullish(),
   email: zod.string().max(updateEnteDestinatarioResponseEmailMax).nullish(),
-  areaOperativaId: zod.number(),
+  areaOperativaId: zod
+    .number()
+    .nullable()
+    .describe(
+      "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.",
+    ),
   attivo: zod.boolean(),
   versione: zod.number().min(1),
   dataCreazione: zod.coerce.date(),
@@ -14876,6 +15686,7 @@ export const GetDocumentoOperativoResponse = zod.object({
   tipoAggregato: zod.enum(["bolla", "trasferimento"]),
   dettaglio: zod.union([
     zod.object({
+      beneficiarioFascicolo: zod.string().nullish(),
       id: zod.number(),
       numeroBolla: zod.string(),
       dataBolla: zod.string(),
@@ -15025,6 +15836,142 @@ export const GetDocumentoOperativoResponse = zod.object({
   ]),
 });
 
+export const listBollaBeneficiariCandidatiQueryLimitMax = 100;
+
+export const listBollaBeneficiariCandidatiQuerySearchMin = 2;
+export const listBollaBeneficiariCandidatiQuerySearchMax = 200;
+
+export const ListBollaBeneficiariCandidatiQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1),
+  centroAscoltoId: zod.coerce.number().min(1),
+  page: zod.coerce.number().min(1).optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listBollaBeneficiariCandidatiQueryLimitMax)
+    .optional(),
+  search: zod.coerce
+    .string()
+    .min(listBollaBeneficiariCandidatiQuerySearchMin)
+    .max(listBollaBeneficiariCandidatiQuerySearchMax)
+    .optional(),
+});
+
+export const ListBollaBeneficiariCandidatiResponseItem = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+export const ListBollaBeneficiariCandidatiResponse = zod.array(
+  ListBollaBeneficiariCandidatiResponseItem,
+);
+
+/**
+ * Lettura esatta e senza effetti operativi della tessera trasversale nel contesto selezionato.
+ */
+
+export const lookupBollaTesseraBodyCodiceTesseraMax = 256;
+
+export const LookupBollaTesseraBody = zod.object({
+  areaOperativaId: zod.number().min(1),
+  centroAscoltoId: zod.number().min(1),
+  codiceTessera: zod
+    .string()
+    .min(1)
+    .max(lookupBollaTesseraBodyCodiceTesseraMax),
+});
+
+export const LookupBollaTesseraResponse = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+
+export const GetBollaBeneficiarioConsegnaParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBollaBeneficiarioConsegnaQueryParams = zod.object({
+  consegnaId: zod.coerce.number().min(1),
+});
+
+export const GetBollaBeneficiarioConsegnaResponse = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+
+/**
+ * @summary Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+ */
+export const GetBeneficiarioStatiServiziParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBeneficiarioStatiServiziResponse = zod.object({
+  emporio: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  mensa: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  tessera: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+});
+
+export const GetBeneficiarioStatiServiziUdsParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBeneficiarioStatiServiziUdsResponse = zod.object({
+  emporio: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  mensa: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+});
+
+/**
+ * Prima emissione o recupero idempotente della tessera. Non sostituisce e non riattiva tessere esistenti.
+ */
+
+export const GetOrCreateBeneficiarioTesseraDocumentoParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetOrCreateBeneficiarioTesseraDocumentoResponse = zod.object({
+  id: zod.number(),
+  beneficiarioId: zod.number(),
+  codice: zod.string(),
+  stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
+  dataEmissione: zod.coerce.date(),
+  dataScadenza: zod.coerce.date().nullish(),
+  dataRevoca: zod.coerce.date().nullish(),
+  motivoRevoca: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  versione: zod.coerce.date(),
+});
+
 export const listBolleQueryPageDefault = 1;
 
 export const listBolleQueryLimitDefault = 50;
@@ -15091,6 +16038,12 @@ export const createBollaBodyIdempotencyKeyMax = 120;
 export const CreateBollaBody = zod.object({
   idempotencyKey: zod.string().min(1).max(createBollaBodyIdempotencyKeyMax),
   tipoDestinatario: zod.enum(["beneficiario", "ente"]),
+  contestoBeneficiarioAtteso: zod
+    .object({
+      areaOperativaId: zod.number().min(1),
+      centroAscoltoId: zod.number().min(1),
+    })
+    .optional(),
   beneficiarioId: zod.number().nullish(),
   enteDestinatarioId: zod.number().nullish(),
   consegnaId: zod.number().optional(),
@@ -15108,6 +16061,7 @@ export const GetBollaParams = zod.object({
 });
 
 export const GetBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15219,6 +16173,7 @@ export const UpdateBollaBody = zod.object({
 });
 
 export const UpdateBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15430,6 +16385,7 @@ export const ConfermaBollaBody = zod.object({
 });
 
 export const ConfermaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15539,6 +16495,7 @@ export const AnnullaBollaBody = zod.object({
 });
 
 export const AnnullaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15653,6 +16610,7 @@ export const StornaAmministrativamenteBollaBody = zod.object({
 });
 
 export const StornaAmministrativamenteBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15761,6 +16719,7 @@ export const ConsegnaBollaBody = zod.object({
 });
 
 export const ConsegnaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15873,6 +16832,7 @@ export const AffidaBollaBody = zod.object({
 });
 
 export const AffidaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15985,6 +16945,7 @@ export const SegnalaMancataConsegnaBollaBody = zod.object({
 });
 
 export const SegnalaMancataConsegnaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16223,6 +17184,7 @@ export const RegistraRientroBollaBody = zod.object({
 });
 
 export const RegistraRientroBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16328,6 +17290,7 @@ export const SegnalaRitiroNonEffettuatoBody = zod.object({
 });
 
 export const SegnalaRitiroNonEffettuatoResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -17481,6 +18444,229 @@ export const UpdateSuperAdminConfigurazioneMatricoleVolontariResponse =
       .optional(),
   });
 
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax = 8;
+
+export const GetSuperAdminConfigurazioneCodiciBeneficiariResponse = zod.object({
+  configurazione: zod.union([
+    zod.object({
+      id: zod.number(),
+      scopeTipo: zod.enum(["GLOBALE"]),
+      versione: zod.number().min(1),
+      prefissoAssociazione: zod
+        .string()
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax,
+        )
+        .nullish(),
+      includiCodiceArea: zod.boolean(),
+      segmentoFisso: zod
+        .string()
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax,
+        )
+        .nullish(),
+      separatore: zod.enum(["", "-", "/"]),
+      cifreProgressivo: zod
+        .number()
+        .min(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin,
+        )
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax,
+        ),
+      numeroIniziale: zod.number().min(1),
+      ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+      attiva: zod.boolean(),
+      aggiornataDa: zod.number().nullish(),
+      dataCreazione: zod.coerce.date(),
+      dataAggiornamento: zod.coerce.date(),
+    }),
+    zod.null(),
+  ]),
+  esempio: zod.string().nullable(),
+  storico: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        scopeTipo: zod.enum(["GLOBALE"]),
+        versione: zod.number().min(1),
+        prefissoAssociazione: zod
+          .string()
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax,
+          )
+          .nullish(),
+        includiCodiceArea: zod.boolean(),
+        segmentoFisso: zod
+          .string()
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax,
+          )
+          .nullish(),
+        separatore: zod.enum(["", "-", "/"]),
+        cifreProgressivo: zod
+          .number()
+          .min(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin,
+          )
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax,
+          ),
+        numeroIniziale: zod.number().min(1),
+        ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+        attiva: zod.boolean(),
+        aggiornataDa: zod.number().nullish(),
+        dataCreazione: zod.coerce.date(),
+        dataAggiornamento: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+});
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneRegExp =
+  new RegExp("^[A-Za-z0-9]\*$");
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoRegExp =
+  new RegExp("^[A-Za-z0-9]\*$");
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMax = 8;
+
+export const UpdateSuperAdminConfigurazioneCodiciBeneficiariBody = zod.object({
+  prefissoAssociazione: zod
+    .string()
+    .max(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneMax,
+    )
+    .regex(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneRegExp,
+    )
+    .nullish(),
+  includiCodiceArea: zod.boolean(),
+  segmentoFisso: zod
+    .string()
+    .max(updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoMax)
+    .regex(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoRegExp,
+    )
+    .nullish(),
+  separatore: zod.enum(["", "-", "/"]),
+  cifreProgressivo: zod
+    .number()
+    .min(updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMin)
+    .max(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMax,
+    ),
+  numeroIniziale: zod.number().min(1),
+  ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+});
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax = 8;
+
+export const UpdateSuperAdminConfigurazioneCodiciBeneficiariResponse =
+  zod.object({
+    configurazione: zod.union([
+      zod.object({
+        id: zod.number(),
+        scopeTipo: zod.enum(["GLOBALE"]),
+        versione: zod.number().min(1),
+        prefissoAssociazione: zod
+          .string()
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax,
+          )
+          .nullish(),
+        includiCodiceArea: zod.boolean(),
+        segmentoFisso: zod
+          .string()
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax,
+          )
+          .nullish(),
+        separatore: zod.enum(["", "-", "/"]),
+        cifreProgressivo: zod
+          .number()
+          .min(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin,
+          )
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax,
+          ),
+        numeroIniziale: zod.number().min(1),
+        ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+        attiva: zod.boolean(),
+        aggiornataDa: zod.number().nullish(),
+        dataCreazione: zod.coerce.date(),
+        dataAggiornamento: zod.coerce.date(),
+      }),
+      zod.null(),
+    ]),
+    esempio: zod.string().nullable(),
+    storico: zod
+      .array(
+        zod.object({
+          id: zod.number(),
+          scopeTipo: zod.enum(["GLOBALE"]),
+          versione: zod.number().min(1),
+          prefissoAssociazione: zod
+            .string()
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax,
+            )
+            .nullish(),
+          includiCodiceArea: zod.boolean(),
+          segmentoFisso: zod
+            .string()
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax,
+            )
+            .nullish(),
+          separatore: zod.enum(["", "-", "/"]),
+          cifreProgressivo: zod
+            .number()
+            .min(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin,
+            )
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax,
+            ),
+          numeroIniziale: zod.number().min(1),
+          ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+          attiva: zod.boolean(),
+          aggiornataDa: zod.number().nullish(),
+          dataCreazione: zod.coerce.date(),
+          dataAggiornamento: zod.coerce.date(),
+        }),
+      )
+      .optional(),
+  });
+
 export const ListSuperAdminModuliResponseItem = zod.object({
   id: zod.number(),
   codice: zod.string(),
@@ -17582,6 +18768,7 @@ export const ListSuperAdminLogSistemaQueryParams = zod.object({
       "PASSWORD_CHANGED_BY_ADMIN",
       "USER_CREATED",
       "USER_DISABLED",
+      "USER_DELETED",
       "USER_ROLE_CHANGED",
       "ACCOUNT_LOCKED",
       "ACCOUNT_UNLOCKED",
@@ -17616,6 +18803,7 @@ export const ListSuperAdminLogSistemaResponse = zod.object({
         "PASSWORD_CHANGED_BY_ADMIN",
         "USER_CREATED",
         "USER_DISABLED",
+        "USER_DELETED",
         "USER_ROLE_CHANGED",
         "ACCOUNT_LOCKED",
         "ACCOUNT_UNLOCKED",
@@ -18079,6 +19267,13 @@ export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleM
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax = 99999999;
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+    ),
   creditoSolidaleAbilitato: zod.boolean().optional(),
   creditoSolidaleStato: zod
     .enum(["non_abilitato", "attivo", "sospeso", "revocato"])
@@ -18107,6 +19302,13 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneResponse =
   zod.object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
     beneficiarioId: zod.number(),
     creditoSolidaleAbilitato: zod.boolean(),
     creditoSolidaleStato: zod.enum([
@@ -18340,6 +19542,7 @@ export const ExecuteCreditoSolidaleRicaricaMensileBody = zod.object({
 export const listVolontariQueryScadutiDaMenoDiMesiMax = 120;
 
 export const ListVolontariQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   centroAscoltoId: zod.coerce.number().optional(),
   search: zod.coerce.string().optional(),
   stato: zod.enum(["attivi", "non_attivi", "tutti"]).optional(),
@@ -18368,6 +19571,7 @@ export const ListVolontariQueryParams = zod.object({
 export const listVolontariResponseMaxConsegneTurnoMin = 0;
 
 export const ListVolontariResponseItem = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -18427,6 +19631,7 @@ export const createVolontarioBodyTwoMaxConsegneTurnoMin = 0;
 
 export const CreateVolontarioBody = zod.unknown().and(
   zod.object({
+    areaOperativaId: zod.number().nullish(),
     nome: zod.string(),
     cognome: zod.string(),
     tipoVolontario: zod.enum(["PERMANENTE", "TEMPORANEO"]).optional(),
@@ -18470,6 +19675,7 @@ export const BulkVolontariBody = zod.object({
   righe: zod.array(
     zod.unknown().and(
       zod.object({
+        areaOperativaId: zod.number().nullish(),
         nome: zod.string(),
         cognome: zod.string(),
         tipoVolontario: zod.enum(["PERMANENTE", "TEMPORANEO"]).optional(),
@@ -18746,6 +19952,7 @@ export const UpdateVolontarioServiceDayBody = zod.object({
 });
 
 export const AnalyzeVolontariImportQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   centroAscoltoId: zod.coerce.number().optional(),
 });
 
@@ -19046,6 +20253,7 @@ export const ConvertVolontarioToPermanentBody = zod.object({
 export const convertVolontarioToPermanentResponseMaxConsegneTurnoMin = 0;
 
 export const ConvertVolontarioToPermanentResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19113,6 +20321,7 @@ export const GetVolontarioQueryParams = zod.object({
 export const getVolontarioResponseMaxConsegneTurnoMin = 0;
 
 export const GetVolontarioResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19174,6 +20383,7 @@ export const UpdateVolontarioParams = zod.object({
 export const updateVolontarioBodyMaxConsegneTurnoMin = 0;
 
 export const UpdateVolontarioBody = zod.object({
+  areaOperativaId: zod.number().nullish(),
   nome: zod.string().optional(),
   cognome: zod.string().optional(),
   centroAscoltoId: zod.number().nullish(),
@@ -19207,6 +20417,7 @@ export const UpdateVolontarioBody = zod.object({
 export const updateVolontarioResponseMaxConsegneTurnoMin = 0;
 
 export const UpdateVolontarioResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19267,8 +20478,16 @@ export const DeleteVolontarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const deleteVolontarioBodyRemoveIfUnusedDefault = false;
+
 export const DeleteVolontarioBody = zod.object({
   versione: zod.number().min(1),
+  removeIfUnused: zod
+    .boolean()
+    .default(deleteVolontarioBodyRemoveIfUnusedDefault)
+    .describe(
+      "Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation.",
+    ),
 });
 
 export const DeleteVolontarioResponse = zod.object({
@@ -19277,6 +20496,7 @@ export const DeleteVolontarioResponse = zod.object({
 });
 
 export const ListMezziResponseItem = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19373,6 +20593,7 @@ export const GetMezzoParams = zod.object({
 });
 
 export const GetMezzoResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19437,6 +20658,7 @@ export const UpdateMezzoBody = zod.object({
 });
 
 export const UpdateMezzoResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19487,6 +20709,7 @@ export const DeleteMezzoResponse = zod.object({
 export const ListApprovazioniLogisticaResponse = zod.object({
   volontari: zod.array(
     zod.object({
+      areaOperativaId: zod.number().nullish(),
       id: zod.number(),
       nome: zod.string(),
       cognome: zod.string(),
@@ -21473,12 +22696,32 @@ export const LoginUserResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
@@ -21496,12 +22739,32 @@ export const GetCurrentUserResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
@@ -22442,7 +23705,8 @@ export const ListGiacenzeMensaResponse = zod.array(
 );
 
 /**
- * Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+ * Solo amministratori; storico delle precedenti assegnazioni, senza effetto sugli accessi. Il ruolo abilita tutte le mense dell'Area dell'operatore.
+ * @deprecated
  */
 
 export const ListUtenteMenseParams = zod.object({
@@ -22462,7 +23726,8 @@ export const ListUtenteMenseResponseItem = zod.object({
 export const ListUtenteMenseResponse = zod.array(ListUtenteMenseResponseItem);
 
 /**
- * Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+ * Operazione dismessa; restituisce 410. Gli accessi Mensa dipendono dal ruolo e dall'Area, senza assegnazioni individuali.
+ * @deprecated
  */
 
 export const SetUtenteMensaParams = zod.object({
@@ -22475,17 +23740,6 @@ export const setUtenteMensaBodyMotivoMax = 500;
 export const SetUtenteMensaBody = zod.object({
   attiva: zod.boolean(),
   motivo: zod.string().min(1).max(setUtenteMensaBodyMotivoMax),
-});
-
-export const SetUtenteMensaResponse = zod.object({
-  id: zod.number(),
-  utenteId: zod.number(),
-  mensaId: zod.number(),
-  attiva: zod.boolean(),
-  assegnataDa: zod.number(),
-  assegnataAt: zod.coerce.date(),
-  revocataDa: zod.number().nullish(),
-  revocataAt: zod.coerce.date().nullish(),
 });
 
 /**
@@ -23155,12 +24409,32 @@ export const ListUtentiResponseItem = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),
@@ -23185,9 +24459,19 @@ export const CreateUtenteBody = zod.object({
   cognome: zod.string().min(1),
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
-  centroAscoltoId: zod.number().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
-  zonaUdsId: zod.number().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   attivo: zod.boolean().optional(),
 });
 
@@ -23204,12 +24488,32 @@ export const GetUtenteResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),
@@ -23230,9 +24534,19 @@ export const UpdateUtenteBody = zod.object({
   cognome: zod.string().nullish(),
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
-  centroAscoltoId: zod.number().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
-  zonaUdsId: zod.number().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   attivo: zod.boolean().optional(),
 });
 
@@ -23245,12 +24559,32 @@ export const UpdateUtenteResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),
@@ -23265,10 +24599,29 @@ export const DeleteUtenteParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const DeleteUtenteQueryParams = zod.object({
+  removeIfUnused: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.",
+    ),
+});
+
 export const ResetUtentePasswordParams = zod.object({
   id: zod.coerce.number(),
 });
 
 export const ResetUtentePasswordResponse = zod.object({
   message: zod.string(),
+});
+
+export const SetUtenteTemporaryPasswordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const setUtenteTemporaryPasswordBodyNewPasswordMin = 8;
+
+export const SetUtenteTemporaryPasswordBody = zod.object({
+  newPassword: zod.string().min(setUtenteTemporaryPasswordBodyNewPasswordMin),
 });

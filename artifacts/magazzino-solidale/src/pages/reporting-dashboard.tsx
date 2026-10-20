@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import {
   useGetReportCentroAscolto,
   useGetReportDashboardGenerale,
@@ -68,7 +69,7 @@ export function reportingFiltersFromSearch(
   user: Pick<
     NonNullable<ReturnType<typeof useAuth>["user"]>,
     "areaOperativaId" | "centroAscoltoId" | "zonaUdsId"
-  > | null,
+  > & { aree?: string[] } | null,
   today = todayEuropeRome(),
 ): ReportingFilterState {
   const params = new URLSearchParams(search);
@@ -94,7 +95,7 @@ export function reportingFiltersFromSearch(
     centroAscoltoId: positiveId(
       params,
       "centroAscoltoId",
-      user?.centroAscoltoId ?? null,
+      operationalCentroId(user),
     ),
     magazzinoId: positiveId(params, "magazzinoId", null),
     mensaId: positiveId(params, "mensaId", null),

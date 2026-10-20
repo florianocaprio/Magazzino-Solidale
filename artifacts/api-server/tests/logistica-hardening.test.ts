@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it , vi } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import {
@@ -37,6 +37,12 @@ let scope: SeedScope;
 let ruoloVolontarioId: number;
 let defaultCentroAscoltoId: number;
 let volunteerSequence = 0;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-01T12:00:00+02:00"));
+});
+afterEach(() => vi.useRealTimers());
 
 beforeEach(async () => {
   scope = newScope();
@@ -75,6 +81,12 @@ function volunteerInput(overrides: Record<string, unknown> = {}) {
     codiceFiscaleNota: "Non disponibile nel test automatico",
     ...overrides,
   };
+}
+
+async function createSharedVolunteer(centreId: number) {
+  const id = await createVolontario(scope, centreId);
+  await db.update(volontariTable).set({ centroAscoltoId: null }).where(eq(volontariTable.id, id));
+  return id;
 }
 
 describe("hardening Logistica", () => {
@@ -195,7 +207,7 @@ describe("hardening Logistica", () => {
     scope.volontarioIds.push(created.body.id);
   });
 
-  it("impedisce a un caller Area-scoped di creare risorse globali NULL", async () => {
+  it("assegna il volontario all’Area del caller anche senza Centro, mantenendo i vincoli dei mezzi", async () => {
     const area = await createAreaOperativa(scope);
     const areaUser = { id: 0, centroAscoltoId: null, areaOperativaId: area };
     const volontario = await request(app(volontariRouter, areaUser)).post("/volontari").send({
@@ -205,7 +217,9 @@ describe("hardening Logistica", () => {
         centroAscoltoId: null,
       }),
     });
-    expect(volontario.status).toBe(422);
+    expect(volontario.status).toBe(201);
+    scope.volontarioIds.push(volontario.body.id);
+    expect(volontario.body).toMatchObject({ areaOperativaId: area, centroAscoltoId: null });
     const mezzo = await request(app(mezziRouter, areaUser)).post("/mezzi").send({
       codice: `AREA-M-${Date.now()}`,
       tipo: "auto",
@@ -266,7 +280,7 @@ describe("hardening Logistica", () => {
     expect(pendingResult.status).toBe(403);
     expect((await request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroA.id, data: "2026-09-01", fascia: "Mattina", volontari: [] })).status).toBe(400);
 
-    const volontario = await createVolontario(scope, null);
+    const volontario = await createSharedVolunteer(centroA.id);
     const first = await request(app(turniRouter)).put("/turni").send({
       centroAscoltoId: centroA.id,
       data: "2026-09-02",
@@ -297,7 +311,7 @@ describe("hardening Logistica", () => {
     const area = await createAreaOperativa(scope);
     const centroA = await createCentroRec(scope, { areaOperativaId: area });
     const centroB = await createCentroRec(scope, { areaOperativaId: area });
-    const volontario = await createVolontario(scope, null);
+    const volontario = await createSharedVolunteer(centroA.id);
     const payload = (centroAscoltoId: number) => ({ centroAscoltoId, data: "2026-09-03", fascia: "18-20", volontari: [{ volontarioId: volontario }] });
     const responses = await Promise.all([
       request(app(turniRouter)).put("/turni").send(payload(centroA.id)),
@@ -312,8 +326,8 @@ describe("hardening Logistica", () => {
     const centroA = await createCentroRec(scope, { areaOperativaId: area });
     const centroB = await createCentroRec(scope, { areaOperativaId: area });
     const mezzo = await createMezzo(scope, { centroId: null });
-    const volontarioA = await createVolontario(scope, null);
-    const volontarioB = await createVolontario(scope, null);
+    const volontarioA = await createSharedVolunteer(centroA.id);
+    const volontarioB = await createSharedVolunteer(centroA.id);
     const responses = await Promise.all([
       request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroA.id, data: "2026-09-10", fascia: "14-18", mezzoId: mezzo, volontari: [{ volontarioId: volontarioA }] }),
       request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroB.id, data: "2026-09-10", fascia: "14-18", mezzoId: mezzo, volontari: [{ volontarioId: volontarioB }] }),

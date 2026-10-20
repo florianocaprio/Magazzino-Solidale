@@ -146,3 +146,114 @@ test("tablet 820: crea e rettifica un intervento UDS dalla card", async ({
   );
   await runUdsLifecycle(page, "uds-interventi-mobile", true);
 });
+
+test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno filtrato", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Lifecycle mutante desktop una volta");
+  await login(page);
+  const areas = await (await page.request.get("/api/aree-operative")).json();
+  const area = areas.find((item: { nome: string }) => item.nome === "Area Demo");
+  expect(area).toBeTruthy();
+  const centres = await (await page.request.get("/api/centri-ascolto")).json();
+  const centre = centres.find((item: { areaOperativaId: number; attivo: boolean }) => item.areaOperativaId === area.id && item.attivo);
+  expect(centre).toBeTruthy();
+  const zoneResponse = await page.request.post("/api/zone-uds", { data: { nome: `BUG21Zona${Date.now()}`, areaOperativaId: area.id } });
+  expect(zoneResponse.status(), await zoneResponse.text()).toBe(201);
+  const zone = await zoneResponse.json();
+  const created = await page.request.post("/api/beneficiari", { data: { nome: "Persona", cognome: `BUG21Browser${Date.now()}`, sesso: "M", fasciaEtaPresunta: "30_64", areaProvenienza: "UE", uds: true, statoAnagrafica: "provvisoria", areaOperativaId: area.id, centroAscoltoId: null } });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const directoryPath = `/uds/anagrafica?search=${person.cognome}`;
+  await page.goto(directoryPath);
+  await page.getByRole("link", { name: person.cognome, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/uds/anagrafica/${person.id}\\?ritorno=`));
+  // Il riepilogo ha solo stati, senza azioni per i servizi o richieste.
+  await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+  await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa|nuova richiesta/i })).toHaveCount(0);
+  await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
+  const download = page.getByRole("button", { name: /scarica tessera pdf/i });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const downloaded = page.waitForEvent("download");
+    await download.click();
+    expect((await downloaded).suggestedFilename()).toMatch(/\.pdf$/i);
+  }
+  const cards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+  expect(cards).toHaveLength(1);
+  // I pulsanti sono nel contenitore immediato del rispettivo selettore.
+  const centrePicker = page.getByRole("combobox", { name: /centro di ascolto di riferimento/i });
+  await selectOption(page, centrePicker, centre.nome);
+  const centrePatch = page.waitForRequest((request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/beneficiari/${person.id}`);
+  await centrePicker.locator("..").getByRole("button", { name: /^salva$/i }).click();
+  expect(Object.keys((await centrePatch).postDataJSON()).sort()).toEqual(["centroAscoltoId", "versione"]);
+  const zonePicker = page.getByRole("combobox", { name: /^zona uds$/i });
+  await selectOption(page, zonePicker, zone.nome);
+  const zonePatch = page.waitForResponse((response) => response.request().method() === "PATCH" && new URL(response.url()).pathname === `/api/beneficiari/${person.id}`);
+  await zonePicker.locator("..").getByRole("button", { name: /^salva$/i }).click();
+  const response = await zonePatch;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(Object.keys(response.request().postDataJSON()).sort()).toEqual(["versione", "zonaUdsId"]);
+  await page.reload();
+  await expect(zonePicker).toContainText(zone.nome);
+  await expect(centrePicker).toContainText(centre.nome);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertViewportSafe(page);
+  await page.getByRole("link", { name: /indietro/i }).click();
+  await expect(page).toHaveURL(new RegExp(`/uds/anagrafica\\?search=${person.cognome}$`));
+  await expect(page.getByRole("link", { name: person.cognome, exact: true })).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: person.cognome });
+  await expect(row).toContainText(zone.nome);
+  await page.goto(`/beneficiari/${person.id}`);
+  await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+  await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa/i })).toHaveCount(0);
+});
+
+test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza sostituire la tessera", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Configurazione mutante una sola volta");
+  await login(page);
+  const endpoint = "/api/super-admin/configurazione-codici-beneficiari";
+  const original = (await (await page.request.get(endpoint)).json()).configurazione;
+  const volunteerConfig = await (await page.request.get("/api/super-admin/configurazione-matricole-volontari")).json();
+  try {
+    await page.goto("/super-admin/configurazione-ambiente");
+    await expect(page.getByRole("button", { name: "Salva nuova versione", exact: true }).nth(1)).toBeEnabled();
+    // La sezione usa gli stessi controlli della configurazione matricole.
+    await page.getByLabel("Prefisso associazione", { exact: true }).fill("UAT");
+    await page.getByLabel("Segmento fisso", { exact: true }).fill("B");
+    await page.getByLabel("Cifre progressivo", { exact: true }).fill("4");
+    await page.getByLabel("Numero iniziale", { exact: true }).fill("42");
+    await expect(page.getByText("UAT-B-0042", { exact: true })).toBeVisible();
+    const saved = page.waitForResponse(r => r.request().method() === "PUT" && r.url().endsWith(endpoint));
+    // Il secondo pulsante salva la nuova sezione, il primo è delle matricole.
+    await page.getByRole("button", { name: "Salva nuova versione", exact: true }).nth(1).click();
+    expect((await saved).status()).toBe(200);
+    const areas = await (await page.request.get("/api/aree-operative")).json();
+    const area = areas.find((a: { nome: string }) => a.nome === "Area Demo");
+    const response = await page.request.post("/api/beneficiari", { data: { nome: "Mario", cognome: "Prova Tessera", sesso: "M", statoAnagrafica: "provvisoria", areaOperativaId: area.id } });
+    expect(response.status(), await response.text()).toBe(201);
+    const person = await response.json();
+    expect(person.codice).toBe("UAT-B-0042");
+    await page.goto(`/beneficiari/${person.id}`);
+    await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+    await expect(page.getByRole("button", { name: /scarica tessera pdf/i })).toHaveCount(0);
+    await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: /modifica anagrafica/i })).toBeVisible();
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toBe("tessera-UAT-B-0042.pdf");
+    await download.saveAs(info.outputPath("tessera-configurata.pdf"));
+    const first = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+    expect(first).toHaveLength(1);
+    expect(first[0].codice).toMatch(/^MS-/);
+    const downloadingAgain = page.waitForEvent("download");
+    await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
+    await downloadingAgain;
+    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual(first);
+    await page.goto("/super-admin/configurazione-ambiente");
+    await expect(page.getByLabel("Prefisso associazione", { exact: true })).toHaveValue("UAT");
+    expect(await (await page.request.get("/api/super-admin/configurazione-matricole-volontari")).json()).toEqual(volunteerConfig);
+  } finally {
+    const { prefissoAssociazione, includiCodiceArea, segmentoFisso, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo } = original;
+    expect((await page.request.put(endpoint, { data: { prefissoAssociazione, includiCodiceArea, segmentoFisso, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo } })).status()).toBe(200);
+  }
+});

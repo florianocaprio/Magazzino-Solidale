@@ -56,11 +56,12 @@ export function canAccessBeneficiarioScope(
 export function canAccessBeneficiarioRecord(
   beneficiario: BeneficiarioScopeRecord,
   req: Request,
+  centroId = callerCentroId(req),
 ): boolean {
   if (req.user?.aree.includes("uds") && !hasUdsOperationalArea(req)) return false;
   return canAccessBeneficiarioScope(
     beneficiario,
-    beneficiarioAccessScopeFromRequest(req),
+    { ...beneficiarioAccessScopeFromRequest(req), centroAscoltoId: centroId },
   );
 }
 

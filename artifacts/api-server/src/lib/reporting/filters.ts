@@ -16,7 +16,7 @@ import {
   callerAreaOperativaId,
   callerCentroId,
   callerZonaUdsId,
-} from "../centroScope";
+} from "../serviceScope";
 import type { ReportFilters } from "./types";
 import { currentMensaIds, MensaScopeError } from "../mensaScope";
 
@@ -133,7 +133,7 @@ export function parseReportFilters(req: Request): ReportFilters {
   );
   const centre = scopedId(
     optionalPositiveInt(req.query.centroAscoltoId, "centroAscoltoId"),
-    req.user?.centroAscoltoId ?? null,
+    callerCentroId(req),
     "centroAscoltoId",
   );
   const zone = scopedId(

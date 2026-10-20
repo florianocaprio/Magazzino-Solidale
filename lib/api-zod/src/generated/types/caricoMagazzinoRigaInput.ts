@@ -10,6 +10,16 @@ import type { FondoOrigine } from "./fondoOrigine";
 import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface CaricoMagazzinoRigaInput {
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  produttore?: string | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   /** @minimum 1 */
   prodottoId: number;
   fondoOrigine: FondoOrigine;

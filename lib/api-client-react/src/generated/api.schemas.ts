@@ -174,7 +174,7 @@ export interface RichiestaMagazzinoCreate {
    */
   magazzinoRichiestoId?: number;
   /**
-   * Mensa assegnata; destinazione derivata dal server.
+   * Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.
    * @minimum 1
    */
   mensaId?: number;
@@ -469,11 +469,16 @@ export interface BeneficiariFseRowInput {
 }
 
 export interface BeneficiariFseWorkbookUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
   dataRiferimento: string;
-  /** Workbook XLSX reale; non viene conservato dal server. */
+  /** Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server. */
   file: Blob;
 }
 
@@ -483,6 +488,8 @@ export type BeneficiariFseImportResolutionAzione =
 export const BeneficiariFseImportResolutionAzione = {
   crea: "crea",
   collega: "collega",
+  salta: "salta",
+  aggiorna: "aggiorna",
 } as const;
 
 export interface BeneficiariFseImportResolution {
@@ -491,22 +498,59 @@ export interface BeneficiariFseImportResolution {
   azione: BeneficiariFseImportResolutionAzione;
   /** @minimum 1 */
   beneficiarioId?: number;
+  aggiornaAnagrafica?: boolean;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
 }
 
 export interface BeneficiariFseWorkbookImportUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data confermata nella preview e rivalidata dal server. */
   dataRiferimento: string;
-  /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
+  /** Lo stesso workbook XLSX o XLSM viene rivalidato dal server. */
   file: Blob;
   /** Array JSON di BeneficiariFseImportResolution. */
   risoluzioni?: string;
 }
 
+export type BeneficiariFseComparisonFieldEsito =
+  (typeof BeneficiariFseComparisonFieldEsito)[keyof typeof BeneficiariFseComparisonFieldEsito];
+
+export const BeneficiariFseComparisonFieldEsito = {
+  conserva: "conserva",
+  aggiorna: "aggiorna",
+  solo_fse: "solo_fse",
+} as const;
+
+export interface BeneficiariFseComparisonField {
+  campo: string;
+  /** @nullable */
+  attuale: string | null;
+  /** @nullable */
+  importato: string | null;
+  esito: BeneficiariFseComparisonFieldEsito;
+  differente?: boolean;
+}
+
 export interface BeneficiariFseDuplicateCandidate {
   id: number;
   codice: string;
+  nome?: string;
+  cognome?: string;
+  /** @nullable */
+  dataNascita?: string | null;
+  collegabile?: boolean;
+  /** @minimum 1 */
+  versione?: number;
+  confronto?: BeneficiariFseComparisonField[];
   /** @nullable */
   centroAscoltoId: number | null;
 }
@@ -532,10 +576,23 @@ export interface BeneficiariFsePreviewRow {
   errori: string[];
   warning: string[];
   beneficiarioId?: number;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
+  confronto?: BeneficiariFseComparisonField[];
   duplicati?: BeneficiariFseDuplicateCandidate[];
 }
 
 export type BeneficiariFsePreviewResultConteggi = { [key: string]: number };
+
+export type BeneficiariFsePreviewResultFormatoFile =
+  (typeof BeneficiariFsePreviewResultFormatoFile)[keyof typeof BeneficiariFsePreviewResultFormatoFile];
+
+export const BeneficiariFsePreviewResultFormatoFile = {
+  ELENCO: "ELENCO",
+  MASSIVO: "MASSIVO",
+} as const;
 
 export interface BeneficiariFsePreviewResult {
   centroAscoltoId: number;
@@ -545,6 +602,7 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  formatoFile?: BeneficiariFsePreviewResultFormatoFile;
   dataRiferimento: string;
 }
 
@@ -558,6 +616,7 @@ export const BeneficiariFseImportDetailEsito = {
   invariato: "invariato",
   conflitto: "conflitto",
   errore: "errore",
+  saltato: "saltato",
 } as const;
 
 export interface BeneficiariFseImportDetail {
@@ -584,12 +643,18 @@ export interface BeneficiariFseImportResult {
   collegati: number;
   aggiornati: number;
   invariati: number;
+  saltati?: number;
   conflitti: number;
   errori: number;
   dettagli: BeneficiariFseImportDetail[];
 }
 
 export interface BeneficiariFseExportInput {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   dataRiferimento: string;
@@ -1580,6 +1645,8 @@ export const VolontarioInputTipoVolontario = {
 } as const;
 
 export type VolontarioInput = unknown & {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -1744,6 +1811,17 @@ export const BeneficiarioInputSesso = {
 } as const;
 
 export interface BeneficiarioInput {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   codice?: string;
   /** @nullable */
   codiceFiscale?: string | null;
@@ -2020,6 +2098,11 @@ export interface FseImportSource {
   attiva: FseImportSourceAttiva;
   creatoDa: number;
   dataCreazione: string;
+}
+
+export interface FseAutomaticSourceInput {
+  /** @minimum 1 */
+  magazzinoId: number;
 }
 
 export interface FseImportSourceInput {
@@ -2646,6 +2729,16 @@ export type CaricoMagazzinoDettaglio = CaricoMagazzino & {
 };
 
 export interface CaricoMagazzinoRigaInput {
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  produttore?: string | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   /** @minimum 1 */
   prodottoId: number;
   fondoOrigine: FondoOrigine;
@@ -2746,6 +2839,11 @@ export interface CaricoPratica {
 }
 
 export interface CaricoPraticaRiga {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   id: number;
   caricoPraticaId: number;
   /** @nullable */
@@ -2755,6 +2853,8 @@ export interface CaricoPraticaRiga {
   prodottoCodice: string;
   fondoOrigine: FondoOrigine;
   quantita?: QuantitaContabile | null;
+  /** Quantità già stornata dalla riga, senza alterare il dato originario. */
+  quantitaRettificata?: QuantitaContabile;
   unitaMisura: string;
   quantitaFrazionabile: boolean;
   lottoFisicoObbligatorio: boolean;
@@ -2792,6 +2892,8 @@ export interface CaricoIntegrazione {
 }
 
 export type CaricoPraticaDettaglio = CaricoPratica & {
+  /** La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate. */
+  soloAggiunte?: boolean;
   areaOperativaNome: string;
   lottoLogicoCodice: string;
   /** @nullable */
@@ -2801,6 +2903,11 @@ export type CaricoPraticaDettaglio = CaricoPratica & {
 };
 
 export interface CaricoPraticaRigaInput {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   /**
    * @maxLength 100
    * @nullable
@@ -2939,18 +3046,129 @@ export interface CaricoPraticaRettificaInput {
    * @maxLength 100
    */
   idempotencyKey: string;
+  /** Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico. */
+  ripristinaBozza?: boolean;
 }
 
 export interface CaricoPraticaRettificaResult {
   praticaId: number;
   rigaId: number;
   rettificaId?: number;
+  rigaSostitutivaId?: number;
   lottoId: number;
   movimentoId: number;
   quantita: QuantitaContabile;
   versione: number;
   replay: boolean;
 }
+
+export interface LottoProduttoreInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  prodottoId: number;
+  /**
+   * @maxLength 80
+   * @nullable
+   */
+  codiceLotto?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  produttore?: string | null;
+  /**
+   * @maxLength 4000
+   * @nullable
+   */
+  note?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  idempotencyKey: string;
+}
+
+export interface LottoProduttorePartita {
+  id: number;
+  magazzinoId: number;
+  magazzinoNome: string;
+  fondoOrigine: FondoOrigine;
+  /** @nullable */
+  lottoLogicoId?: number | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  quantitaResidua: QuantitaContabile;
+  quantitaPrenotata: QuantitaContabile;
+  disponibile: QuantitaContabile;
+}
+
+/**
+ * @nullable
+ */
+export type LottoProduttoreOrigine =
+  | (typeof LottoProduttoreOrigine)[keyof typeof LottoProduttoreOrigine]
+  | null;
+
+export const LottoProduttoreOrigine = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
+export type LottoProduttoreStatoPartite =
+  (typeof LottoProduttoreStatoPartite)[keyof typeof LottoProduttoreStatoPartite];
+
+export const LottoProduttoreStatoPartite = {
+  PARTITE_VISIBILI: "PARTITE_VISIBILI",
+  MAI_CARICATO: "MAI_CARICATO",
+  NESSUNA_PARTITA_VISIBILE: "NESSUNA_PARTITA_VISIBILE",
+} as const;
+
+export interface LottoProduttore {
+  id: number;
+  areaOperativaId: number;
+  prodottoId: number;
+  prodottoNome: string;
+  prodottoCodice: string;
+  unitaMisura: string;
+  /** @nullable */
+  codiceOriginale?: string | null;
+  /** @nullable */
+  codiceCanonico?: string | null;
+  riferimentoInterno: string;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  produttore?: string | null;
+  /** @nullable */
+  produttoreCanonico?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  origine?: LottoProduttoreOrigine;
+  /** @nullable */
+  fonte?: string | null;
+  /** @nullable */
+  primoAutoreId?: number | null;
+  /** @nullable */
+  autore?: string | null;
+  /** @nullable */
+  primaCreazioneAt?: string | null;
+  dataAssociazione: string;
+  partite: LottoProduttorePartita[];
+  numeroPartiteVisibili: number;
+  residuo: QuantitaContabile;
+  prenotato: QuantitaContabile;
+  disponibile: QuantitaContabile;
+  statoPartite: LottoProduttoreStatoPartite;
+}
+
+export type LottoProduttorePreregisResult = LottoProduttore & {
+  creato: boolean;
+};
 
 export type LottoLogicoStato =
   (typeof LottoLogicoStato)[keyof typeof LottoLogicoStato];
@@ -3019,6 +3237,20 @@ export interface LottoLogicoTransitionInput {
   motivo?: string;
 }
 
+/**
+ * Origine dell’anagrafica; null per dati storici non attestati.
+ * @nullable
+ */
+export type LottoOrigineAnagrafica =
+  | (typeof LottoOrigineAnagrafica)[keyof typeof LottoOrigineAnagrafica]
+  | null;
+
+export const LottoOrigineAnagrafica = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
 export type LottoDocumentiCaricoItem = {
   caricoId: number;
   numero: string;
@@ -3044,6 +3276,16 @@ export type LottoLineageCarichiItem = {
 };
 
 export interface Lotto {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
+  /**
+   * Origine dell’anagrafica; null per dati storici non attestati.
+   * @nullable
+   */
+  origineAnagrafica?: LottoOrigineAnagrafica;
   id: number;
   prodottoId: number;
   /** @nullable */
@@ -3109,6 +3351,11 @@ export const LottoInputCausale = {
 } as const;
 
 export interface LottoInput {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   prodottoId: number;
   /** @nullable */
   lottoLogicoId?: number | null;
@@ -3665,6 +3912,13 @@ export interface RientroTrasportoDettaglio {
   documenti?: RientroTrasportoDocumento[];
 }
 
+export interface VolontarioRemoveInput {
+  /** @minimum 1 */
+  versione: number;
+  /** Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation. */
+  removeIfUnused?: boolean;
+}
+
 export interface VersioneInput {
   /** @minimum 1 */
   versione: number;
@@ -4132,6 +4386,23 @@ export const BeneficiarioCreditoSolidaleStato = {
  * Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
  */
 export interface Beneficiario {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */
@@ -4527,6 +4798,19 @@ export interface Consegna {
 }
 
 export interface BeneficiarioDettaglio {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /** @minimum 0 */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */
@@ -4675,6 +4959,17 @@ export const BeneficiarioUpdateSesso = {
 } as const;
 
 export interface BeneficiarioUpdate {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   /** @nullable */
   codiceFiscale?: string | null;
   /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
@@ -5081,6 +5376,12 @@ export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazioneInput {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   creditoSolidaleAbilitato?: boolean;
   creditoSolidaleStato?: CreditoSolidaleConfigurazioneInputCreditoSolidaleStato;
   /** @nullable */
@@ -5112,6 +5413,12 @@ export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazione {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   beneficiarioId: number;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: CreditoSolidaleConfigurazioneCreditoSolidaleStato;
@@ -5916,6 +6223,7 @@ export const SystemLogEventType = {
   PASSWORD_CHANGED_BY_ADMIN: "PASSWORD_CHANGED_BY_ADMIN",
   USER_CREATED: "USER_CREATED",
   USER_DISABLED: "USER_DISABLED",
+  USER_DELETED: "USER_DELETED",
   USER_ROLE_CHANGED: "USER_ROLE_CHANGED",
   ACCOUNT_LOCKED: "ACCOUNT_LOCKED",
   ACCOUNT_UNLOCKED: "ACCOUNT_UNLOCKED",
@@ -7354,6 +7662,8 @@ export interface SpesaEmporioChiusuraResult {
 }
 
 export interface BollaEmporioStampa {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   intestazione: string;
   /** @nullable */
   numeroBolla?: string | null;
@@ -7522,7 +7832,11 @@ export interface EnteDestinatario {
    * @nullable
    */
   email?: string | null;
-  areaOperativaId: number;
+  /**
+   * NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.
+   * @nullable
+   */
+  areaOperativaId: number | null;
   attivo: boolean;
   /** @minimum 1 */
   versione: number;
@@ -7556,8 +7870,12 @@ export interface EnteDestinatarioInput {
    * @nullable
    */
   email?: string | null;
-  /** @minimum 1 */
-  areaOperativaId: number;
+  /**
+   * Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale.
+   * @minimum 1
+   * @nullable
+   */
+  areaOperativaId: number | null;
 }
 
 export interface EnteDestinatarioUpdate {
@@ -7702,6 +8020,8 @@ export interface BollaRiga {
 }
 
 export interface BollaDettaglio {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   id: number;
   numeroBolla: string;
   dataBolla: string;
@@ -8016,6 +8336,13 @@ export const BollaInputTipoDestinatario = {
   ente: "ente",
 } as const;
 
+export interface BollaBeneficiarioContestoAtteso {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId: number;
+}
+
 export interface BollaInput {
   /**
    * @minLength 1
@@ -8023,6 +8350,7 @@ export interface BollaInput {
    */
   idempotencyKey: string;
   tipoDestinatario: BollaInputTipoDestinatario;
+  contestoBeneficiarioAtteso?: BollaBeneficiarioContestoAtteso;
   /** @nullable */
   beneficiarioId?: number | null;
   /** @nullable */
@@ -8164,6 +8492,111 @@ export interface ConfigurazioneMatricoleVolontariResponse {
   storico?: ConfigurazioneMatricoleVolontari[];
 }
 
+export type ConfigurazioneCodiciBeneficiariScopeTipo =
+  (typeof ConfigurazioneCodiciBeneficiariScopeTipo)[keyof typeof ConfigurazioneCodiciBeneficiariScopeTipo];
+
+export const ConfigurazioneCodiciBeneficiariScopeTipo = {
+  GLOBALE: "GLOBALE",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariSeparatore =
+  (typeof ConfigurazioneCodiciBeneficiariSeparatore)[keyof typeof ConfigurazioneCodiciBeneficiariSeparatore];
+
+export const ConfigurazioneCodiciBeneficiariSeparatore = {
+  "": "",
+  "-": "-",
+  "/": "/",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariAmbitoProgressivo =
+  (typeof ConfigurazioneCodiciBeneficiariAmbitoProgressivo)[keyof typeof ConfigurazioneCodiciBeneficiariAmbitoProgressivo];
+
+export const ConfigurazioneCodiciBeneficiariAmbitoProgressivo = {
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
+} as const;
+
+export interface ConfigurazioneCodiciBeneficiari {
+  id: number;
+  scopeTipo: ConfigurazioneCodiciBeneficiariScopeTipo;
+  /** @minimum 1 */
+  versione: number;
+  /**
+   * @maxLength 12
+   * @nullable
+   */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+   * @maxLength 8
+   * @nullable
+   */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneCodiciBeneficiariSeparatore;
+  /**
+   * @minimum 2
+   * @maximum 8
+   */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneCodiciBeneficiariAmbitoProgressivo;
+  attiva: boolean;
+  /** @nullable */
+  aggiornataDa?: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export type ConfigurazioneCodiciBeneficiariInputSeparatore =
+  (typeof ConfigurazioneCodiciBeneficiariInputSeparatore)[keyof typeof ConfigurazioneCodiciBeneficiariInputSeparatore];
+
+export const ConfigurazioneCodiciBeneficiariInputSeparatore = {
+  "": "",
+  "-": "-",
+  "/": "/",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo =
+  (typeof ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo)[keyof typeof ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo];
+
+export const ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo = {
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
+} as const;
+
+export interface ConfigurazioneCodiciBeneficiariInput {
+  /**
+   * @maxLength 12
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+   * @maxLength 8
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneCodiciBeneficiariInputSeparatore;
+  /**
+   * @minimum 2
+   * @maximum 8
+   */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo;
+}
+
+export interface ConfigurazioneCodiciBeneficiariResponse {
+  configurazione: ConfigurazioneCodiciBeneficiari | null;
+  /** @nullable */
+  esempio: string | null;
+  storico?: ConfigurazioneCodiciBeneficiari[];
+}
+
 export type VolontarioTipoVolontario =
   (typeof VolontarioTipoVolontario)[keyof typeof VolontarioTipoVolontario];
 
@@ -8194,6 +8627,8 @@ export const VolontarioStatoApprovazione = {
 } as const;
 
 export interface Volontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;
@@ -8263,6 +8698,8 @@ export interface Volontario {
 }
 
 export interface VolontarioUpdate {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome?: string;
   cognome?: string;
   /** @nullable */
@@ -8302,6 +8739,7 @@ export interface VolontarioUpdate {
 }
 
 export interface VolontarioFieldErrors {
+  areaOperativaId?: string;
   nome?: string;
   cognome?: string;
   matricola?: string;
@@ -8891,6 +9329,8 @@ export const MezzoStatoApprovazione = {
 } as const;
 
 export interface Mezzo {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   codice: string;
   tipo: string;
@@ -8969,6 +9409,8 @@ export interface ActionResult {
 }
 
 export interface ApprovazioneVolontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;
@@ -10164,17 +10606,33 @@ export interface AuthUser {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoNome?: string | null;
   /** @nullable */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsNome?: string | null;
   isSuperAdmin: boolean;
   isAdmin: boolean;
@@ -10230,17 +10688,33 @@ export interface Utente {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoNome?: string | null;
   /** @nullable */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsNome?: string | null;
   isSuperAdmin: boolean;
   attivo: boolean;
@@ -10253,6 +10727,11 @@ export interface Utente {
   /** @nullable */
   ultimoAccesso?: string | null;
   dataCreazione: string;
+}
+
+export interface TemporaryPasswordInput {
+  /** @minLength 8 */
+  newPassword: string;
 }
 
 export interface UtenteInput {
@@ -10273,11 +10752,19 @@ export interface UtenteInput {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   /** @nullable */
   areaOperativaId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
   attivo?: boolean;
 }
@@ -10293,11 +10780,19 @@ export interface UtenteUpdate {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   /** @nullable */
   areaOperativaId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
   attivo?: boolean;
 }
@@ -10329,6 +10824,54 @@ export interface RuoloUpdate {
   aree?: string[];
   permessi?: string[];
   isAdmin?: boolean;
+}
+
+export interface BollaTesseraLookupInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId: number;
+  /**
+   * @minLength 1
+   * @maxLength 256
+   */
+  codiceTessera: string;
+}
+
+export interface BollaBeneficiarioCandidato {
+  /** @minimum 1 */
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  /** @nullable */
+  areaOperativaId: number | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  consegnaDomicilio: boolean;
+}
+
+export interface BeneficiarioServizioStatoUds {
+  disponibile: boolean;
+  /** @nullable */
+  stato: string | null;
+}
+
+export interface BeneficiarioServizioStato {
+  disponibile: boolean;
+  /** @nullable */
+  stato: string | null;
+}
+
+export interface BeneficiarioServiziRiepilogo {
+  emporio: BeneficiarioServizioStato;
+  mensa: BeneficiarioServizioStato;
+  tessera: BeneficiarioServizioStato;
+}
+
+export interface BeneficiarioStatiServiziUds {
+  emporio: BeneficiarioServizioStatoUds;
+  mensa: BeneficiarioServizioStatoUds;
 }
 
 /**
@@ -11000,6 +11543,37 @@ export type ListLottiLogiciParams = {
   includeStorico?: boolean;
 };
 
+export type ListLottiProduttoreParams = {
+  areaOperativaId?: number;
+  prodottoId?: number;
+  origine?: ListLottiProduttoreOrigine;
+  q?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type ListLottiProduttoreOrigine =
+  (typeof ListLottiProduttoreOrigine)[keyof typeof ListLottiProduttoreOrigine];
+
+export const ListLottiProduttoreOrigine = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
+export type ListLottiProduttore200 = {
+  items: LottoProduttore[];
+  page: number;
+  hasMore: boolean;
+};
+
 export type ListLottiParams = {
   prodottoId?: number;
   magazzinoId?: number;
@@ -11099,8 +11673,24 @@ export type ListScarichiParams = {
 };
 
 export type ListFornitoriParams = {
+  /**
+   * Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).
+   */
+  ambito?: ListFornitoriAmbito;
+  /**
+   * Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.
+   * @minimum 1
+   */
   areaOperativaId?: number;
 };
+
+export type ListFornitoriAmbito =
+  (typeof ListFornitoriAmbito)[keyof typeof ListFornitoriAmbito];
+
+export const ListFornitoriAmbito = {
+  tutti: "tutti",
+  globali: "globali",
+} as const;
 
 export type ListApprovvigionamentiParams = {
   stato?: string;
@@ -11643,6 +12233,12 @@ export type ListSpeseEmporioParams = {
 };
 
 export type ListEntiDestinatariParams = {
+  /**
+   * Enti dell’Area e globali; intersecato con l’Area del profilo.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  ambito?: ListEntiDestinatariAmbito;
   attivo?: boolean;
   /**
    * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
@@ -11660,6 +12256,14 @@ export type ListEntiDestinatariParams = {
    */
   offset?: number;
 };
+
+export type ListEntiDestinatariAmbito =
+  (typeof ListEntiDestinatariAmbito)[keyof typeof ListEntiDestinatariAmbito];
+
+export const ListEntiDestinatariAmbito = {
+  tutti: "tutti",
+  globali: "globali",
+} as const;
 
 export type ListDocumentiOperativiParams = {
   tipoAggregato?: ListDocumentiOperativiTipoAggregato;
@@ -11791,6 +12395,38 @@ export const ExportDocumentiOperativiSortDirection = {
   asc: "asc",
   desc: "desc",
 } as const;
+
+export type ListBollaBeneficiariCandidatiParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minLength 2
+   * @maxLength 200
+   */
+  search?: string;
+};
+
+export type GetBollaBeneficiarioConsegnaParams = {
+  /**
+   * @minimum 1
+   */
+  consegnaId: number;
+};
 
 export type ListBolleParams = {
   stato?: string;
@@ -11970,6 +12606,10 @@ export type ExecuteCreditoSolidaleRicaricaMensile410 = {
 };
 
 export type ListVolontariParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
   search?: string;
   stato?: ListVolontariStato;
@@ -12045,6 +12685,10 @@ export type PreviewBulkVolontariInsurance200 = {
 export type GetVolontarioDossier200 = { [key: string]: unknown };
 
 export type AnalyzeVolontariImportParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
 };
 
@@ -12559,6 +13203,10 @@ export type ListGiacenzeMensaParams = {
   magazzinoId: number;
 };
 
+export type SetUtenteMensa410 = {
+  error: string;
+};
+
 export type ListLottiMensaParams = {
   /**
    * @minimum 1
@@ -12638,4 +13286,11 @@ export type ListUtentiParams = {
   areaOperativaId?: number;
   matricola?: string;
   query?: string;
+};
+
+export type DeleteUtenteParams = {
+  /**
+   * Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.
+   */
+  removeIfUnused?: boolean;
 };

@@ -22,7 +22,11 @@ export interface EnteDestinatario {
    * @nullable
    */
   email?: string | null;
-  areaOperativaId: number;
+  /**
+   * NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.
+   * @nullable
+   */
+  areaOperativaId: number | null;
   attivo: boolean;
   /** @minimum 1 */
   versione: number;

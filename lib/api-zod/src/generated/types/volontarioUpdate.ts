@@ -7,6 +7,8 @@
  */
 
 export interface VolontarioUpdate {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome?: string;
   cognome?: string;
   /** @nullable */

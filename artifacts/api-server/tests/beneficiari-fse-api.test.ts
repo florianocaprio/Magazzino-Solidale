@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +17,8 @@ import {
   utentiTable,
   zoneUdsTable,
 } from "@workspace/db";
+import { massivoFixture } from "./helpers/fse-massivo-workbook";
+import beneficiariRouter from "../src/routes/beneficiari";
 import beneficiariFseRouter from "../src/routes/beneficiari-fse";
 import {
   FSE_BENEFICIARI_HEADERS,
@@ -157,6 +160,98 @@ async function insertBeneficiary(
   return created;
 }
 
+it.runIf(Boolean(process.env.FSE_BENEFICIARI_REAL_PATH))("importa il workbook FSE+ reale e ripete senza duplicati", async () => {
+  const [area] = await db.insert(areeOperativeTable).values({ nome: `Import reale ${suffix}` }).returning(); areaIds.push(area.id);
+  const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Import reale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id);
+  const target = app({ areaOperativaId: area.id });
+  const buffer = readFileSync(process.env.FSE_BENEFICIARI_REAL_PATH!);
+  if (process.env.FSE_REGISTRY_ORIGINAL_PATH) {
+    const wrongFile = await upload(target, "/beneficiari/fse/preview", centre.id, [], { buffer: readFileSync(process.env.FSE_REGISTRY_ORIGINAL_PATH), dataRiferimento: "2026-10-20" });
+    expect(wrongFile.status).toBe(400); expect(wrongFile.body.error).toContain("ElencoFascicoliSociali");
+    expect(wrongFile.body.errori.join(" ")).toContain("ElencoFascicoliSociali");
+  }
+  const preview = await upload(target, "/beneficiari/fse/preview", centre.id, [], { buffer, dataRiferimento: "2026-10-20" });
+  expect(preview.status).toBe(200);
+  expect(preview.body.numeroRighe).toBe(117);
+  expect(preview.body.conteggi.errore ?? 0).toBe(0);
+  const risoluzioni = preview.body.righe.filter((r: { classificazione: string }) => r.classificazione === "possibile_duplicato")
+    .map((r: { numeroRiga: number }) => ({ numeroRiga: r.numeroRiga, azione: "crea" }));
+  const imported = await upload(target, "/beneficiari/fse/import", centre.id, [], { buffer, risoluzioni, dataRiferimento: "2026-10-20" });
+  expect(imported.status).toBe(200);
+  expect({ creati: imported.body.creati, errori: imported.body.errori, conflitti: imported.body.conflitti }).toEqual({ creati: 117, errori: 0, conflitti: 0 });
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(XLSX.read(buffer, { type: "buffer", cellDates: false }).Sheets.Table1);
+  const importedDates = await db.select({ codice: fseFascicoliSocialiTable.codiceFascicolo, data: beneficiariTable.dataPresaInCarico }).from(beneficiariTable)
+    .innerJoin(fseFascicoliSocialiTable, eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId)).where(eq(beneficiariTable.centroAscoltoId, centre.id));
+  expect(importedDates).toHaveLength(117);
+  for (const actual of importedDates) {
+    const source = raw.find((r) => String(r["Codice fascicolo"]).trim() === actual.codice)!;
+    const serial = source["Data di presa in carico"];
+    const date = XLSX.SSF.parse_date_code(Number(serial));
+    expect(actual.data).toBe(`${date.y}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}`);
+  }
+  const replay = await upload(target, "/beneficiari/fse/import", centre.id, [], { buffer, risoluzioni, dataRiferimento: "2026-10-20" });
+  expect(replay.status).toBe(200);
+  expect({ creati: replay.body.creati, invariati: replay.body.invariati, errori: replay.body.errori }).toEqual({ creati: 0, invariati: 117, errori: 0 });
+});
+
+it.runIf(Boolean(process.env.FSE_MASSIVO_REAL_PATH))("importa il Massivo XLSM reale anche dopo l’Elenco e ripete senza cambiare le anagrafiche", async () => {
+  const buffer = readFileSync(process.env.FSE_MASSIVO_REAL_PATH!);
+  const parsed = parseFseBeneficiariWorkbook(buffer);
+  const codes = parsed.rows.map((item) => item.codiceFascicolo!.trim().toLowerCase());
+  const owners = await db.select({ areaId: beneficiariTable.areaOperativaId, centreId: beneficiariTable.centroAscoltoId }).from(fseFascicoliSocialiTable)
+    .innerJoin(beneficiariTable, eq(fseFascicoliSocialiTable.beneficiarioId, beneficiariTable.id))
+    .where(inArray(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes));
+  let areaId: number, centreId: number;
+  if (owners.length) {
+    expect(owners).toHaveLength(117); expect(new Set(owners.map((o) => `${o.areaId}:${o.centreId}`)).size).toBe(1);
+    areaId = owners[0].areaId!; centreId = owners[0].centreId!;
+  } else {
+    const [area] = await db.insert(areeOperativeTable).values({ nome: `Massivo reale ${suffix}` }).returning(); areaIds.push(area.id); areaId = area.id;
+    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Massivo reale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id); centreId = centre.id;
+  }
+  const api = app({ areaOperativaId: areaId });
+  const options = { buffer, filename: "Elenco_Fascicoli_Sociali_Massivo.xlsm", dataRiferimento: "2026-10-20" };
+  const initialPreview = await upload(api, "/beneficiari/fse/preview", centreId, [], options);
+  expect(initialPreview.status).toBe(200);
+  const decisions = initialPreview.body.righe.filter((row: { classificazione: string }) => row.classificazione !== "nuovo").map((row: { numeroRiga: number; beneficiarioId: number; versioneBeneficiario: number; versioneFascicolo: number }) => ({ numeroRiga: row.numeroRiga, azione: "aggiorna", beneficiarioId: row.beneficiarioId, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo }));
+  const response = await upload(api, "/beneficiari/fse/import", centreId, [], { ...options, risoluzioni: decisions });
+  expect(response.status).toBe(200); expect(response.body).toMatchObject({ creati: owners.length ? 0 : 117, aggiornati: owners.length ? 117 : 0, errori: 0, conflitti: 0 });
+  const rows = await db.select().from(beneficiariTable).where(eq(beneficiariTable.centroAscoltoId, centreId)).orderBy(beneficiariTable.id);
+  expect(rows.filter((r) => r.dataNascita)).toHaveLength(117); expect(rows.filter((r) => r.codiceFiscale)).toHaveLength(115);
+  expect(rows.reduce((n, row) => n + row.numComponenti, 0)).toBe(289);
+  expect(rows.reduce((n, row) => n + row.numMinori, 0)).toBe(74); expect(rows.reduce((n, row) => n + row.numAnziani, 0)).toBe(21);
+  const preview = await upload(api, "/beneficiari/fse/preview", centreId, [], options);
+  expect(preview.body.conteggi.invariato).toBe(117);
+  const risoluzioni = preview.body.righe.map((row: { numeroRiga: number; beneficiarioId: number; versioneBeneficiario: number; versioneFascicolo: number }) => ({ numeroRiga: row.numeroRiga, azione: "aggiorna", beneficiarioId: row.beneficiarioId, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo }));
+  const replay = await upload(api, "/beneficiari/fse/import", centreId, [], { ...options, risoluzioni });
+  expect(replay.body).toMatchObject({ creati: 0, invariati: 117, aggiornati: 0, errori: 0 });
+  expect(await db.select().from(beneficiariTable).where(eq(beneficiariTable.centroAscoltoId, centreId)).orderBy(beneficiariTable.id)).toEqual(rows);
+});
+
+it("conserva Fascicolo facoltativo nella stessa identità FSE per creazione, modifica e lettura", async () => {
+  const [area] = await db.insert(areeOperativeTable).values({ nome: `Fascicolo manuale ${suffix}` }).returning(); areaIds.push(area.id);
+  const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Fascicolo manuale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id);
+  const api = app({ areaOperativaId: area.id, permessi: [...permissions, "beneficiari.manage", "beneficiari.view"] }); api.use(beneficiariRouter);
+  const created = await request(api).post("/beneficiari").send({ nome: "Identità", cognome: `Fascicolo ${suffix}`, sesso: "F", areaOperativaId: area.id, centroAscoltoId: centre.id, fascicolo: ` MAN-${suffix} ` });
+  expect(created.status).toBe(201); beneficiaryIds.push(created.body.id);
+  expect({ fascicolo: created.body.fascicolo, versione: created.body.versioneFascicolo }).toEqual({ fascicolo: `MAN-${suffix}`, versione: 1 });
+  const read = await request(api).get(`/beneficiari/${created.body.id}`); expect(read.body.fascicolo).toBe(`MAN-${suffix}`);
+  const changed = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: read.body.versione, fascicolo: `MAN-EDIT-${suffix}`, versioneFascicolo: 1 });
+  expect(changed.status).toBe(200); expect(changed.body.fascicolo).toBe(`MAN-EDIT-${suffix}`);
+  const stale = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: changed.body.versione, fascicolo: "STALE", versioneFascicolo: 1 });
+  expect(stale.status).toBe(409);
+  const staleBeneficiary = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: created.body.versione, fascicolo: "ROLLBACK", versioneFascicolo: 2 });
+  expect(staleBeneficiary.status).toBe(409);
+  const rolledBack = await request(api).get(`/beneficiari/${created.body.id}`); expect(rolledBack.body.fascicolo).toBe(`MAN-EDIT-${suffix}`); expect(rolledBack.body.versioneFascicolo).toBe(2);
+  const reverted = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: changed.body.versione, fascicolo: `MAN-${suffix}`, versioneFascicolo: 2 });
+  expect(reverted.status).toBe(200);
+  const repeated = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: reverted.body.versione, fascicolo: `MAN-EDIT-${suffix}`, versioneFascicolo: 3 });
+  expect(repeated.status).toBe(200); expect(repeated.body.versioneFascicolo).toBe(4);
+  const duplicate = await request(api).post("/beneficiari").send({ nome: "Seconda", cognome: "Persona", sesso: "F", areaOperativaId: area.id, centroAscoltoId: centre.id, fascicolo: `man-edit-${suffix}` });
+  expect(duplicate.status).toBe(409);
+  const final = await request(api).get(`/beneficiari/${created.body.id}`); expect(final.body.fascicolo).toBe(`MAN-EDIT-${suffix}`); expect(final.body.versione).toBe(repeated.body.versione);
+});
+
 beforeAll(async () => {
   const [user] = await db
     .insert(utentiTable)
@@ -296,7 +391,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
     expect(response.body.righe[0].classificazione).toBe("nuovo");
     expect(response.body).not.toHaveProperty("rawRows");
-    expect(JSON.stringify(response.body)).not.toContain(`Referente-${suffix}`);
+    expect(response.body.righe[0].confronto).toContainEqual({ campo: "nome", attuale: null, importato: `Referente-${suffix}-PREVIEW-1`, esito: "aggiorna", differente: true });
   });
 
   it("rifiuta lato server un workbook con foglio diverso da Table1", async () => {
@@ -390,6 +485,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     expect(beneficiary).toMatchObject({
       areaOperativaId: areaA,
       centroAscoltoId: centerA,
+      statoAnagrafica: "completa",
       sesso: "F",
       fasciaEtaPresunta: "30_64",
     });
@@ -630,6 +726,14 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       preview.body.righe[0].duplicati.map((item: { id: number }) => item.id),
     ).toContain(target.id);
 
+    const candidate = preview.body.righe[0].duplicati.find((item: { id: number }) => item.id === target.id);
+    expect(candidate).toMatchObject({ nome: target.nome, cognome: target.cognome, dataNascita: "1990-01-01", collegabile: true });
+    expect(candidate.confronto).toEqual(expect.arrayContaining([
+      { campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva", differente: false },
+      { campo: "numeroComponenti", attuale: "1", importato: "5", esito: "aggiorna", differente: true },
+      { campo: "tipologiaAttivita", attuale: "Pacchi", importato: "Domiciliare", esito: "aggiorna", differente: true },
+    ]));
+
     const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [
       duplicateRow,
     ]);
@@ -688,6 +792,100 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       donneImportate: 3,
       uominiImportati: 2,
     });
+  });
+
+  it("salta una riga senza toccare anagrafica o Fascicolo e consente il successivo collegamento esplicito", async () => {
+    const source = row("SKIP-REVIEW", { "Nome Referente fascicolo": "Scelta", "Cognome Referente fascicolo": `Saltata-${suffix}` });
+    const target = await insertBeneficiary({ nome: String(source["Nome Referente fascicolo"]), cognome: String(source["Cognome Referente fascicolo"]) });
+    const skipped = await upload(app(), "/beneficiari/fse/import", centerA, [source], { risoluzioni: [{ numeroRiga: 2, azione: "salta" }] });
+    expect(skipped.status).toBe(200);
+    expect(skipped.body).toMatchObject({ stato: "confermato", saltati: 1, creati: 0, collegati: 0, aggiornati: 0, errori: 0 });
+    expect(skipped.body.dettagli[0]).toMatchObject({ esito: "saltato", errori: [] });
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id)))[0]).toEqual(target);
+    expect(await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id))).toHaveLength(0);
+    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [source], { risoluzioni: [{ numeroRiga: 2, azione: "collega", beneficiarioId: target.id }] });
+    expect(linked.body).toMatchObject({ collegati: 1, saltati: 0, errori: 0 });
+    const [before] = await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
+    const changedSource = { ...source, Disabili: 1 };
+    const existingPreview = await upload(app(), "/beneficiari/fse/preview", centerA, [changedSource]);
+    expect(existingPreview.body.righe[0]).toMatchObject({ classificazione: "da_aggiornare", beneficiarioId: target.id });
+    expect(existingPreview.body.righe[0].confronto).toContainEqual({ campo: "disabili", attuale: "0", importato: "1", esito: "aggiorna", differente: true });
+    const secondSkip = await upload(app(), "/beneficiari/fse/import", centerA, [changedSource], { risoluzioni: [{ numeroRiga: 2, azione: "salta" }] });
+    expect(secondSkip.body).toMatchObject({ saltati: 1, aggiornati: 0, errori: 0 });
+    expect((await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)))[0]).toEqual(before);
+  });
+
+  it("importa solo le risoluzioni selezionate e riprende le righe restanti senza cambiare quelle già allineate", async () => {
+    const [area] = await db.insert(areeOperativeTable).values({ nome: `Selezionati ${suffix}` }).returning(); areaIds.push(area.id);
+    const [selectedCentre] = await db.insert(centriAscoltoTable).values({ nome: `Selezionati ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(selectedCentre.id);
+    const selectedApp = app({ areaOperativaId: area.id });
+    const codes = [1, 2, 3].map((n) => `SELECTED-${suffix}-${n}`);
+    const initial = row(codes[0], { "Nome Referente fascicolo": "Azzurra", "Cognome Referente fascicolo": "Boschi" });
+    expect((await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, [initial])).status).toBe(200);
+    const rows = [{ ...initial, "Numero componenti fascicolo": 2, Donne: 2, "Età 30-64": 2 }, row(codes[1], { "Nome Referente fascicolo": "Teresa", "Cognome Referente fascicolo": "Landi" }), row(codes[2], { "Nome Referente fascicolo": "Sergio", "Cognome Referente fascicolo": "Galli" })];
+    const before = await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows);
+    expect(before.body.righe.map((r: { classificazione: string }) => r.classificazione)).toEqual(["da_aggiornare", "nuovo", "nuovo"]);
+    const target = before.body.righe[0];
+    const partial = await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, rows, { risoluzioni: [
+      { numeroRiga: 2, azione: "aggiorna", beneficiarioId: target.beneficiarioId, versioneBeneficiario: target.versioneBeneficiario, versioneFascicolo: target.versioneFascicolo },
+      { numeroRiga: 3, azione: "crea" },
+      { numeroRiga: 4, azione: "salta" },
+    ] });
+    expect(partial.status).toBe(200);
+    expect(partial.body).toMatchObject({ aggiornati: 1, creati: 1, saltati: 1, conflitti: 0, errori: 0 });
+    expect(await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes[2].toLowerCase()))).toHaveLength(0);
+    const profiles = await db.select().from(fseFascicoliSocialiTable).where(inArray(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes.slice(0, 2).map((c) => c.toLowerCase()))).orderBy(fseFascicoliSocialiTable.id);
+    const ids = profiles.map((p) => p.beneficiarioId);
+    const beneficiaries = await db.select().from(beneficiariTable).where(inArray(beneficiariTable.id, ids)).orderBy(beneficiariTable.id);
+    const snapshots = await db.select().from(fseFascicoliSocialiSnapshotTable).where(inArray(fseFascicoliSocialiSnapshotTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiSnapshotTable.id);
+    expect(beneficiaries.find((b) => b.id === target.beneficiarioId)?.numComponenti).toBe(2);
+    const resumed = await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows);
+    expect(resumed.body.righe.map((r: { classificazione: string }) => r.classificazione)).toEqual(["invariato", "invariato", "nuovo"]);
+    const final = await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, rows, { risoluzioni: [
+      { numeroRiga: 2, azione: "salta" }, { numeroRiga: 3, azione: "salta" }, { numeroRiga: 4, azione: "crea" },
+    ] });
+    expect(final.body).toMatchObject({ creati: 1, aggiornati: 0, saltati: 2, conflitti: 0, errori: 0 });
+    expect(await db.select().from(beneficiariTable).where(inArray(beneficiariTable.id, ids)).orderBy(beneficiariTable.id)).toEqual(beneficiaries);
+    expect(await db.select().from(fseFascicoliSocialiTable).where(inArray(fseFascicoliSocialiTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiTable.id)).toEqual(profiles);
+    expect(await db.select().from(fseFascicoliSocialiSnapshotTable).where(inArray(fseFascicoliSocialiSnapshotTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiSnapshotTable.id)).toEqual(snapshots);
+    expect((await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows)).body.conteggi.invariato).toBe(3);
+  });
+
+  it("aggiorna esplicitamente nascita, codice fiscale e riepilogo per età dal Massivo; conserva i componenti e nasconde il replay invariato", async () => {
+    const target = await insertBeneficiary({ nome: "Persona", cognome: "Massiva", numComponenti: 1 });
+    const buffer = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}` });
+    const options = { buffer, filename: "Elenco_Fascicoli_Sociali_Massivo.xlsm", dataRiferimento: "2026-10-20" };
+    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [], options);
+    expect(preview.status).toBe(200); expect(preview.body.formatoFile).toBe("MASSIVO");
+    const candidate = preview.body.righe[0].duplicati.find((candidate: { id: number }) => candidate.id === target.id);
+    expect(candidate).toBeTruthy();
+    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...options, risoluzioni: [{ numeroRiga: 9, azione: "collega", beneficiarioId: target.id, aggiornaAnagrafica: true, versioneBeneficiario: candidate.versione }] });
+    expect(linked.body).toMatchObject({ collegati: 1, errori: 0 });
+    const [after] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    expect(after).toMatchObject({ codiceFiscale: "RSSMRA90A01H501U", dataNascita: "1990-01-01", sesso: "F", numComponenti: 3, numMinori: 1, numAnziani: 1, numDisabili: 1, versione: target.versione + 1 });
+    // A complete, real local member is retained even when aggregate totals change.
+    const [member] = await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Reale", dataNascita: "2015-01-01", sesso: "M" }).returning();
+    await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Anziano", dataNascita: "1950-01-01", sesso: "F" });
+    const changed = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}`, NomeReferenteNucleoFamiliare: "Persona corretta", DataDiNascitaReferenteNucleoFamiliare: "02/01/1990", TotaleDonne: 3, "Totale18-29": 1 });
+    const changedOptions = { ...options, buffer: changed };
+    const review = await upload(app(), "/beneficiari/fse/preview", centerA, [], changedOptions);
+    const row = review.body.righe[0]; expect(row.classificazione).toBe("da_aggiornare");
+    const decision = { numeroRiga: 9, azione: "aggiorna", beneficiarioId: target.id, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo };
+    const updated = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [decision] });
+    expect(updated.body).toMatchObject({ aggiornati: 1, errori: 0 });
+    const [local] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    expect(local).toMatchObject({ nome: "Persona corretta", dataNascita: "1990-01-02", numComponenti: 4 });
+    expect((await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.id, member.id)))[0]).toEqual(member);
+    const [profile] = await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
+    expect(profile).toMatchObject({ numeroComponentiImportato: 4, eta017Importata: 1, eta1829Importata: 1, eta3064Importata: 1, eta65PlusImportata: 1 });
+    const same = await upload(app(), "/beneficiari/fse/preview", centerA, [], changedOptions);
+    expect(same.body.righe[0].classificazione).toBe("invariato");
+    expect(same.body.righe[0].confronto.every((field: { differente: boolean }) => !field.differente)).toBe(true);
+    const noChange = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [{ ...decision, versioneBeneficiario: local.versione, versioneFascicolo: profile.versione }] });
+    expect(noChange.body).toMatchObject({ invariati: 1, aggiornati: 0 });
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id)))[0]).toEqual(local);
+    const stale = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [decision] });
+    expect(stale.body.dettagli[0].errori).toContain("ANAGRAFICA_MODIFICATA");
   });
 
   it("non sovrascrive i conteggi di un nucleo interno anagraficamente completo", async () => {
@@ -759,6 +957,16 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
   });
 
+  it("Area: scheda FSE leggibile da un altro Centro, mai da altra Area o Centro legacy esterno", async () => {
+    const own = await insertBeneficiary({ centroAscoltoId: centerRemote });
+    const local = app({ centroAscoltoId: centerA });
+    expect((await request(local).get(`/beneficiari/${own.id}/fse`)).status).toBe(200);
+    expect((await request(app({ areaOperativaId: areaB, centroAscoltoId: centerB }))
+      .get(`/beneficiari/${own.id}/fse`)).status).toBe(403);
+    const legacy = await insertBeneficiary({ areaOperativaId: null, centroAscoltoId: centerB });
+    expect((await request(local).get(`/beneficiari/${legacy.id}/fse`)).status).toBe(403);
+  });
+
   it("espone e aggiorna la scheda FSE applicando scope e validazione", async () => {
     const [profile] = await db
       .select()
@@ -818,7 +1026,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       .post("/beneficiari/fse/export/preflight")
       .send({
         centroAscoltoId: centerExport,
-        areaOperativaId: areaB,
+        areaOperativaId: areaA,
         dataRiferimento: "2026-08-24",
         soloAttivi: true,
       });
@@ -862,11 +1070,20 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       senzaTettoEsclusioneAbitativa: 0,
     });
 
-    const preflight = await request(app())
+    const wrongArea = await request(app())
       .post("/beneficiari/fse/export/preflight")
       .send({
         centroAscoltoId: centerExport,
         areaOperativaId: areaB,
+        dataRiferimento: "2026-08-24",
+        soloAttivi: true,
+      });
+    expect(wrongArea.status).toBe(409);
+    const preflight = await request(app())
+      .post("/beneficiari/fse/export/preflight")
+      .send({
+        centroAscoltoId: centerExport,
+        areaOperativaId: areaA,
         dataRiferimento: "2026-08-24",
         soloAttivi: true,
       });

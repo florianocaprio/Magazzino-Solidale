@@ -1,3 +1,5 @@
+import { createInstance } from "i18next";
+import { blocco05, registerBlocco05 } from "./i18n/namespaces/blocco05";
 import { describe, expect, it } from "vitest";
 import type {
   CaricoPraticaRiga,
@@ -6,12 +8,14 @@ import type {
 } from "@workspace/api-client-react";
 import {
   blocksCaricoDraftSave,
+  caricoStatusBadgeClass,
   caricoDraftFromRow,
   isCaricoRowDraftDirty,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
   reconcileCaricoDrafts,
+  remainingCaricoQuantity,
   shouldAcceptBarcodeScan,
   validateCaricoRow,
   type CaricoRowDraft,
@@ -244,6 +248,15 @@ describe("UX-CARICO-01 — validazione e draft locali", () => {
     expect(merged.drafts[1]).toEqual(caricoDraftFromRow(savedA));
     expect(merged.drafts[2]).toEqual(drafts[2]);
     expect(merged.conflicts).toEqual([]);
+    const newRow = practiceRow(3, {
+      quantita: null,
+      clientId: "aggiunta-con-draft",
+    });
+    const afterAdd = reconcileCaricoDrafts([a, b], [a, b, newRow], drafts);
+    expect(afterAdd.drafts[1]).toEqual(drafts[1]);
+    expect(afterAdd.drafts[2]).toEqual(drafts[2]);
+    expect(afterAdd.drafts[3]).toEqual(caricoDraftFromRow(newRow));
+
     const concurrent = reconcileCaricoDrafts(
       [a, b],
       [savedA, practiceRow(2, { quantita: "7.000000" })],
@@ -252,5 +265,50 @@ describe("UX-CARICO-01 — validazione e draft locali", () => {
     );
     expect(concurrent.drafts[2]).toEqual(drafts[2]);
     expect(concurrent.conflicts).toEqual([2]);
+  });
+});
+
+it("BUG10–14: testi distinti della riga completi nelle sei lingue e stati del Carico coerenti", () => {
+  for (const texts of Object.values(blocco05)) {
+    expect(Object.keys(texts).sort()).toEqual(Object.keys(blocco05.it).sort());
+    expect(Object.values(texts).every(Boolean)).toBe(true);
+  }
+  expect(caricoPratiche.it.saveDraft).toBe("Salva bozza");
+  expect(blocco05.it.insertProduct).toBe("Inserisci Prodotto");
+  expect(caricoStatusBadgeClass("bozza")).toContain("slate");
+  expect(caricoStatusBadgeClass("aperta")).toContain("blue");
+  expect(caricoStatusBadgeClass("chiusa")).toContain("emerald");
+  expect(caricoStatusBadgeClass("annullata")).toContain("red");
+});
+
+it("carica tutte le traduzioni della pagina quando viene aperto Carico Merce", async () => {
+  const instance = createInstance();
+  await instance.init({ lng: "it", resources: {}, fallbackLng: "it" });
+  registerBlocco05(instance);
+  for (const lng of ["it", "en", "es", "fr", "de", "ar"] as const) {
+    expect(instance.t("caricoPratiche.saveDraft", { lng })).toBe(
+      caricoPratiche[lng].saveDraft,
+    );
+    expect(instance.t("blocco05.insertProduct", { lng })).toBe(
+      blocco05[lng].insertProduct,
+    );
+  }
+});
+
+describe("quantità rettificabile", () => {
+  it("sottrae gli storni senza perdere la precisione del magazzino", () => {
+    expect(
+      remainingCaricoQuantity({
+        quantita: "99999999.999999",
+        quantitaRettificata: "99999999.999998",
+      }),
+    ).toBe("0.000001");
+    expect(
+      remainingCaricoQuantity({
+        quantita: "5.123456",
+        quantitaRettificata: "5.123456",
+      }),
+    ).toBe("0.000000");
+    expect(remainingCaricoQuantity({ quantita: "10.00" })).toBe("10.000000");
   });
 });

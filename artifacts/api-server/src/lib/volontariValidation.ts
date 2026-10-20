@@ -1,5 +1,5 @@
 import {
-  isDateOnly,
+  isDateOnly, todayRome,
   normalizeCodiceFiscale,
   normalizeEmail,
   normalizePhone,
@@ -20,6 +20,7 @@ export const VOLONTARIO_VALIDATION_FIELDS = [
   "telefono",
   "telefonoSecondario",
   "email",
+  "areaOperativaId",
   "centroAscoltoId",
   "ruoloVolontarioId",
   "maxConsegneTurno",
@@ -38,6 +39,7 @@ export type VolontarioFieldErrors = Partial<
 export const VOLONTARIO_EDITABLE_FIELDS = [
   "nome",
   "cognome",
+  "areaOperativaId",
   "centroAscoltoId",
   "telefono",
   "telefonoSecondario",
@@ -74,6 +76,7 @@ export type VolontarioValidationState = Record<string, unknown> & {
   telefono?: unknown;
   telefonoSecondario?: unknown;
   email?: unknown;
+  areaOperativaId?: unknown;
   centroAscoltoId?: unknown;
   ruoloVolontarioId?: unknown;
   maxConsegneTurno?: unknown;
@@ -184,6 +187,10 @@ export function validateVolontarioState(
   if (!isDateOnly(state.dataNascita)) {
     errors.dataNascita =
       "La data di nascita è obbligatoria e deve essere valida";
+  }
+
+  if (isDateOnly(state.dataNascita) && state.dataNascita > todayRome()) {
+    errors.dataNascita = "La data di nascita deve essere reale e non futura.";
   }
 
   const cf = normalizeCodiceFiscale(state.codiceFiscale);

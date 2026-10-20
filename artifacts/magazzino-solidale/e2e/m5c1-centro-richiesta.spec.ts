@@ -16,8 +16,26 @@ async function login(page: Page, username: string) {
   expect(current.status()).toBe(200);
   return current.json() as Promise<{
     areaOperativaId: number;
+    centroAscoltoId: number | null;
+  }>;
+}
+
+async function socialReferenceCentre(page: Page, areaId: number) {
+  const response = await page.request.get(
+    "/api/beneficiari?search=M5C1-E2E-B1",
+  );
+  expect(response.status()).toBe(200);
+  const beneficiaries = (await response.json()) as Array<{
+    codice: string;
+    areaOperativaId: number;
     centroAscoltoId: number;
   }>;
+  const beneficiary = beneficiaries.find(
+    (item) => item.codice === "M5C1-E2E-B1",
+  );
+  expect(beneficiary?.areaOperativaId).toBe(areaId);
+  expect(beneficiary?.centroAscoltoId).toBeGreaterThan(0);
+  return beneficiary!.centroAscoltoId;
 }
 
 async function selectSocialBeneficiary(page: Page, form: Locator) {
@@ -220,8 +238,13 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const actor = await login(page, "m5c1-e2e-social");
+  expect(actor.centroAscoltoId).toBeNull();
+  const referenceCentreId = await socialReferenceCentre(
+    page,
+    actor.areaOperativaId,
+  );
   await page.goto(
-    `/interventi?vista=annullati&areaOperativa=${actor.areaOperativaId}&centro=${actor.centroAscoltoId}&q=inesistente&priorita=urgente&operatore=99999&tipo=inesistente&da=2020-01-01&a=2020-01-02&stato=annullato&legacy=legacy`,
+    `/interventi?vista=annullati&areaOperativa=${actor.areaOperativaId}&centro=${referenceCentreId}&q=inesistente&priorita=urgente&operatore=99999&tipo=inesistente&da=2020-01-01&a=2020-01-02&stato=annullato&legacy=legacy`,
   );
   await page.getByRole("button", { name: /Nuovo intervento/i }).click();
   await page
@@ -251,7 +274,7 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
     String(actor.areaOperativaId),
   );
   expect(new URL(page.url()).searchParams.get("centro")).toBe(
-    String(actor.centroAscoltoId),
+    String(referenceCentreId),
   );
   expect(new URL(page.url()).searchParams.has("q")).toBe(false);
   for (const filter of [
@@ -304,7 +327,7 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
   expect((await requestsAfterUndatedNavigation.json()).items).toHaveLength(0);
 
   await page.goto(
-    `/interventi?vista=da_pianificare&areaOperativa=${actor.areaOperativaId}&centro=${actor.centroAscoltoId}&interventoId=${created.id}`,
+    `/interventi?vista=da_pianificare&areaOperativa=${actor.areaOperativaId}&centro=${referenceCentreId}&interventoId=${created.id}`,
   );
   await expect(detail).toBeVisible();
   await detail.getByRole("button", { name: "Close" }).click();
@@ -433,8 +456,13 @@ test("M5C1-R1: creazione direttamente pianificata da vista incompatibile", async
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const actor = await login(page, "m5c1-e2e-social");
+  expect(actor.centroAscoltoId).toBeNull();
+  const referenceCentreId = await socialReferenceCentre(
+    page,
+    actor.areaOperativaId,
+  );
   await page.goto(
-    `/interventi?vista=conclusi&areaOperativa=${actor.areaOperativaId}&centro=${actor.centroAscoltoId}&q=inesistente&priorita=urgente&stato=concluso`,
+    `/interventi?vista=conclusi&areaOperativa=${actor.areaOperativaId}&centro=${referenceCentreId}&q=inesistente&priorita=urgente&stato=concluso`,
   );
   await page.getByRole("button", { name: /Nuovo intervento/i }).click();
   await page
@@ -472,7 +500,7 @@ test("M5C1-R1: creazione direttamente pianificata da vista incompatibile", async
     String(actor.areaOperativaId),
   );
   expect(new URL(page.url()).searchParams.get("centro")).toBe(
-    String(actor.centroAscoltoId),
+    String(referenceCentreId),
   );
   for (const filter of ["q", "priorita", "stato"]) {
     expect(new URL(page.url()).searchParams.has(filter)).toBe(false);

@@ -1,15 +1,13 @@
 import { useState } from "react";
-import { UtenteMense } from "@/components/utente-mense";
 import {
   useListUtenti,
   useCreateUtente,
   useUpdateUtente,
   useDeleteUtente,
   useResetUtentePassword,
+  useSetUtenteTemporaryPassword,
   useListRuoli,
-  useListCentriAscolto,
   useListAreeOperative,
-  useListZoneUds,
   getListUtentiQueryKey,
   type Utente,
 } from "@workspace/api-client-react";
@@ -67,26 +65,33 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Pencil, Power, KeyRound } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Power,
+  KeyRound,
+  Trash2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { registerUtentiActions } from "@/lib/i18n/namespaces/utentiActions";
 import { ruoliNelPerimetro } from "@/lib/admin-scope";
 
+registerUtentiActions(i18n);
+
 const NO_ROLE = "none";
-const NO_CENTRO = "__none__";
 const NO_AREA_OPERATIVA = "__noareaOperativa__";
-const ALL_ZONE = "__allzone__";
 const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Utenti() {
   const { t } = useTranslation();
-  const { user: currentUser } = useAuth();
-  const lockedCentroId = currentUser?.centroAscoltoId ?? null;
-  const isCentroLocked = lockedCentroId != null;
+  const { user: currentUser, refresh } = useAuth();
   const lockedAreaOperativaId = currentUser?.areaOperativaId ?? null;
   const isAreaOperativaLocked = lockedAreaOperativaId != null;
-  const isZonaLocked = currentUser?.zonaUdsId != null;
   const canFilterAreaGeografica = currentUser?.isAdmin ?? false;
   const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   const [matricolaFilter, setMatricolaFilter] = useState("");
@@ -108,7 +113,6 @@ export default function Utenti() {
     query: { queryKey: getListUtentiQueryKey(listUtentiParams) },
   });
   const { data: ruoli } = useListRuoli();
-  const { data: centri } = useListCentriAscolto();
   const { data: areaOperativa } = useListAreeOperative();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -117,11 +121,23 @@ export default function Utenti() {
   const updateUtente = useUpdateUtente();
   const deleteUtente = useDeleteUtente();
   const resetPassword = useResetUtentePassword();
+  const temporaryReset = useSetUtenteTemporaryPassword();
+  const pending =
+    createUtente.isPending ||
+    updateUtente.isPending ||
+    deleteUtente.isPending ||
+    resetPassword.isPending ||
+    temporaryReset.isPending;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Utente | null>(null);
   const [deleting, setDeleting] = useState<Utente | null>(null);
   const [resetting, setResetting] = useState<Utente | null>(null);
+  const [resetMode, setResetMode] = useState<"email" | "temporary">("email");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [removeIfUnused, setRemoveIfUnused] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -129,37 +145,40 @@ export default function Utenti() {
   const [cognome, setCognome] = useState("");
   const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
-  const [centroId, setCentroId] = useState<string>(NO_CENTRO);
   const [areaOperativaId, setAreaOperativaId] =
     useState<string>(NO_AREA_OPERATIVA);
-  const [zonaUdsId, setZonaUdsId] = useState<string>(ALL_ZONE);
   const [attivo, setAttivo] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const resettingHasValidEmail = hasValidResetEmail(resetting);
 
-  const selectedAreaOperativaNum =
-    areaOperativaId === NO_AREA_OPERATIVA
-      ? undefined
-      : parseInt(areaOperativaId, 10);
   const visibleRoles = ruoliNelPerimetro(
     ruoli ?? [],
     currentUser?.aree ?? [],
     currentUser?.isSuperAdmin ?? false,
   );
   const editingSelf = editing?.id === currentUser?.id;
-  const { data: zoneUds } = useListZoneUds(
-    { areaOperativaId: selectedAreaOperativaNum },
-    {
-      query: {
-        enabled: selectedAreaOperativaNum != null,
-        queryKey: ["zoneUds", selectedAreaOperativaNum],
-      },
-    },
-  );
+  const selectedRoleIsAdmin = ruoli?.find((role) => String(role.id) === ruoloId)?.isAdmin ?? false;
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
+    await refresh();
+  };
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
+  const openReset = (u: Utente, mode: "email" | "temporary") => {
+    setTemporaryPassword("");
+    setConfirmPassword("");
+    setResetError(null);
+    setResetMode(mode);
+    setResetting(u);
+  };
+  const closeReset = () => {
+    if (pending) return;
+    setResetting(null);
+    setTemporaryPassword("");
+    setConfirmPassword("");
+    setResetError(null);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -169,12 +188,11 @@ export default function Utenti() {
     setCognome("");
     setMatricola("");
     setPassword("");
+    setPasswordVisible(false);
     setRuoloId(NO_ROLE);
-    setCentroId(isCentroLocked ? String(lockedCentroId) : NO_CENTRO);
     setAreaOperativaId(
       isAreaOperativaLocked ? String(lockedAreaOperativaId) : NO_AREA_OPERATIVA,
     );
-    setZonaUdsId(ALL_ZONE);
     setAttivo(true);
     setFormError(null);
     setIsFormOpen(true);
@@ -189,14 +207,11 @@ export default function Utenti() {
     setCognome(u.cognome ?? "");
     setMatricola(u.matricola ?? "");
     setPassword("");
+    setPasswordVisible(false);
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
-    setCentroId(
-      u.centroAscoltoId != null ? String(u.centroAscoltoId) : NO_CENTRO,
-    );
     setAreaOperativaId(
       u.areaOperativaId != null ? String(u.areaOperativaId) : NO_AREA_OPERATIVA,
     );
-    setZonaUdsId(u.zonaUdsId != null ? String(u.zonaUdsId) : ALL_ZONE);
     setAttivo(u.attivo);
     setFormError(null);
     setIsFormOpen(true);
@@ -204,23 +219,14 @@ export default function Utenti() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending) return;
     setFormError(null);
     const ruoloIdValue = ruoloId === NO_ROLE ? null : parseInt(ruoloId, 10);
-    const centroIdValue = isCentroLocked
-      ? lockedCentroId
-      : centroId === NO_CENTRO
-        ? null
-        : parseInt(centroId, 10);
     const areaOperativaIdValue = isAreaOperativaLocked
       ? lockedAreaOperativaId
       : areaOperativaId === NO_AREA_OPERATIVA
         ? null
         : parseInt(areaOperativaId, 10);
-    const zonaUdsIdValue =
-      areaOperativaIdValue == null || zonaUdsId === ALL_ZONE
-        ? null
-        : parseInt(zonaUdsId, 10);
-
     if (editing) {
       updateUtente.mutate(
         {
@@ -231,9 +237,7 @@ export default function Utenti() {
             cognome: cognome.trim() || null,
             matricola: matricola.trim() || null,
             ruoloId: ruoloIdValue,
-            centroAscoltoId: centroIdValue,
             areaOperativaId: areaOperativaIdValue,
-            zonaUdsId: zonaUdsIdValue,
             attivo,
           },
         },
@@ -261,9 +265,7 @@ export default function Utenti() {
             matricola: matricola.trim() || null,
             password,
             ruoloId: ruoloIdValue,
-            centroAscoltoId: centroIdValue,
             areaOperativaId: areaOperativaIdValue,
-            zonaUdsId: zonaUdsIdValue,
             attivo,
           },
         },
@@ -283,13 +285,17 @@ export default function Utenti() {
   };
 
   const confirmDelete = () => {
-    if (!deleting) return;
+    if (!deleting || pending) return;
     deleteUtente.mutate(
-      { id: deleting.id },
+      { id: deleting.id, params: { removeIfUnused } },
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: t("utenti.toastDeleted") });
+          toast({
+            title: t(
+              removeIfUnused ? "utenti.toastRemoved" : "utenti.toastDeleted",
+            ),
+          });
           setDeleting(null);
         },
         onError: (err) => {
@@ -306,7 +312,36 @@ export default function Utenti() {
 
   const confirmReset = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetting) return;
+    if (!resetting || pending) return;
+    if (resetMode === "temporary") {
+      if (
+        temporaryPassword.length < 8 ||
+        !/[A-Za-z]/.test(temporaryPassword) ||
+        !/[0-9]/.test(temporaryPassword)
+      ) {
+        setResetError(t("utenti.temporaryPolicy"));
+        return;
+      }
+      if (temporaryPassword !== confirmPassword) {
+        setResetError(t("utenti.passwordMismatch"));
+        return;
+      }
+      temporaryReset.mutate(
+        { id: resetting.id, data: { newPassword: temporaryPassword } },
+        {
+          onSuccess: () => {
+            setResetting(null);
+            setTemporaryPassword("");
+            setConfirmPassword("");
+            setResetError(null);
+            void invalidate();
+            toast({ title: t("utenti.temporarySuccess") });
+          },
+          onError: (err) => setResetError(extractError(err)),
+        },
+      );
+      return;
+    }
     if (!resettingHasValidEmail) {
       toast({
         title: t("utenti.error"),
@@ -337,7 +372,7 @@ export default function Utenti() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("utenti.title")}</h1>
           <p className="text-sm text-muted-foreground">
@@ -424,26 +459,140 @@ export default function Utenti() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="sticky start-0 z-20 bg-card">
+                    {t("utenti.actions")}
+                  </TableHead>
                   <TableHead>{t("utenti.colUsername")}</TableHead>
                   <TableHead>{t("common.email")}</TableHead>
                   <TableHead>{t("common.name")}</TableHead>
                   <TableHead>{t("utenti.colMatricola")}</TableHead>
                   <TableHead>{t("utenti.colRuolo")}</TableHead>
-                  <TableHead>{t("common.centro")}</TableHead>
                   <TableHead>{t("utenti.colAreaOperativa")}</TableHead>
-                  <TableHead>{t("utenti.colZona")}</TableHead>
                   <TableHead>{t("common.status")}</TableHead>
                   <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
-                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {utenti?.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.username}</TableCell>
+                    <TableCell className="sticky start-0 z-10 bg-card">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="min-h-11"
+                            disabled={pending}
+                            aria-label={t("utenti.actionsFor", {
+                              username: u.username,
+                            })}
+                          >
+                            <MoreHorizontal
+                              className="me-2 h-4 w-4"
+                              aria-hidden="true"
+                            />
+                            {t("utenti.actions")}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={
+                              u.isSuperAdmin && !currentUser?.isSuperAdmin
+                            }
+                            onClick={() => openEdit(u)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            {t("common.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              u.isSuperAdmin && !currentUser?.isSuperAdmin
+                            }
+                            onClick={() => openReset(u, "email")}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {t("utenti.resetPassword")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              pending ||
+                              !u.attivo ||
+                              (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                            }
+                            onClick={() => openReset(u, "temporary")}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {t("utenti.temporaryAction")}
+                          </DropdownMenuItem>
+                          {!u.attivo && (
+                            <DropdownMenuItem
+                              disabled={
+                                pending ||
+                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                              }
+                              onClick={() =>
+                                updateUtente.mutate(
+                                  { id: u.id, data: { attivo: true } },
+                                  {
+                                    onSuccess: () => {
+                                      void invalidate();
+                                      toast({
+                                        title: t("utenti.toastUpdated"),
+                                      });
+                                    },
+                                    onError: (err) =>
+                                      toast({
+                                        title: t("utenti.error"),
+                                        description: extractError(err),
+                                        variant: "destructive",
+                                      }),
+                                  },
+                                )
+                              }
+                            >
+                              <Power className="mr-2 h-4 w-4" />
+                              {t("utenti.reactivate")}
+                            </DropdownMenuItem>
+                          )}
+                          {u.attivo && (
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              disabled={
+                                u.id === currentUser?.id ||
+                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                              }
+                              onClick={() => {
+                                setRemoveIfUnused(false);
+                                setDeleting(u);
+                              }}
+                            >
+                              <Power className="mr-2 h-4 w-4" />
+                              {t("common.deactivate")}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            disabled={
+                              pending ||
+                              u.id === currentUser?.id ||
+                              (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                            }
+                            onClick={() => {
+                              setRemoveIfUnused(true);
+                              setDeleting(u);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t("utenti.remove")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                    <TableCell className="font-medium break-all">
+                      {u.username}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       <div className="flex flex-col gap-1">
-                        <span>{u.email ?? "—"}</span>
+                        <span className="break-all">{u.email ?? "—"}</span>
                         {u.emailDaAggiornare && (
                           <Badge variant="secondary" className="w-fit">
                             {t("utenti.emailDaAggiornare")}
@@ -466,13 +615,7 @@ export default function Utenti() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {u.centroAscoltoNome ?? t("common.centroComune")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.areaOperativaNome ?? t("utenti.areaOperativaGlobale")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.zonaUdsNome ?? t("utenti.tutteLeZone")}
+                      {u.areaOperativaNome ?? t(u.isSuperAdmin || ruoli?.find((role) => role.id === u.ruoloId)?.isAdmin ? "utenti.areaOperativaGlobale" : "utenti.areaUnassigned")}
                     </TableCell>
                     <TableCell>
                       {u.attivo ? (
@@ -480,7 +623,7 @@ export default function Utenti() {
                           {t("common.active")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">
+                        <Badge variant="secondary" className="bg-red-500/10 text-red-700">
                           {t("utenti.disattivato")}
                         </Badge>
                       )}
@@ -490,54 +633,12 @@ export default function Utenti() {
                         ? new Date(u.ultimoAccesso).toLocaleString("it-IT")
                         : t("utenti.never")}
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            disabled={
-                              u.isSuperAdmin && !currentUser?.isSuperAdmin
-                            }
-                            onClick={() => openEdit(u)}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {t("common.edit")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={
-                              u.isSuperAdmin && !currentUser?.isSuperAdmin
-                            }
-                            onClick={() => setResetting(u)}
-                          >
-                            <KeyRound className="mr-2 h-4 w-4" />
-                            {t("utenti.resetPassword")}
-                          </DropdownMenuItem>
-                          {u.attivo && (
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              disabled={
-                                u.id === currentUser?.id ||
-                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
-                              }
-                              onClick={() => setDeleting(u)}
-                            >
-                              <Power className="mr-2 h-4 w-4" />
-                              {t("common.deactivate")}
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
                   </TableRow>
                 ))}
                 {utenti?.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={11}
+                      colSpan={9}
                       className="text-center text-muted-foreground py-8"
                     >
                       {t("utenti.emptyUsers")}
@@ -616,14 +717,33 @@ export default function Utenti() {
                 <Label htmlFor="u-password">
                   {t("utenti.passwordIniziale")}
                 </Label>
-                <Input
-                  id="u-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="u-password"
+                    type={passwordVisible ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-12"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-11 w-11 text-muted-foreground"
+                    aria-controls="u-password"
+                    aria-label={t(passwordVisible ? "utenti.hidePassword" : "utenti.showPassword")}
+                    aria-pressed={passwordVisible}
+                    onClick={() => setPasswordVisible((visible) => !visible)}
+                  >
+                    {passwordVisible ? (
+                      <EyeOff aria-hidden="true" />
+                    ) : (
+                      <Eye aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {t("utenti.passwordHint")}
                 </p>
@@ -658,40 +778,10 @@ export default function Utenti() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>{t("common.centro")}</Label>
-              <Select
-                value={centroId}
-                onValueChange={setCentroId}
-                disabled={isCentroLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CENTRO}>
-                    {t("common.centroComune")}
-                  </SelectItem>
-                  {centri?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isCentroLocked && (
-                <p className="text-xs text-muted-foreground">
-                  {t("common.centroLocked")}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
               <Label>{t("utenti.colAreaOperativa")}</Label>
               <Select
                 value={areaOperativaId}
-                onValueChange={(v) => {
-                  setAreaOperativaId(v);
-                  setZonaUdsId(ALL_ZONE);
-                }}
+                onValueChange={setAreaOperativaId}
                 disabled={isAreaOperativaLocked}
               >
                 <SelectTrigger>
@@ -702,7 +792,7 @@ export default function Utenti() {
                 <SelectContent>
                   {!isAreaOperativaLocked && (
                     <SelectItem value={NO_AREA_OPERATIVA}>
-                      {t("utenti.areaOperativaGlobale")}
+                      {t(selectedRoleIsAdmin ? "utenti.areaOperativaGlobale" : "utenti.areaUnassigned")}
                     </SelectItem>
                   )}
                   {(isAreaOperativaLocked
@@ -718,45 +808,17 @@ export default function Utenti() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>{t("utenti.colZona")}</Label>
-              <Select
-                value={zonaUdsId}
-                onValueChange={setZonaUdsId}
-                disabled={areaOperativaId === NO_AREA_OPERATIVA || isZonaLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("utenti.selezionaZona")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_ZONE}>
-                    {t("utenti.tutteLeZone")}
-                  </SelectItem>
-                  {zoneUds?.map((z) => (
-                    <SelectItem key={z.id} value={String(z.id)}>
-                      {z.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>
               <Switch
                 id="u-attivo"
+                disabled={editingSelf || pending}
                 checked={attivo}
                 onCheckedChange={setAttivo}
               />
             </div>
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
-            )}
-            {editing && (
-              <UtenteMense
-                key={editing.id}
-                utenteId={editing.id}
-                areaId={editing.areaOperativaId ?? null}
-              />
             )}
             <Button
               type="submit"
@@ -769,20 +831,66 @@ export default function Utenti() {
         </SheetContent>
       </Sheet>
 
-      <Dialog
-        open={!!resetting}
-        onOpenChange={(open) => !open && setResetting(null)}
-      >
+      <Dialog open={!!resetting} onOpenChange={(open) => !open && closeReset()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("utenti.resetTitle")}</DialogTitle>
+            <DialogTitle>
+              {t(
+                resetMode === "temporary"
+                  ? "utenti.temporaryAction"
+                  : "utenti.resetTitle",
+              )}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={confirmReset} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {t("utenti.resetConfirm")}
+              {t(
+                resetMode === "temporary"
+                  ? "utenti.temporaryHelp"
+                  : "utenti.resetConfirm",
+              )}
             </p>
             <p className="text-sm font-medium">{resetting?.email ?? "—"}</p>
-            {!resettingHasValidEmail && (
+            {resetMode === "temporary" && (
+              <>
+                <p className="text-sm font-medium">{resetting?.username}</p>
+                <Label htmlFor="u-temporary">
+                  {t("utenti.temporaryAction")}
+                </Label>
+                <Input
+                  id="u-temporary"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  disabled={pending}
+                  value={temporaryPassword}
+                  onChange={(e) => setTemporaryPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("utenti.temporaryPolicy")}
+                </p>
+                <Label htmlFor="u-temporary-confirm">
+                  {t("utenti.confirmPassword")}
+                </Label>
+                <Input
+                  id="u-temporary-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  disabled={pending}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </>
+            )}
+            {resetError && (
+              <p role="alert" className="text-sm text-destructive">
+                {resetError}
+              </p>
+            )}
+            {resetMode === "email" && !resettingHasValidEmail && (
               <p className="text-sm text-destructive">
                 {t("utenti.emailInvalidForReset")}
               </p>
@@ -791,15 +899,22 @@ export default function Utenti() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setResetting(null)}
+                onClick={closeReset}
+                disabled={pending}
               >
                 {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
-                disabled={resetPassword.isPending || !resettingHasValidEmail}
+                disabled={
+                  pending || (resetMode === "email" && !resettingHasValidEmail)
+                }
               >
-                {t("utenti.resetButton")}
+                {t(
+                  resetMode === "temporary"
+                    ? "utenti.temporaryAction"
+                    : "utenti.resetButton",
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -808,24 +923,34 @@ export default function Utenti() {
 
       <AlertDialog
         open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && !pending && setDeleting(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("utenti.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t(removeIfUnused ? "utenti.removeTitle" : "utenti.deleteTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("utenti.deleteDescBefore")}{" "}
               <span className="font-medium">{deleting?.username}</span>{" "}
-              {t("utenti.deleteDescAfter")}
+              {t(
+                removeIfUnused ? "utenti.removeHelp" : "utenti.deleteDescAfter",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              disabled={pending}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {t("common.deactivate")}
+              {t(removeIfUnused ? "utenti.remove" : "common.deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

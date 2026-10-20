@@ -44,7 +44,7 @@ import {
   appendVolontarioLedgerEvent,
   buildVolunteerRegistrationSnapshot,
 } from "../lib/volontariLedger";
-import { todayRome } from "../lib/volontariDomain";
+import { todayRome, isDateOnly, addCalendarDays } from "../lib/volontariDomain";
 
 const router: IRouter = Router();
 
@@ -265,6 +265,10 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
     res.status(400).json({ error: "fascia non valida: usare 09-13, 14-18 o 18-20" });
     return;
   }
+  if (!isDateOnly(body.data)) {
+    res.status(400).json({ error: "Data del turno non valida" });
+    return;
+  }
   if (
     caller == null &&
     !inVisibleCentroSet(
@@ -336,6 +340,17 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
         if (versione !== existing.versione) {
           throw new LogisticaPolicyError(409, "La pianificazione è stata aggiornata da un altro operatore");
         }
+      }
+
+      // An empty replacement cancels a recorded shift; it is not new planning.
+      const cancelling = existing != null && effectiveVolontari.length === 0 && effectiveMezzoId == null;
+      if (!cancelling && body.data! < addCalendarDays(todayRome(), -7)) {
+        const sameAssignments = existing != null && existing.stato !== "annullato" && existing.mezzoId === effectiveMezzoId &&
+          existingVolontari.length === effectiveVolontari.length && existingVolontari.every((old) =>
+            effectiveVolontari.some((next) => next.volontarioId === old.volontarioId && (next.ruolo ?? "") === (old.ruolo ?? "")));
+        if (sameAssignments) return existing.id; // Historical no-op: preserve version and state.
+
+        throw new LogisticaPolicyError(400, "La pianificazione è consentita soltanto da sette giorni fa in poi");
       }
 
       if (effectiveMezzoId != null) {

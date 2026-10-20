@@ -1,3 +1,4 @@
+import { enteMatchesArea } from "./entiScope";
 import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -204,7 +205,7 @@ export async function inspectRequestClosure(tx: Tx, richiestaId: number) {
       (!beneficiary?.areaOperativaId ||
         beneficiary.areaOperativaId !== request.areaOperativaId)) ||
     (request.tipoDestinatario === "ente" &&
-      entity?.areaOperativaId !== request.areaOperativaId)
+      !enteMatchesArea(entity, request.areaOperativaId))
   )
     reason = "area_incoerente";
   else if (

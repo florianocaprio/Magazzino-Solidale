@@ -3449,12 +3449,12 @@ function make(
         "تصدير FSE+",
       ][index],
       scopeDescription: [
-        "Il Centro determina automaticamente l’Area Operativa; il server verifica nuovamente lo scope.",
-        "El centro determina automáticamente el área operativa; el servidor vuelve a comprobar el ámbito.",
-        "The Centre determines the Operational Area; the server verifies the scope again.",
-        "Le centre détermine automatiquement la zone opérationnelle ; le serveur vérifie à nouveau le périmètre.",
-        "Die Anlaufstelle bestimmt den Betriebsbereich; der Server prüft den Umfang erneut.",
-        "يحدد المركز المنطقة التشغيلية تلقائيًا ويتحقق الخادم من النطاق مجددًا.",
+        "Seleziona prima l’Area Operativa, poi un Centro di Ascolto dell’Area. Il server verifica entrambi.",
+        "Seleccione primero el área operativa y después un centro del área. El servidor verifica ambos.",
+        "Select the Operational Area first, then a Centre in that Area. The server checks both.",
+        "Sélectionnez d’abord la zone opérationnelle, puis un centre de cette zone. Le serveur vérifie les deux.",
+        "Wählen Sie zuerst den Betriebsbereich, dann eine Anlaufstelle in diesem Bereich. Der Server prüft beide.",
+        "اختر المنطقة التشغيلية أولاً، ثم مركزًا في تلك المنطقة. يتحقق الخادم من كليهما.",
       ][index],
       centre: [
         "Centro di Ascolto FSE+",
@@ -3981,6 +3981,8 @@ function make(
         "المرشحون: {{candidates}} · القابلون للتصدير: {{exportable}} · المحظورون: {{blocked}} · التحذيرات: {{warnings}}",
       ][index],
       classification: {
+        da_aggiornare: ["Da aggiornare", "Por actualizar", "To update", "À actualiser", "Zu aktualisieren", "للتحديث"][index],
+        invariato: ["Invariati", "Sin cambios", "Unchanged", "Inchangés", "Unverändert", "دون تغيير"][index],
         nuovo: ["Nuovi", "Nuevos", "New", "Nouveaux", "Neu", "جديد"][index],
         errore: ["Errori", "Errores", "Errors", "Erreurs", "Fehler", "أخطاء"][
           index

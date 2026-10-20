@@ -5,7 +5,7 @@ import {
   registroVolontariEventiTable,
   volontariTable,
 } from "@workspace/db";
-import { and, asc, eq, gte, inArray, lte, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, or, type SQL } from "drizzle-orm";
 
 export const VOLUNTEER_REGISTER_CORRECTION_FIELDS = [
   "matricola",
@@ -142,6 +142,7 @@ export async function resolveVolunteerRegisterStatesAt(
     servizioDa?: string | null;
     servizioA?: string | null;
     allowedCenterIds?: number[] | null;
+    includeUnassignedServiceCentre?: boolean;
   } = {},
 ): Promise<ResolvedVolunteerRegisterState[]> {
   const ids = rows.map((row) => row.id);
@@ -160,12 +161,10 @@ export async function resolveVolunteerRegisterStatesAt(
     );
   if (options.allowedCenterIds != null)
     serviceConditions.push(
-      options.allowedCenterIds.length
-        ? inArray(
-            giornateServizioVolontariTable.centroAscoltoId,
-            options.allowedCenterIds,
-          )
-        : eq(giornateServizioVolontariTable.id, -1),
+      or(
+        options.allowedCenterIds.length ? inArray(giornateServizioVolontariTable.centroAscoltoId, options.allowedCenterIds) : eq(giornateServizioVolontariTable.id, -1),
+        options.includeUnassignedServiceCentre ? isNull(giornateServizioVolontariTable.centroAscoltoId) : undefined,
+      )!,
     );
   const [events, identifiers, serviceDays] = await Promise.all([
     db

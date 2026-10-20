@@ -22,7 +22,7 @@ describe("Volontari 2.0 — contratti UI", () => {
     expect(operations).toContain(
       'queryKey: ["volontario-detail", volontario.id]',
     );
-    expect(page).not.toContain("useDeleteVolontario");
+    expect(page).toContain("removeIfUnused: true");
     expect(page).not.toContain("toggleStatus");
   });
 

@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { fornitoriTable, areeOperativeTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, isNull } from "drizzle-orm";
 import {
   callerAreaOperativaId,
   areaOperativaScopeFilter,
@@ -63,18 +63,29 @@ async function validateActiveArea(areaOperativaId: unknown): Promise<string | nu
 }
 
 router.get("/fornitori", async (req, res) => {
-  const { areaOperativaId } = req.query as Record<string, string>;
+  const { areaOperativaId, ambito } = req.query;
+  if (ambito !== undefined && ambito !== "tutti" && ambito !== "globali") {
+    res.status(400).json({ error: "Ambito non valido" });
+    return;
+  }
+  if (areaOperativaId !== undefined && (typeof areaOperativaId !== "string" || !/^\d+$/.test(areaOperativaId) || !Number.isSafeInteger(Number(areaOperativaId)) || Number(areaOperativaId) <= 0)) {
+    res.status(400).json({ error: "Area non valida" });
+    return;
+  }
   const caller = callerAreaOperativaId(req);
   // Fornitori are scoped by Area Operativa ("Area"). Scoped users are pinned to their
   // area operativa; global users may filter by a chosen area operativa. Either way fornitori
   // "per tutte le area operativa" (NULL) are shown (areaOperativaScopeFilter = own-or-null).
   const effectiveAreaOperativa =
-    caller != null ? caller : areaOperativaId ? parseInt(areaOperativaId) : null;
+    caller != null ? caller : areaOperativaId ? Number(areaOperativaId) : null;
   const rows = await db
     .select({ f: fornitoriTable, areaOperativaNome: areeOperativeTable.nome })
     .from(fornitoriTable)
     .leftJoin(areeOperativeTable, eq(areeOperativeTable.id, fornitoriTable.areaOperativaId))
-    .where(areaOperativaScopeFilter(fornitoriTable.areaOperativaId, effectiveAreaOperativa))
+    .where(and(
+      areaOperativaScopeFilter(fornitoriTable.areaOperativaId, effectiveAreaOperativa),
+      ambito === "globali" ? isNull(fornitoriTable.areaOperativaId) : undefined,
+    ))
     .orderBy(desc(fornitoriTable.id));
   res.json(rows.map((r) => fmt(r.f, r.areaOperativaNome)));
 });

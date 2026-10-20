@@ -5,7 +5,7 @@ import {
   statiVolontariTable,
   volontariTable,
 } from "@workspace/db";
-import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import {
   evaluateOperationalState,
   type OperationalState,
@@ -16,6 +16,7 @@ export type VolontariTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type VolunteerBase = Pick<
   typeof volontariTable.$inferSelect,
   "id" | "statoApprovazione" | "attivo" | "tipoVolontario"
+  | "areaOperativaId"
 >;
 
 export async function operationalStatesForRows(
@@ -65,15 +66,12 @@ export async function operationalStatesForRows(
             "PIANIFICATA",
             "PRESENTE",
           ]),
-          centroAscoltoId == null
-            ? undefined
-            : or(
-                eq(
-                  giornateServizioVolontariTable.centroAscoltoId,
-                  centroAscoltoId,
-                ),
-                isNull(giornateServizioVolontariTable.centroAscoltoId),
-              ),
+          // A service day covers its Area; its Centre records where service occurred.
+          or(isNull(giornateServizioVolontariTable.centroAscoltoId),
+            sql`exists (select 1 from volontari vday join centri_di_ascolto cday
+              on cday.id = ${giornateServizioVolontariTable.centroAscoltoId}
+              where vday.id = ${giornateServizioVolontariTable.volontarioId}
+                and vday.area_operativa_id = cday.area_operativa_id)`),
         ),
       ),
   ]);
@@ -95,18 +93,18 @@ export async function operationalStatesForRows(
         ? event.tipoEvento === "SOSPENSIONE"
         : row.statoApprovazione === "approvato" && !row.attivo;
       const amministrativamenteAttivo = !sospesoManualmente;
-      return [
-        row.id,
-        evaluateOperationalState({
-          approvazione: row.statoApprovazione,
-          amministrativamenteAttivo,
-          sospesoManualmente,
-          tipoVolontario: row.tipoVolontario,
-          riferimento,
-          coperture: coveragesById.get(row.id) ?? [],
-          giornataValida: validDayIds.has(row.id),
-        }),
-      ];
+      const state = evaluateOperationalState({
+        approvazione: row.statoApprovazione,
+        amministrativamenteAttivo,
+        sospesoManualmente,
+        tipoVolontario: row.tipoVolontario,
+        riferimento,
+        coperture: coveragesById.get(row.id) ?? [],
+        giornataValida: validDayIds.has(row.id),
+      });
+      return [row.id, row.areaOperativaId == null
+        ? { ...state, operativo: false, motivoNonOperativo: "AREA_OPERATIVA_MANCANTE" }
+        : state];
     }),
   );
 }
@@ -123,6 +121,7 @@ export async function operationalStateForVolunteer(
       statoApprovazione: volontariTable.statoApprovazione,
       attivo: volontariTable.attivo,
       tipoVolontario: volontariTable.tipoVolontario,
+      areaOperativaId: volontariTable.areaOperativaId,
     })
     .from(volontariTable)
     .where(eq(volontariTable.id, volontarioId));

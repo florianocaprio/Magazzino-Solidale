@@ -181,14 +181,14 @@ describe("M5A full-app auth/session/areaGuard", () => {
     ).toBe(403);
   });
 
-  it("nega liste, conteggi e dettaglio a un altro Centro nella stessa Area", async () => {
+  it("consente liste e dettaglio a un altro Centro nella stessa Area", async () => {
     const list = await otherCenter.get("/api/richieste-magazzino");
     expect(list.status).toBe(200);
     expect(
       list.body.items.some((item: { id: number }) => item.id === requestId),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       (await otherCenter.get(`/api/richieste-magazzino/${requestId}`)).status,
-    ).toBe(404);
+    ).toBe(200);
   });
 });
