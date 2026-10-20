@@ -5,6 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { InterventoStato } from "./interventoStato";
+import type { UdsReportBisogno } from "./udsReportBisogno";
 
 export interface UdsInterventoGiornaliero {
   id: number;
@@ -15,6 +17,9 @@ export interface UdsInterventoGiornaliero {
   zonaNome?: string | null;
   dataIntervento: string;
   tipoIntervento: string;
+  stato: InterventoStato;
+  /** Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro. */
+  bisogniPianificati: UdsReportBisogno[];
   descrizione?: string | null;
   note?: string | null;
   noteUds?: string | null;

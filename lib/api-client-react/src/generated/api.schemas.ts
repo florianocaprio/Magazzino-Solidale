@@ -9510,6 +9510,25 @@ export interface AllocazioneMezziReport {
   altro: AllocazioneMezziReportAltro;
 }
 
+export type UdsReportBisognoTipo =
+  (typeof UdsReportBisognoTipo)[keyof typeof UdsReportBisognoTipo];
+
+export const UdsReportBisognoTipo = {
+  richiesta: "richiesta",
+  azione: "azione",
+} as const;
+
+export interface UdsReportBisogno {
+  id: number;
+  tipo: UdsReportBisognoTipo;
+  descrizione: string;
+  stato: string;
+  dataPrevista?: string | null;
+  priorita: string;
+  note?: string | null;
+  dataCompletamento?: string | null;
+}
+
 export interface UdsInterventoGiornaliero {
   id: number;
   beneficiarioId: number;
@@ -9519,6 +9538,9 @@ export interface UdsInterventoGiornaliero {
   zonaNome?: string | null;
   dataIntervento: string;
   tipoIntervento: string;
+  stato: InterventoStato;
+  /** Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro. */
+  bisogniPianificati: UdsReportBisogno[];
   descrizione?: string | null;
   note?: string | null;
   noteUds?: string | null;
@@ -11784,6 +11806,14 @@ export type ListInterventiParams = {
    * Filtra gli interventi in base ai Bisogni Pianificati collegati.
    */
   bisogni?: ListInterventiBisogni;
+  /**
+   * Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+   */
+  tipoBisogno?: ListInterventiTipoBisogno;
+  /**
+   * Zona storica dell'incontro; richiede ambito UDS.
+   */
+  zonaUdsId?: number;
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
   /**
@@ -11844,6 +11874,14 @@ export const ListInterventiBisogni = {
   nessuno: "nessuno",
 } as const;
 
+export type ListInterventiTipoBisogno =
+  (typeof ListInterventiTipoBisogno)[keyof typeof ListInterventiTipoBisogno];
+
+export const ListInterventiTipoBisogno = {
+  richiesta: "richiesta",
+  azione: "azione",
+} as const;
+
 export type ListInterventiOrdina =
   (typeof ListInterventiOrdina)[keyof typeof ListInterventiOrdina];
 
@@ -11880,6 +11918,14 @@ export type ListInterventiPaginaParams = {
    * Filtra gli interventi in base ai Bisogni Pianificati collegati.
    */
   bisogni?: ListInterventiPaginaBisogni;
+  /**
+   * Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+   */
+  tipoBisogno?: ListInterventiPaginaTipoBisogno;
+  /**
+   * Zona storica dell'incontro; richiede ambito UDS.
+   */
+  zonaUdsId?: number;
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
   /**
@@ -11938,6 +11984,14 @@ export const ListInterventiPaginaBisogni = {
   aperti: "aperti",
   scaduti: "scaduti",
   nessuno: "nessuno",
+} as const;
+
+export type ListInterventiPaginaTipoBisogno =
+  (typeof ListInterventiPaginaTipoBisogno)[keyof typeof ListInterventiPaginaTipoBisogno];
+
+export const ListInterventiPaginaTipoBisogno = {
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
 export type ListInterventiPaginaOrdina =

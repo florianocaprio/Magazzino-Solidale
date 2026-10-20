@@ -36575,7 +36575,8 @@ export const getReportUdsInterventiGiornalieriUrl = (
 };
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 export const reportUdsInterventiGiornalieri = async (
   params: ReportUdsInterventiGiornalieriParams,
@@ -36636,7 +36637,7 @@ export type ReportUdsInterventiGiornalieriQueryResult = NonNullable<
 export type ReportUdsInterventiGiornalieriQueryError = ErrorType<unknown>;
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 
 export function useReportUdsInterventiGiornalieri<

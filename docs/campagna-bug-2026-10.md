@@ -2778,3 +2778,50 @@ Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-AVVIO-d9
 Produzione ricontrollata esclusivamente tramite metadati SSH: API/WEB con revision `d9d34d7` e immagini coincidenti con il rilascio precedente; nessuna modifica remota in questo incarico. Nessun typecheck o suite applicativa estesa rieseguiti per il solo aggiornamento documentale, come richiesto dal prompt 00; build, budget, restore e controlli di rilascio sopra sono esecuzioni reali. Nessun nuovo contratto o migration. Nessun impedimento concreto all'avvio C2A; specifica separata mancante registrata come limite documentale, senza inventarne il contenuto.
 
 **PRONTO PER C2A.** Si attende l'incarico `01_Interventi_Report_UDS.txt`; nessuna UAT o implementazione del secondo ciclo è dichiarata conclusa e nessun nuovo merge/produzione è avviato.
+
+## Ciclo 2 — C2A, Interventi e report UDS — 20/10/2026
+
+Floriano attiva `01_Interventi_Report_UDS.txt` e richiede esplicitamente la ricompilazione della 8082. Il mandato comprende questa installazione personale, senza avviare C2B/C2C, merge o produzione. Base di avvio `1d8e1f1`, branch `codex/bugfix-ciclo2-ottobre-2026`; cinque documenti locali preesistenti preservati e non inclusi nel commit. Il file SPECIFICA separato resta assente; requisiti e criteri completi sono quelli del prompt C2A letto integralmente.
+
+BUG22 e BUG23 **IN SVILUPPO / verifiche conclusive**. Persona facoltativa nei filtri e persona dell'intervento separate; Nuovo intervento avvia l'identificazione UdsPersonaSheet e poi il form sullo stesso ID. Riuso/collegamento/creazione conservano i percorsi e i permessi esistenti. La toolbar non contiene Nuova persona; ricerca con filtri applicati esplicitamente (anche Invio), periodo giorno/intervallo, tipo richiesta/azione e stato dei bisogni distinti. Rettifica/Nota/Bisogni operano sulla riga selezionata, con versione e invalidazione delle liste/dettagli/report pertinenti. Pagine server da 50 righe, esportazioni che recuperano tutte le pagine, con limite esplicito 10.000 e controllo di cambiamento totale/duplicazione durante il recupero.
+
+Il registro UDS filtra `dataIntervento` civile Europe/Rome e Zona/Area snapshot; ordine data decrescente e ID decrescente. Sociale conserva la propria semantica temporale. Tipo e stato devono corrispondere allo stesso bisogno, senza moltiplicare gli interventi; tipo+nessuno produce 400 comprensibile. Una persona riassegnata non riclassifica incontri preesistenti.
+
+Il report dedicato `/uds/report-giornaliero` mantiene un record per incontro, numero storico personale assoluto e scope storico (Zona vincolante inclusa). Una singola query SQL seleziona prima gli incontri autorizzati e aggrega solo i relativi bisogni, nella stessa lettura coerente. Proiezione esplicita, senza dossier o dati finanziari. Piani futuri conservati; stato corrente al momento della generazione dichiarato. Distinti Sintesi, Materiale, Note operative e Richieste/Azioni; materiale assente indicato come non registrato. Stessa mappatura per UI e PDF, schede mobile, contenuti lunghi su più pagine e numerazione PDF. Nessuna scrittura inventariale.
+
+Allineati accesso e navigazione frontend del report ai guard backend: Area Analisi, permesso `uds.reports.view`, moduli UDS+REPORT. Nessun nuovo grant, nessun obbligo `uds.interventi.view` per il report. Errori/revoca nascondono i dati e disabilitano export; lettura fresca e rivalidazione finale prima del download. Report oltre 10.000 incontri respinto con 413 esplicito, senza file parziali.
+
+### Contratto e file coinvolti
+
+Nessuna migration o variazione dello schema DB. OpenAPI: nuovi filtri opzionali `tipoBisogno` e `zonaUdsId` su elenco/pagina Interventi; DTO giornaliero esteso con stato e bisogni minimizzati. Client React/Zod rigenerati tramite comando canonico, senza modifiche manuali ai generati.
+
+- API: `routes/interventi.ts`, `routes/report.ts`.
+- UI: `pages/uds-interventi.tsx`, `pages/uds-report-giornaliero.tsx`, `components/uds-persona-sheet.tsx`, `App.tsx`, `components/layout.tsx`.
+- Contenuto/PDF: `lib/uds-report-content.ts`, `lib/uds-report-pdf.ts`; namespace `udsInterventi.ts`, `udsReportGiornaliero.ts` (sei lingue).
+- Test API: `interventi-uds-area-operativa-scope.test.ts`, `report-uds-giornaliero.test.ts`, allowlist additiva del solo giornaliero in `reporting-m66-security.test.ts`.
+- Test UI: `uds-interventi-hardening.test.tsx`, nuovi `uds-report-content.test.ts`, `uds-report-pdf.test.ts`, `uds-report-giornaliero.test.tsx`. Browser `e2e/uds-workflows.spec.ts` adattato al passaggio di identificazione, con controllo del report e piano futuro.
+- Contratti: `lib/api-spec/openapi.yaml` e generati sotto `lib/api-client-react/src/generated`, `lib/api-zod/src/generated`.
+
+### Criteri ed evidenze
+
+BUG22-01–03: identificazione esplicita senza filtro, stesso ID al retry, toolbar e applicazione filtri coperti dalle prove UI. BUG22-04–05: data civile distinta dalla conclusione, Zona storica distinta da quella attuale, tipo/stato sullo stesso bisogno e 205 righe in due pagine provati via API. BUG22-06–07: comandi di riga/versioni, guardie e regressioni UDS/BUG21 mantenuti; prova browser in completamento.
+
+BUG23-01–03: due incontri con progressivo storico, contenuti separati, più bisogni inclusi quelli futuri, lettura dello stato aggiornato e scope verificati. BUG23-04–06: mapping condiviso, PDF multipagina sintetico realmente generato e renderizzato, errore/revoca e download bloccato provati; API aggregata senza duplicazioni e nessuna scrittura stock introdotta. Criteri non dichiarati UAT OK prima della verifica di Floriano.
+
+Eseguiti install frozen, codegen, typecheck e 832 test frontend (128 file), più ripetizioni mirate dopo gli ultimi affinamenti. API runner canonico `api general reporting core`: **1.720 PASS / 7 SKIP**, zero failure, database temporanei attestati rimossi con rete e senza volumi creati. Gli skip riguardano gli originali esterni opzionali non passati a questa esecuzione, estranei al delta UDS. Migrazioni/replay dei tre gruppi PASS. Ricevute private in `test-results/quality-gates/api/cd4a2bbf-ee6c-41c4-af04-f41d2beec6ab` (non committate).
+
+Primo tentativo install/test/build/browser locale interrotto per esclusione preesistente delle controparti native macOS di LightningCSS/Oxide nel workspace. `pnpm install --frozen-lockfile` riuscito, ma il modulo restava escluso; ripristinate soltanto in `/private/tmp/c2a-native` le controparti delle stesse versioni (1.32.0/4.3.0), collegate in node_modules, senza cambiare manifest, lockfile o policy del progetto. Build WEB successiva riuscita realmente; **389,3/400 KiB gzip**. Il budget letto prima della correzione proveniva dalla build precedente ed è stato esplicitamente rettificato nella comunicazione; non è usato come evidenza del candidato. Build API PASS. Il primo browser non ha eseguito i casi; ripetizione canonica in corso, senza ignorare il KO preliminare.
+
+Verifiche conclusive C2A: browser canonico **9 PASS / 16 SKIP di matrice**, zero failure/flaky (5 sessioni UDS in tutte le viewport e 4 lifecycle UDS, incluse prove del BUG21). Evidenze in `test-results/quality-gates/browser/1e495586-3591-47a9-9948-771eeaf733e6`. Typecheck finale PASS; ulteriori 33 test mirati PASS dopo eliminazione della sola formattazione superflua. Il tentativo browser preliminare fermo per runtime macOS rimane registrato; entrambe le suite sono poi passate realmente. Nessuna asserzione allentata né soglia modificata.
+
+BUG22-01–07 e BUG23-01–06 implementati e verificati nei percorsi sopra: **PRONTO PER UAT**, subordinato all'installazione e ricevuta 8082 qui sotto. Nessun OK UAT dedotto dai test automatici. Si riusano soltanto le evidenze del primo ciclo per funzionalità applicative rimaste invariate; le prove elencate per C2A sono nuove esecuzioni.
+
+Prova proposta a Floriano sulla 8082:
+
+1. Senza Persona nei filtri, scegliere l'Area se globale e avviare **Nuovo intervento**; cercare e selezionare una persona esistente. Provare anche collegamento o nuova provvisoria dal percorso autorizzato.
+2. Registrare sintesi, materiale, una Richiesta e un'Azione pianificata futura; verificare identità e continuità dei dati, tessera/Centro/Zona nei percorsi BUG21.
+3. Applicare giorno/intervallo, Persona facoltativa, Zona storica, tipo richiesta/azione e stato bisogno. Controllare ordine e pulsanti pagina.
+4. Senza Persona filtrata, aggiornare una Nota, rettificare un incontro o modificare i Bisogni della sua riga; verificare rilettura e conservazione dei filtri.
+5. Aprire il report con un profilo autorizzato: incontri distinti, sezioni separate, piano futuro e indicazione di stato corrente. Confrontare il PDF, anche per testi lunghi e più pagine.
+
+La richiesta diretta di Floriano autorizza la ricompilazione personale in questa consegna, superando il rinvio alla fase separata indicato nel pacchetto. Non attiva C2B, merge o un nuovo rilascio Hetzner.

@@ -13,6 +13,7 @@ import type { ListInterventiAmbitoLegacy } from "./listInterventiAmbitoLegacy";
 import type { ListInterventiBisogni } from "./listInterventiBisogni";
 import type { ListInterventiDirezione } from "./listInterventiDirezione";
 import type { ListInterventiOrdina } from "./listInterventiOrdina";
+import type { ListInterventiTipoBisogno } from "./listInterventiTipoBisogno";
 
 export type ListInterventiParams = {
   beneficiarioId?: number;
@@ -23,6 +24,14 @@ export type ListInterventiParams = {
    * Filtra gli interventi in base ai Bisogni Pianificati collegati.
    */
   bisogni?: ListInterventiBisogni;
+  /**
+   * Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+   */
+  tipoBisogno?: ListInterventiTipoBisogno;
+  /**
+   * Zona storica dell'incontro; richiede ambito UDS.
+   */
+  zonaUdsId?: number;
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
   /**

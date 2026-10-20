@@ -35,6 +35,7 @@ async function runUdsLifecycle(
   });
   await personOption.click();
   await expect(personOption).toBeHidden();
+  await page.getByRole("button", { name: /applica filtri/i }).click();
   if (auditTablet) {
     await expect(page.getByTestId("uds-interventi-mobile")).toBeVisible();
     await expect(page.getByTestId("uds-interventi-desktop")).toBeHidden();
@@ -42,6 +43,11 @@ async function runUdsLifecycle(
   }
 
   await page.getByRole("button", { name: /nuovo intervento/i }).click();
+  const identify = page.getByRole("dialog", { name: /identifica la persona/i });
+  await identify
+    .getByLabel("Cerca una persona già presente", { exact: true })
+    .fill("DEMO-BEN-001");
+  await identify.getByRole("button", { name: /^seleziona$/i }).click();
   const form = page.getByRole("dialog", {
     name: /nuovo intervento di strada/i,
   });
@@ -125,6 +131,24 @@ async function runUdsLifecycle(
     id: created.id,
     descrizione: rectifiedDescription,
   });
+  const record = await finalResponse.json();
+  const reportResponse = await page.request.get(
+    `/api/report/uds/interventi-giornalieri?da=${record.dataIntervento}`,
+  );
+  expect(reportResponse.status()).toBe(200);
+  const reportRow = (await reportResponse.json()).find(
+    (r: { id: number }) => r.id === created.id,
+  );
+  expect(reportRow.descrizione).toBe(rectifiedDescription);
+  expect(reportRow.note).toBe("Kit igiene E2E");
+  expect(reportRow.bisogniPianificati).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        descrizione: "Ricontatto operatore E2E",
+        dataPrevista: "2028-12-31",
+      }),
+    ]),
+  );
 }
 
 test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una versione obsoleta", async ({

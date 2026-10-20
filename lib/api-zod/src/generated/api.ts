@@ -9932,6 +9932,16 @@ export const ListInterventiQueryParams = zod.object({
     .describe(
       "Filtra gli interventi in base ai Bisogni Pianificati collegati.",
     ),
+  tipoBisogno: zod
+    .enum(["richiesta", "azione"])
+    .optional()
+    .describe(
+      "Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.",
+    ),
+  zonaUdsId: zod.coerce
+    .number()
+    .optional()
+    .describe("Zona storica dell'incontro; richiede ambito UDS."),
   stato: zod
     .enum([
       "da_pianificare",
@@ -10228,6 +10238,16 @@ export const ListInterventiPaginaQueryParams = zod.object({
     .describe(
       "Filtra gli interventi in base ai Bisogni Pianificati collegati.",
     ),
+  tipoBisogno: zod
+    .enum(["richiesta", "azione"])
+    .optional()
+    .describe(
+      "Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.",
+    ),
+  zonaUdsId: zod.coerce
+    .number()
+    .optional()
+    .describe("Zona storica dell'incontro; richiede ambito UDS."),
   stato: zod
     .enum([
       "da_pianificare",
@@ -22590,7 +22610,8 @@ export const ReportUdsInterventiPerMeseResponse = zod.array(
 );
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 export const ReportUdsInterventiGiornalieriQueryParams = zod.object({
   da: zod.coerce
@@ -22615,6 +22636,32 @@ export const ReportUdsInterventiGiornalieriResponseItem = zod.object({
   zonaNome: zod.string().nullish(),
   dataIntervento: zod.string(),
   tipoIntervento: zod.string(),
+  stato: zod
+    .enum([
+      "da_pianificare",
+      "pianificato",
+      "in_corso",
+      "concluso",
+      "annullato",
+      "mancata_presentazione",
+    ])
+    .describe("Stato canonico del ciclo di vita dell'intervento."),
+  bisogniPianificati: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        tipo: zod.enum(["richiesta", "azione"]),
+        descrizione: zod.string(),
+        stato: zod.string(),
+        dataPrevista: zod.string().nullish(),
+        priorita: zod.string(),
+        note: zod.string().nullish(),
+        dataCompletamento: zod.string().nullish(),
+      }),
+    )
+    .describe(
+      "Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro.",
+    ),
   descrizione: zod.string().nullish(),
   note: zod.string().nullish(),
   noteUds: zod.string().nullish(),

@@ -4240,6 +4240,14 @@ paths:
           schema:
             type: string
             enum: [aperti, scaduti, nessuno]
+        - name: tipoBisogno
+          in: query
+          description: Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+          schema: { type: string, enum: [richiesta, azione] }
+        - name: zonaUdsId
+          in: query
+          description: Zona storica dell'incontro; richiede ambito UDS.
+          schema: { type: integer }
         - name: stato
           in: query
           schema:
@@ -9907,7 +9915,8 @@ paths:
     get:
       operationId: reportUdsInterventiGiornalieri
       tags: [report]
-      summary: UDS street interventions for a day or date range, with per-person sequence number
+      summary: UDS operational detail, current linked needs and absolute per-person sequence
+      description: Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
       parameters:
         - name: da
           in: query
@@ -22221,6 +22230,13 @@ components:
           type: string
         tipoIntervento:
           type: string
+        stato:
+          $ref: "#/components/schemas/InterventoStato"
+        bisogniPianificati:
+          type: array
+          description: Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro.
+          items:
+            $ref: "#/components/schemas/UdsReportBisogno"
         descrizione:
           type: string
           nullable: true
@@ -22245,7 +22261,22 @@ components:
           tipoIntervento,
           numeroIntervento,
           primoIntervento,
+          stato,
+          bisogniPianificati,
         ]
+
+    UdsReportBisogno:
+      type: object
+      properties:
+        id: { type: integer }
+        tipo: { type: string, enum: [richiesta, azione] }
+        descrizione: { type: string }
+        stato: { type: string }
+        dataPrevista: { type: string, nullable: true }
+        priorita: { type: string }
+        note: { type: string, nullable: true }
+        dataCompletamento: { type: string, nullable: true }
+      required: [id, tipo, descrizione, stato, priorita]
 
     UdsInterventiMeseReport:
       type: object

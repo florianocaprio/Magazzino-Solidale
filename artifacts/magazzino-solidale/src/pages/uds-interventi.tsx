@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   useListUdsDirectory,
-  useListInterventi,
+  useListInterventiPagina,
+  listInterventiPagina,
+  getListInterventiPaginaQueryKey,
+  type ListInterventiPaginaParams,
   useCreateUdsIntervento,
   useUpdateUdsInterventoNota,
   useRectifyUdsIntervento,
   useListAreeOperative,
   useListZoneUds,
   useListTipiIntervento,
-  getListInterventiQueryKey,
   getListAreeOperativeQueryKey,
   type Intervento,
 } from "@workspace/api-client-react";
@@ -160,7 +162,7 @@ function personLabel(b: {
   cognome: string;
   soprannome?: string | null;
 }): string {
-  const base = `${b.cognome} ${b.nome}`;
+  const base = `${b.cognome} ${b.nome}`.trim();
   return b.soprannome ? `${base} (${b.soprannome})` : base;
 }
 
@@ -170,7 +172,7 @@ export default function UdsInterventi() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const schema = makeSchema(t);
-  const canCreatePerson = hasArea("uds") && hasPermission("beneficiari.manage");
+  const canView = hasArea("uds") && hasPermission("uds.interventi.view");
 
   const isGlobal = user?.areaOperativaId == null;
   const [selectedPerson, setSelectedPerson] = useState<string>("");
@@ -188,6 +190,42 @@ export default function UdsInterventi() {
   const [bisogniFilter, setBisogniFilter] = useState<
     "tutti" | "aperti" | "scaduti" | "nessuno"
   >("tutti");
+
+  const [dateMode, setDateMode] = useState("day");
+  const [from, setFrom] = useState(todayEuropeRome());
+  const [to, setTo] = useState(todayEuropeRome());
+  const [needType, setNeedType] = useState("all");
+  const [page, setPage] = useState(1);
+  const [formPerson, setFormPerson] = useState<UdsPersonaSelection | null>(
+    null,
+  );
+  const [editingIntervento, setEditingIntervento] = useState<Intervento | null>(
+    null,
+  );
+  const [applied, setApplied] = useState<ListInterventiPaginaParams>({
+    ambito: "uds",
+    da: todayEuropeRome(),
+    a: todayEuropeRome(),
+    areaOperativaId: user?.areaOperativaId ?? undefined,
+  });
+  useEffect(() => {
+    setSelectedPerson("");
+    setSelectedPersonFallback(null);
+    setPersonSearch("");
+    setFilterAreaOperativa("");
+    setFilterZona(ALL_ZONE);
+    setPage(1);
+    setIsFormOpen(false);
+    setIsNewPersonOpen(false);
+    setNoteEditing(null);
+    setBisogniEditingId(null);
+    setApplied({
+      ambito: "uds",
+      da: todayEuropeRome(),
+      a: todayEuropeRome(),
+      areaOperativaId: user?.areaOperativaId ?? undefined,
+    });
+  }, [user?.id, user?.areaOperativaId, canView]);
 
   const { data: areaOperativaList } = useListAreeOperative({
     query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
@@ -218,30 +256,87 @@ export default function UdsInterventi() {
       : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
-  const { data: persone } = useListUdsDirectory({
-    ...personeParams,
-    page: 1,
-    limit: 100,
-  });
+  const {
+    data: persone,
+    isError: personError,
+    isFetching: personLoading,
+  } = useListUdsDirectory(
+    {
+      ...personeParams,
+      page: 1,
+      limit: 100,
+    },
+    {
+      query: {
+        queryKey: ["/api/uds/directory", personeParams],
+        enabled: canView && effectiveAreaOperativa != null,
+      },
+    },
+  );
   const personId = selectedPerson ? parseInt(selectedPerson) : undefined;
 
-  const interventiParams = {
-    beneficiarioId: personId,
-    ambito: "uds" as const,
-    includiStorici: true,
-    ...(isGlobal && effectiveAreaOperativa
-      ? { areaOperativaId: effectiveAreaOperativa }
-      : {}),
-    ...(bisogniFilter !== "tutti" ? { bisogni: bisogniFilter } : {}),
-  };
-  const { data: interventi, isLoading } = useListInterventi(interventiParams, {
+  const interventiParams = { ...applied, pagina: page, limite: 50 };
+  const listEnabled =
+    canView &&
+    (applied.areaOperativaId != null || applied.beneficiarioId != null);
+  const {
+    data: interventiPage,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+  } = useListInterventiPagina(interventiParams, {
     query: {
-      queryKey: getListInterventiQueryKey(interventiParams),
-      enabled: personId != null,
+      queryKey: [
+        ...getListInterventiPaginaQueryKey(interventiParams),
+        user?.id,
+        user?.areaOperativaId,
+      ],
+      enabled: listEnabled,
     },
   });
+  const interventi =
+    listEnabled && !isError ? interventiPage?.items : undefined;
+  const applyFilters = () => {
+    setPage(1);
+    setApplied({
+      ambito: "uds",
+      includiStorici: true,
+      beneficiarioId: personId,
+      areaOperativaId: effectiveAreaOperativa,
+      zonaUdsId: filterZona === ALL_ZONE ? undefined : Number(filterZona),
+      bisogni: bisogniFilter === "tutti" ? undefined : bisogniFilter,
+      tipoBisogno:
+        needType === "all" ? undefined : (needType as "richiesta" | "azione"),
+      da: from,
+      a: dateMode === "day" ? from : to,
+    });
+  };
+  const loadExportRows = async () => {
+    const all: Intervento[] = [];
+    let expectedTotal: number | undefined;
+    for (let pagina = 1; ; pagina++) {
+      const result = await listInterventiPagina({
+        ...applied,
+        pagina,
+        limite: 200,
+      });
+      if (result.total > 10000) throw new Error(t("udsInterventi.exportLimit"));
+      if (expectedTotal != null && expectedTotal !== result.total)
+        throw new Error(t("udsInterventi.loadError"));
+      expectedTotal = result.total;
+      const ids = new Set(all.map((row) => row.id));
+      if (result.items.some((row) => ids.has(row.id)))
+        throw new Error(t("udsInterventi.loadError"));
+      all.push(...result.items);
+      if (all.length === result.total) return all;
+      if (result.items.length === 0)
+        throw new Error(t("udsInterventi.loadError"));
+    }
+  };
 
   const createIntervento = useCreateUdsIntervento();
+  const submitInFlight = useRef(false);
   const updateNote = useUpdateUdsInterventoNota();
   const rectifyIntervento = useRectifyUdsIntervento();
   const { data: tipiIntervento } = useListTipiIntervento();
@@ -280,18 +375,9 @@ export default function UdsInterventi() {
     "ascolto";
 
   const handlePersonReady = (person: UdsPersonaSelection) => {
-    if (isGlobal && person.areaOperativaId != null)
-      setFilterAreaOperativa(String(person.areaOperativaId));
-    setFilterZona(
-      person.zonaUdsId != null ? String(person.zonaUdsId) : ALL_ZONE,
-    );
-    setPersonSearch("");
-    setSelectedPersonFallback(person);
-    setSelectedPerson(String(person.id));
-  };
-
-  const handleCreate = () => {
+    setFormPerson(person);
     setEditingId(null);
+    setEditingIntervento(null);
     form.reset({
       dataIntervento: todayEuropeRome(),
       tipoIntervento: defaultTipo,
@@ -302,9 +388,16 @@ export default function UdsInterventi() {
     });
     setIsFormOpen(true);
   };
+  const handleCreate = () => setIsNewPersonOpen(true);
 
   const handleEdit = (i: Intervento) => {
     setEditingId(i.id);
+    setEditingIntervento(i);
+    setFormPerson({
+      id: i.beneficiarioId,
+      nome: i.beneficiarioNome ?? "",
+      cognome: "",
+    });
     form.reset({
       dataIntervento: i.dataIntervento?.slice(0, 10) ?? "",
       tipoIntervento: i.tipoIntervento,
@@ -317,16 +410,24 @@ export default function UdsInterventi() {
   };
 
   const invalidateList = () => {
-    if (personId != null) {
-      queryClient.invalidateQueries({
-        queryKey: getListInterventiQueryKey(interventiParams),
-      });
-    }
+    void queryClient.invalidateQueries({
+      predicate: (q) =>
+        ["/api/interventi", "/api/report/uds"].some((prefix) =>
+          String(q.queryKey[0]).startsWith(prefix),
+        ),
+    });
   };
 
   const onSubmit = (data: FormValues) => {
-    if (personId == null) return;
+    if (
+      !formPerson ||
+      submitInFlight.current ||
+      createIntervento.isPending ||
+      rectifyIntervento.isPending
+    )
+      return;
     const onError = (err: unknown) => {
+      submitInFlight.current = false;
       if (isConflict(err)) invalidateList();
       toast({
         title:
@@ -340,7 +441,7 @@ export default function UdsInterventi() {
       });
     };
     if (editingId != null) {
-      const current = interventi?.find((item) => item.id === editingId);
+      const current = editingIntervento;
       const motivo = data.motivoRettifica?.trim();
       if (!current?.dataAggiornamento || !motivo) {
         toast({
@@ -350,6 +451,7 @@ export default function UdsInterventi() {
         });
         return;
       }
+      submitInFlight.current = true;
       rectifyIntervento.mutate(
         {
           id: editingId,
@@ -364,6 +466,7 @@ export default function UdsInterventi() {
         },
         {
           onSuccess: () => {
+            submitInFlight.current = false;
             invalidateList();
             toast({ title: t("udsInterventi.toastUpdated") });
             form.reset();
@@ -373,10 +476,11 @@ export default function UdsInterventi() {
         },
       );
     } else {
+      submitInFlight.current = true;
       createIntervento.mutate(
         {
           data: {
-            beneficiarioId: personId,
+            beneficiarioId: formPerson.id,
             tipoIntervento: data.tipoIntervento,
             descrizione: data.descrizione || null,
             note: data.note || null,
@@ -392,6 +496,7 @@ export default function UdsInterventi() {
         },
         {
           onSuccess: () => {
+            submitInFlight.current = false;
             invalidateList();
             toast({ title: t("udsInterventi.toastCreated") });
             form.reset();
@@ -448,6 +553,11 @@ export default function UdsInterventi() {
   const exportColumns = useMemo(
     () => [
       {
+        header: t("udsInterventi.selectPerson"),
+        accessor: (i: Intervento) =>
+          i.beneficiarioNome ?? String(i.beneficiarioId),
+      },
+      {
         header: t("udsInterventi.colData"),
         accessor: (i: Intervento) => interventoDataLabel(i),
       },
@@ -493,15 +603,40 @@ export default function UdsInterventi() {
           <ExportButtons
             rows={rows}
             columns={exportColumns}
-            filename={`uds-interventi${selectedPersonData ? "-" + selectedPersonData.cognome : ""}`}
-            title={`${t("udsInterventi.exportTitle")}${selectedPersonData ? " — " + personLabel(selectedPersonData) : ""}`}
-            disabled={personId == null}
+            filename="uds-interventi"
+            title={t("udsInterventi.exportTitle")}
+            subtitle={[
+              applied.da,
+              applied.a,
+              applied.areaOperativaId ? `Area #${applied.areaOperativaId}` : "",
+              applied.zonaUdsId ? `Zona #${applied.zonaUdsId}` : "",
+              applied.beneficiarioId
+                ? `Persona #${applied.beneficiarioId}`
+                : "",
+              applied.tipoBisogno,
+              applied.bisogni,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            disabled={!listEnabled || isError || isFetching}
+            loadRows={loadExportRows}
+            contextKey={JSON.stringify([applied, user])}
+            validateDownload={async () => {
+              await listInterventiPagina({ ...applied, pagina: 1, limite: 1 });
+            }}
+            onError={(err) =>
+              toast({
+                title: t("udsInterventi.exportTitle"),
+                description:
+                  err instanceof Error ? err.message : t("common.error"),
+                variant: "destructive",
+              })
+            }
           />
           {hasPermission("uds.interventi.create") && (
             <Button
               onClick={handleCreate}
               className="min-h-11 w-full gap-2 sm:w-auto"
-              disabled={personId == null}
             >
               <Plus className="h-4 w-4" /> {t("udsInterventi.newIntervento")}
             </Button>
@@ -510,17 +645,58 @@ export default function UdsInterventi() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-end gap-4 p-4">
-          {isGlobal && (
+        <CardContent className="p-4">
+          <form
+            className="flex flex-wrap items-end gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyFilters();
+            }}
+          >
+            {isGlobal && (
+              <div className="space-y-1">
+                <span className="text-sm font-medium">
+                  {t("udsAnagrafica.filterAreaOperativa")}
+                </span>
+                <Select
+                  value={filterAreaOperativa || ALL_ZONE}
+                  onValueChange={(v) => {
+                    setFilterAreaOperativa(v === ALL_ZONE ? "" : v);
+                    setFilterZona(ALL_ZONE);
+                    setSelectedPerson("");
+                    setSelectedPersonFallback(null);
+                    setPersonSearch("");
+                  }}
+                >
+                  <SelectTrigger
+                    className="w-[220px]"
+                    aria-label={t("udsAnagrafica.filterAreaOperativa")}
+                  >
+                    <SelectValue
+                      placeholder={t("udsAnagrafica.allAreaOperativa")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_ZONE}>
+                      {t("udsAnagrafica.allAreaOperativa")}
+                    </SelectItem>
+                    {areaOperativaList?.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <span className="text-sm font-medium">
-                {t("udsAnagrafica.filterAreaOperativa")}
+                {t("udsAnagrafica.filterZona")}
               </span>
               <Select
-                value={filterAreaOperativa || ALL_ZONE}
+                value={filterZona}
                 onValueChange={(v) => {
-                  setFilterAreaOperativa(v === ALL_ZONE ? "" : v);
-                  setFilterZona(ALL_ZONE);
+                  setFilterZona(v);
                   setSelectedPerson("");
                   setSelectedPersonFallback(null);
                   setPersonSearch("");
@@ -528,123 +704,161 @@ export default function UdsInterventi() {
               >
                 <SelectTrigger
                   className="w-[220px]"
-                  aria-label={t("udsAnagrafica.filterAreaOperativa")}
+                  aria-label={t("udsAnagrafica.filterZona")}
                 >
-                  <SelectValue
-                    placeholder={t("udsAnagrafica.allAreaOperativa")}
-                  />
+                  <SelectValue placeholder={t("udsAnagrafica.allZone")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_ZONE}>
-                    {t("udsAnagrafica.allAreaOperativa")}
+                    {t("udsAnagrafica.allZone")}
                   </SelectItem>
-                  {areaOperativaList?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.nome}
+                  {zoneList?.map((z) => (
+                    <SelectItem key={z.id} value={String(z.id)}>
+                      {z.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
-          <div className="space-y-1">
-            <span className="text-sm font-medium">
-              {t("udsAnagrafica.filterZona")}
-            </span>
-            <Select
-              value={filterZona}
-              onValueChange={(v) => {
-                setFilterZona(v);
+            <div className="space-y-1 min-w-[220px] flex-1">
+              <span className="text-sm font-medium">
+                {t("udsInterventi.selectPerson")}
+              </span>
+              <BeneficiarioCombobox
+                items={persone ?? []}
+                value={selectedPerson}
+                onChange={(id) => {
+                  setSelectedPerson(id);
+                  setSelectedPersonFallback(
+                    persone?.find((p) => p.id === Number(id)) ?? null,
+                  );
+                }}
+                placeholder={t("udsInterventi.selectPersonPlaceholder")}
+                selectedLabelFallback={
+                  selectedPersonData ? personLabel(selectedPersonData) : null
+                }
+                searchValue={personSearch}
+                onSearchChange={setPersonSearch}
+                filterLocally={false}
+                emptyText={
+                  personError
+                    ? t("udsInterventi.loadError")
+                    : personLoading
+                      ? t("common.loading")
+                      : t("common.noResults")
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="text-sm font-medium">
+                {t("udsInterventi.bisogniFilterLabel")}
+              </span>
+              <Select
+                value={bisogniFilter}
+                onValueChange={(value: typeof bisogniFilter) =>
+                  setBisogniFilter(value)
+                }
+              >
+                <SelectTrigger
+                  className="w-[220px]"
+                  aria-label={t("udsInterventi.bisogniFilterLabel")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tutti">
+                    {t("udsInterventi.bisogniFilter.tutti")}
+                  </SelectItem>
+                  <SelectItem value="aperti">
+                    {t("udsInterventi.bisogniFilter.aperti")}
+                  </SelectItem>
+                  <SelectItem value="scaduti">
+                    {t("udsInterventi.bisogniFilter.scaduti")}
+                  </SelectItem>
+                  <SelectItem value="nessuno">
+                    {t("udsInterventi.bisogniFilter.nessuno")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
                 setSelectedPerson("");
                 setSelectedPersonFallback(null);
-                setPersonSearch("");
               }}
             >
-              <SelectTrigger
-                className="w-[220px]"
-                aria-label={t("udsAnagrafica.filterZona")}
-              >
-                <SelectValue placeholder={t("udsAnagrafica.allZone")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_ZONE}>
-                  {t("udsAnagrafica.allZone")}
-                </SelectItem>
-                {zoneList?.map((z) => (
-                  <SelectItem key={z.id} value={String(z.id)}>
-                    {z.nome}
+              {t("udsInterventi.clearPerson")}
+            </Button>
+            <div className="space-y-1">
+              <span className="text-sm font-medium">
+                {t("udsInterventi.needType")}
+              </span>
+              <Select value={needType} onValueChange={setNeedType}>
+                <SelectTrigger
+                  aria-label={t("udsInterventi.needType")}
+                  className="w-[220px]"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("common.all")}</SelectItem>
+                  <SelectItem value="richiesta">
+                    {t("udsInterventi.request")}
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1 min-w-[220px] flex-1">
-            <span className="text-sm font-medium">
-              {t("udsInterventi.selectPerson")}
-            </span>
-            <BeneficiarioCombobox
-              items={persone ?? []}
-              value={selectedPerson}
-              onChange={(id) => {
-                setSelectedPerson(id);
-                setSelectedPersonFallback(null);
-              }}
-              placeholder={t("udsInterventi.selectPersonPlaceholder")}
-              selectedLabelFallback={
-                selectedPersonData ? personLabel(selectedPersonData) : null
-              }
-              searchValue={personSearch}
-              onSearchChange={setPersonSearch}
-            />
-          </div>
-          <div className="space-y-1">
-            <span className="text-sm font-medium">
-              {t("udsInterventi.bisogniFilterLabel")}
-            </span>
-            <Select
-              value={bisogniFilter}
-              onValueChange={(value: typeof bisogniFilter) =>
-                setBisogniFilter(value)
-              }
-            >
+                  <SelectItem value="azione">
+                    {t("udsInterventi.action")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Select value={dateMode} onValueChange={setDateMode}>
               <SelectTrigger
-                className="w-[220px]"
-                aria-label={t("udsInterventi.bisogniFilterLabel")}
+                className="w-[180px]"
+                aria-label={t("udsReportGiornaliero.date")}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="tutti">
-                  {t("udsInterventi.bisogniFilter.tutti")}
+                <SelectItem value="day">
+                  {t("udsReportGiornaliero.modeDay")}
                 </SelectItem>
-                <SelectItem value="aperti">
-                  {t("udsInterventi.bisogniFilter.aperti")}
-                </SelectItem>
-                <SelectItem value="scaduti">
-                  {t("udsInterventi.bisogniFilter.scaduti")}
-                </SelectItem>
-                <SelectItem value="nessuno">
-                  {t("udsInterventi.bisogniFilter.nessuno")}
+                <SelectItem value="range">
+                  {t("udsReportGiornaliero.modeRange")}
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          {canCreatePerson && (
-            <div className="space-y-1">
-              <span className="text-sm font-medium">&nbsp;</span>
-              <Button
-                type="button"
-                onClick={() => setIsNewPersonOpen(true)}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
-              </Button>
-            </div>
-          )}
+            <label className="text-sm">
+              {t("udsReportGiornaliero.from")}
+              <Input
+                aria-label={t("udsReportGiornaliero.from")}
+                type="date"
+                required
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            {dateMode === "range" && (
+              <label className="text-sm">
+                {t("udsReportGiornaliero.to")}
+                <Input
+                  aria-label={t("udsReportGiornaliero.to")}
+                  type="date"
+                  required
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </label>
+            )}
+            <Button type="submit">{t("udsInterventi.applyFilters")}</Button>
+          </form>
         </CardContent>
       </Card>
 
       <UdsPersonaSheet
+        key={`identification-${effectiveAreaOperativa ?? "global"}`}
+        selectionMode
         open={isNewPersonOpen}
         onOpenChange={setIsNewPersonOpen}
         initialAreaOperativaId={effectiveAreaOperativa}
@@ -658,10 +872,14 @@ export default function UdsInterventi() {
         onPersonReady={handlePersonReady}
       />
 
-      {personId == null ? (
+      {isError ? (
+        <p role="alert" className="text-destructive">
+          {extractError(error, t("udsInterventi.loadError"))}
+        </p>
+      ) : !listEnabled ? (
         <Card>
           <CardContent className="h-40 flex items-center justify-center text-muted-foreground">
-            {t("udsInterventi.noPersonSelected")}
+            {t("udsInterventi.chooseArea")}
           </CardContent>
         </Card>
       ) : (
@@ -706,6 +924,10 @@ export default function UdsInterventi() {
                       <div>
                         <div className="font-semibold">
                           {interventoDataLabel(intervento)}
+                          <div className="text-sm font-normal">
+                            {intervento.beneficiarioNome ??
+                              `#${intervento.beneficiarioId}`}
+                          </div>
                         </div>
                         <Badge
                           variant="outline"
@@ -802,6 +1024,7 @@ export default function UdsInterventi() {
                     <TableHead className="w-[120px]">
                       {t("udsInterventi.colData")}
                     </TableHead>
+                    <TableHead>{t("udsInterventi.selectPerson")}</TableHead>
                     <TableHead>{t("udsInterventi.colTipo")}</TableHead>
                     <TableHead>{t("interventi.workflowState")}</TableHead>
                     <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
@@ -820,7 +1043,7 @@ export default function UdsInterventi() {
                       .fill(0)
                       .map((_, i) => (
                         <TableRow key={i}>
-                          {Array(9)
+                          {Array(10)
                             .fill(0)
                             .map((_, j) => (
                               <TableCell key={j}>
@@ -832,7 +1055,7 @@ export default function UdsInterventi() {
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={10}
                         className="h-32 text-center text-muted-foreground"
                       >
                         {t("udsInterventi.noIntervento")}
@@ -853,6 +1076,9 @@ export default function UdsInterventi() {
                       >
                         <TableCell className="text-sm">
                           {interventoDataLabel(i)}
+                        </TableCell>
+                        <TableCell>
+                          {i.beneficiarioNome ?? `#${i.beneficiarioId}`}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -987,6 +1213,31 @@ export default function UdsInterventi() {
         </>
       )}
 
+      {listEnabled && !isError && (
+        <div className="flex items-center justify-end gap-3">
+          <span>
+            {t("udsInterventi.pageInfo", {
+              page,
+              total: interventiPage?.total ?? 0,
+            })}
+          </span>
+          <Button
+            variant="outline"
+            disabled={page <= 1 || isFetching}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            {t("udsInterventi.previous")}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={isFetching || page * 50 >= (interventiPage?.total ?? 0)}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            {t("udsInterventi.next")}
+          </Button>
+        </div>
+      )}
+
       <UdsBisogniDialog
         interventoId={bisogniEditingId}
         interventoVersione={bisogniEditingIntervento?.dataAggiornamento ?? null}
@@ -1011,7 +1262,11 @@ export default function UdsInterventi() {
                 ? t("udsInterventi.editTitle")
                 : t("udsInterventi.newTitle")}
             </SheetTitle>
-            <SheetDescription>{t("udsInterventi.subtitle")}</SheetDescription>
+            <SheetDescription>
+              {formPerson
+                ? personLabel(formPerson)
+                : t("udsInterventi.subtitle")}
+            </SheetDescription>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>

@@ -1,15 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import {
   useReportUdsInterventiGiornalieri,
+  reportUdsInterventiGiornalieri,
   useListAreeOperative,
   useListZoneUds,
   getReportUdsInterventiGiornalieriQueryKey,
   getListZoneUdsQueryKey,
 } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,6 +39,8 @@ import { CalendarClock, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { exportUdsReportGiornalieroPdf } from "@/lib/uds-report-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
+import { udsReportSections } from "@/lib/uds-report-content";
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { todayEuropeRome } from "@/lib/europe-rome";
 
 const ALL = "all";
@@ -26,7 +48,15 @@ type Mode = "day" | "range";
 
 export default function UdsReportGiornaliero() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasArea, hasPermission } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const canReport =
+    hasArea("analisi") &&
+    hasPermission("uds.reports.view") &&
+    isModuloAttivo("UDS") &&
+    isModuloAttivo("REPORT");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const isGlobalAreaOperativa = (user?.areaOperativaId ?? null) == null;
   const lockedZonaId = user?.zonaUdsId ?? null;
 
@@ -35,7 +65,9 @@ export default function UdsReportGiornaliero() {
   const [da, setDa] = useState(today);
   const [a, setA] = useState(today);
   const [areaOperativaId, setAreaOperativaId] = useState<string>(ALL);
-  const [zonaId, setZonaId] = useState<string>(lockedZonaId != null ? String(lockedZonaId) : ALL);
+  const [zonaId, setZonaId] = useState<string>(
+    lockedZonaId != null ? String(lockedZonaId) : ALL,
+  );
 
   useEffect(() => {
     if (lockedZonaId != null) setZonaId(String(lockedZonaId));
@@ -51,20 +83,49 @@ export default function UdsReportGiornaliero() {
   const zonaParam = zonaId === ALL ? undefined : parseInt(zonaId);
 
   const effectiveA = mode === "range" ? a : undefined;
-  const params = { da, a: effectiveA, areaOperativaId: areaOperativaParam, zonaUdsId: zonaParam };
-  const { data: rows, isLoading } = useReportUdsInterventiGiornalieri(params, {
-    query: { queryKey: getReportUdsInterventiGiornalieriQueryKey(params), enabled: !!da },
+  const params = {
+    da,
+    a: effectiveA,
+    areaOperativaId: areaOperativaParam,
+    zonaUdsId: zonaParam,
+  };
+  const {
+    data: rows,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+  } = useReportUdsInterventiGiornalieri(params, {
+    query: {
+      queryKey: [
+        ...getReportUdsInterventiGiornalieriQueryKey(params),
+        user?.id,
+        user?.zonaUdsId,
+      ],
+      enabled: !!da && canReport,
+    },
   });
 
-  const tipoLabel = (tipo: string) => t(`udsReportGiornaliero.tipo_${tipo}`, { defaultValue: tipo });
-  const personaLabel = (r: { beneficiarioNome?: string | null; soprannome?: string | null }) => {
+  const tipoLabel = (tipo: string) =>
+    t(`udsReportGiornaliero.tipo_${tipo}`, { defaultValue: tipo });
+  const personaLabel = (r: {
+    beneficiarioNome?: string | null;
+    soprannome?: string | null;
+  }) => {
     if (!r.beneficiarioNome) return r.soprannome ?? "—";
     return r.soprannome ? `${r.beneficiarioNome} (${r.soprannome})` : r.beneficiarioNome;
   };
-  const noteOf = (r: { note?: string | null; noteUds?: string | null; descrizione?: string | null }) =>
-    [r.descrizione, r.note, r.noteUds].filter(Boolean).join(" · ");
-
-  const list = rows ?? [];
+  const list = canReport && !isError ? (rows ?? []) : [];
+  const context = JSON.stringify([user, params, canReport]);
+  const current = useRef(context);
+  current.current = context;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const selectedAreaOperativaNome = isGlobalAreaOperativa
     ? (areaOperativa ?? []).find((c) => c.id === areaOperativaParam)?.nome
     : (user?.areaOperativaNome ?? undefined);
@@ -73,43 +134,68 @@ export default function UdsReportGiornaliero() {
   const periodoLabel = mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : formatIt(da);
 
   const handleExportPdf = async () => {
-    const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
-    await exportUdsReportGiornalieroPdf({
-      filename: `uds_report_${mode === "range" ? `${da}_${a}` : da}`,
-      title: t("udsReportGiornaliero.pdfTitle"),
-      meta: {
-        date: mode === "day" ? formatIt(da) : undefined,
-        period: mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : undefined,
-        areaOperativa: selectedAreaOperativaNome,
-        zone: selectedZonaNome,
-      },
-      labels: {
-        colN: t("udsReportGiornaliero.colN"),
-        colData: t("udsReportGiornaliero.colData"),
-        colPersona: t("udsReportGiornaliero.colPersona"),
-        colZona: t("udsReportGiornaliero.colZona"),
-        colTipo: t("udsReportGiornaliero.colTipo"),
-        colNote: t("udsReportGiornaliero.colNote"),
-        colOperatore: t("udsReportGiornaliero.colOperatore"),
-        legend: t("udsReportGiornaliero.legend"),
-        metaDate: t("udsReportGiornaliero.pdfMetaDate"),
-        metaPeriod: t("udsReportGiornaliero.pdfMetaPeriod"),
-        metaAreaOperativa: t("udsReportGiornaliero.pdfMetaAreaOperativa"),
-        metaZone: t("udsReportGiornaliero.pdfMetaZone"),
-      },
-      rows: list.map((r) => ({
-        numeroIntervento: r.numeroIntervento,
-        primoIntervento: r.primoIntervento,
-        data: formatIt(r.dataIntervento),
-        persona: personaLabel(r),
-        zona: r.zonaNome ?? "—",
-        tipo: tipoLabel(r.tipoIntervento),
-        note: noteOf(r),
-        operatore: r.operatoreCodice ?? "—",
-      })),
-      branding,
-      associationLogoDataUrl: logoDataUrl,
-    });
+    if (!canReport || exporting || isError || isFetching) return;
+    const captured = current.current;
+    const validate = () => {
+      if (!mounted.current || captured !== current.current)
+        throw new Error(t("common.readdenied"));
+    };
+    setExporting(true);
+    setExportError("");
+    try {
+      const freshRows = await reportUdsInterventiGiornalieri(params);
+      validate();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+      await exportUdsReportGiornalieroPdf({
+        filename: `uds_report_${mode === "range" ? `${da}_${a}` : da}`,
+        title: t("udsReportGiornaliero.pdfTitle"),
+        meta: {
+          date: mode === "day" ? formatIt(da) : undefined,
+          period:
+            mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : undefined,
+          areaOperativa: selectedAreaOperativaNome,
+          zone: selectedZonaNome,
+        },
+        labels: {
+          colN: t("udsReportGiornaliero.colN"),
+          colData: t("udsReportGiornaliero.colData"),
+          colPersona: t("udsReportGiornaliero.colPersona"),
+          colZona: t("udsReportGiornaliero.colZona"),
+          colTipo: t("udsReportGiornaliero.colTipo"),
+          colNote: t("udsReportGiornaliero.colNote"),
+          colOperatore: t("udsReportGiornaliero.colOperatore"),
+          legend: `${t("udsReportGiornaliero.legend")} ${t("udsReportGiornaliero.currentNeeds")}`,
+          metaDate: t("udsReportGiornaliero.pdfMetaDate"),
+          metaPeriod: t("udsReportGiornaliero.pdfMetaPeriod"),
+          metaAreaOperativa: t("udsReportGiornaliero.pdfMetaAreaOperativa"),
+          metaZone: t("udsReportGiornaliero.pdfMetaZone"),
+        },
+        rows: freshRows.map((r) => ({
+          id: r.id,
+          numeroIntervento: r.numeroIntervento,
+          primoIntervento: r.primoIntervento,
+          data: formatIt(r.dataIntervento),
+          persona: personaLabel(r),
+          zona: r.zonaNome ?? "—",
+          tipo: `${tipoLabel(r.tipoIntervento)} · ${t(`interventi.workflowStati.${r.stato}`, { defaultValue: r.stato })}`,
+          sections: udsReportSections(r, t),
+          operatore: r.operatoreCodice ?? "—",
+        })),
+        branding,
+        associationLogoDataUrl: logoDataUrl,
+        beforeSave: async () => {
+          validate();
+          await reportUdsInterventiGiornalieri(params);
+          validate();
+        },
+      });
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : t("udsInterventi.loadError"),
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -208,7 +294,17 @@ export default function UdsReportGiornaliero() {
             </Select>
           </div>
           <div className="md:ml-auto">
-            <Button onClick={handleExportPdf} disabled={list.length === 0} variant="outline">
+            <Button
+              onClick={handleExportPdf}
+              disabled={
+                !canReport ||
+                isError ||
+                isFetching ||
+                exporting ||
+                list.length === 0
+              }
+              variant="outline"
+            >
               <FileDown className="w-4 h-4 mr-2" />
               {t("udsReportGiornaliero.exportPdf")}
             </Button>
@@ -222,10 +318,23 @@ export default function UdsReportGiornaliero() {
             <CalendarClock className="w-5 h-5 text-primary" /> {periodoLabel}
           </CardTitle>
           <CardDescription>
-            {t("udsReportGiornaliero.countLabel", { count: list.length })} · {t("udsReportGiornaliero.legend")}
+            {t("udsReportGiornaliero.countLabel", { count: list.length })} ·{" "}
+            {t("udsReportGiornaliero.legend")}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {(isError || !canReport || exportError) && (
+            <p role="alert" className="text-destructive">
+              {!canReport
+                ? t("common.readdenied")
+                : exportError ||
+                  (error as { data?: { error?: string } })?.data?.error ||
+                  t("udsInterventi.loadError")}
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground mb-4">
+            {t("udsReportGiornaliero.currentNeeds")}
+          </p>
           {isLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : list.length === 0 ? (
@@ -233,41 +342,118 @@ export default function UdsReportGiornaliero() {
               {t("udsReportGiornaliero.empty")}
             </p>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-14 text-center">{t("udsReportGiornaliero.colN")}</TableHead>
-                    {mode === "range" && <TableHead className="w-28">{t("udsReportGiornaliero.colData")}</TableHead>}
-                    <TableHead>{t("udsReportGiornaliero.colPersona")}</TableHead>
-                    <TableHead>{t("udsReportGiornaliero.colZona")}</TableHead>
-                    <TableHead>{t("udsReportGiornaliero.colTipo")}</TableHead>
-                    <TableHead>{t("udsReportGiornaliero.colNote")}</TableHead>
-                    <TableHead>{t("udsReportGiornaliero.colOperatore")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-center font-bold">
-                        <span
-                          className={r.primoIntervento ? "text-red-600" : undefined}
-                          title={r.primoIntervento ? t("udsReportGiornaliero.primoTooltip") : undefined}
-                        >
-                          {r.numeroIntervento}
-                        </span>
-                      </TableCell>
-                      {mode === "range" && <TableCell>{formatIt(r.dataIntervento)}</TableCell>}
-                      <TableCell className="font-medium">{personaLabel(r)}</TableCell>
-                      <TableCell>{r.zonaNome ?? "—"}</TableCell>
-                      <TableCell>{tipoLabel(r.tipoIntervento)}</TableCell>
-                      <TableCell className="max-w-md whitespace-pre-wrap">{noteOf(r) || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.operatoreCodice ?? "—"}</TableCell>
+            <>
+              <div className="space-y-4 lg:hidden">
+                {list.map((r) => (
+                  <article
+                    key={r.id}
+                    className="rounded-lg border p-4 space-y-3"
+                  >
+                    <h2 className="font-semibold">
+                      {personaLabel(r)} · {formatIt(r.dataIntervento)}
+                    </h2>
+                    <p className="text-sm">
+                      #{r.id} · {t("udsReportGiornaliero.colN")}{" "}
+                      {r.numeroIntervento} · {tipoLabel(r.tipoIntervento)} ·{" "}
+                      {t(`interventi.workflowStati.${r.stato}`, {
+                        defaultValue: r.stato,
+                      })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {r.zonaNome ?? "—"} · {r.operatoreCodice ?? "—"}
+                    </p>
+                    <dl className="space-y-3">
+                      {udsReportSections(r, t).map((section) => (
+                        <div key={section.label}>
+                          <dt className="font-semibold">{section.label}</dt>
+                          <dd className="whitespace-pre-wrap break-words">
+                            {section.text}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden lg:block border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-14 text-center">
+                        {t("udsReportGiornaliero.colN")}
+                      </TableHead>
+                      {mode === "range" && (
+                        <TableHead className="w-28">
+                          {t("udsReportGiornaliero.colData")}
+                        </TableHead>
+                      )}
+                      <TableHead>
+                        {t("udsReportGiornaliero.colPersona")}
+                      </TableHead>
+                      <TableHead>{t("udsReportGiornaliero.colZona")}</TableHead>
+                      <TableHead>{t("udsReportGiornaliero.colTipo")}</TableHead>
+                      <TableHead>{t("udsReportGiornaliero.colNote")}</TableHead>
+                      <TableHead>
+                        {t("udsReportGiornaliero.colOperatore")}
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {list.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-center font-bold">
+                          <span
+                            className={
+                              r.primoIntervento ? "text-red-600" : undefined
+                            }
+                            title={
+                              r.primoIntervento
+                                ? t("udsReportGiornaliero.primoTooltip")
+                                : undefined
+                            }
+                          >
+                            {r.numeroIntervento}
+                          </span>
+                          <div className="text-xs font-normal text-muted-foreground">
+                            #{r.id}
+                          </div>
+                        </TableCell>
+                        {mode === "range" && (
+                          <TableCell>{formatIt(r.dataIntervento)}</TableCell>
+                        )}
+                        <TableCell className="font-medium">
+                          {personaLabel(r)}
+                        </TableCell>
+                        <TableCell>{r.zonaNome ?? "—"}</TableCell>
+                        <TableCell>
+                          {tipoLabel(r.tipoIntervento)}
+                          <div>
+                            {t(`interventi.workflowStati.${r.stato}`, {
+                              defaultValue: r.stato,
+                            })}
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[280px] max-w-lg whitespace-pre-wrap">
+                          <dl className="space-y-3">
+                            {udsReportSections(r, t).map((section) => (
+                              <div key={section.label}>
+                                <dt className="font-semibold">
+                                  {section.label}
+                                </dt>
+                                <dd className="break-words">{section.text}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.operatoreCodice ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

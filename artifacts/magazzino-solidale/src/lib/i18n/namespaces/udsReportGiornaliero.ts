@@ -1,5 +1,13 @@
 export const udsReportGiornaliero = {
   it: {
+    notRecorded: "Non indicato",
+    operationalNotes: "Note operative",
+    linkedNeeds: "Richieste e azioni collegate",
+    currentNeeds:
+      "I bisogni mostrano lo stato corrente al momento della generazione.",
+    plannedDate: "Data prevista",
+    completedDate: "Completamento",
+
     title: "Report Unità di Strada",
     subtitle: "Interventi di Unità di Strada per un giorno o un intervallo.",
     areaOperativa: "Area Operativa",
@@ -35,6 +43,14 @@ export const udsReportGiornaliero = {
     tipo_altro: "Altro",
   },
   es: {
+    notRecorded: "No indicado",
+    operationalNotes: "Notas operativas",
+    linkedNeeds: "Solicitudes y acciones vinculadas",
+    currentNeeds:
+      "Las necesidades muestran el estado actual al generar el informe.",
+    plannedDate: "Fecha prevista",
+    completedDate: "Finalización",
+
     title: "Informe Unidad de Calle",
     subtitle: "Intervenciones de Unidad de Calle por un día o un intervalo.",
     areaOperativa: "Área Operativa",
@@ -70,6 +86,13 @@ export const udsReportGiornaliero = {
     tipo_altro: "Otro",
   },
   en: {
+    notRecorded: "Not recorded",
+    operationalNotes: "Operational notes",
+    linkedNeeds: "Linked requests and actions",
+    currentNeeds: "Needs show their current state at generation time.",
+    plannedDate: "Planned date",
+    completedDate: "Completion",
+
     title: "Street Unit Report",
     subtitle: "Street Unit interventions for a day or a date range.",
     areaOperativa: "Operational Area",
@@ -105,6 +128,14 @@ export const udsReportGiornaliero = {
     tipo_altro: "Other",
   },
   fr: {
+    notRecorded: "Non indiqué",
+    operationalNotes: "Notes opérationnelles",
+    linkedNeeds: "Demandes et actions liées",
+    currentNeeds:
+      "Les besoins affichent leur état actuel lors de la génération.",
+    plannedDate: "Date prévue",
+    completedDate: "Achèvement",
+
     title: "Rapport Unité de Rue",
     subtitle: "Interventions d'Unité de Rue pour un jour ou une période.",
     areaOperativa: "Zone opérationnelle",
@@ -140,6 +171,14 @@ export const udsReportGiornaliero = {
     tipo_altro: "Autre",
   },
   de: {
+    notRecorded: "Nicht angegeben",
+    operationalNotes: "Operative Notizen",
+    linkedNeeds: "Verknüpfte Anfragen und Aktionen",
+    currentNeeds:
+      "Bedarfe zeigen den aktuellen Zustand zum Erstellungszeitpunkt.",
+    plannedDate: "Geplantes Datum",
+    completedDate: "Abschluss",
+
     title: "Straßeneinsatz-Bericht",
     subtitle: "Straßeneinsätze für einen Tag oder einen Zeitraum.",
     areaOperativa: "Betriebsbereich",
@@ -175,6 +214,13 @@ export const udsReportGiornaliero = {
     tipo_altro: "Sonstiges",
   },
   ar: {
+    notRecorded: "غير مسجل",
+    operationalNotes: "ملاحظات تشغيلية",
+    linkedNeeds: "الطلبات والإجراءات المرتبطة",
+    currentNeeds: "تعرض الاحتياجات حالتها الحالية وقت الإنشاء.",
+    plannedDate: "التاريخ المخطط",
+    completedDate: "الإكمال",
+
     title: "تقرير وحدة الشارع",
     subtitle: "تدخلات وحدة الشارع ليوم واحد أو لفترة.",
     areaOperativa: "المنطقة التشغيلية",

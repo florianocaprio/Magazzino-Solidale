@@ -477,6 +477,8 @@ it("SEC-03/04 UDS applica il confine Area, mantiene filtri Zona e allowlist PII"
       "operatoreCodice",
       "numeroIntervento",
       "primoIntervento",
+      "stato",
+      "bisogniPianificati",
     ].sort(),
   );
   expect(
