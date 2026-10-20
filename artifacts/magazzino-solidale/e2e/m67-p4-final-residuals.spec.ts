@@ -13,6 +13,7 @@ import {
 import { updateModuloAmbiente } from "../../api-server/src/lib/configurazioneAmbiente";
 import { dataCivileEuropeRome } from "../../api-server/src/lib/interventiWorkflow";
 import { pool } from "../../../lib/db/src/index";
+import { selectOption } from "./helpers";
 
 test.afterAll(async () => {
   await pool.end();
@@ -48,10 +49,6 @@ test("M67-32: real logistics session edits its calendar slot, rejects stale vers
     'update ruoli set aree=\'["logistica","sociale"]\',permessi=$1 where id=$2',
     [JSON.stringify(grants), f.users.requester.roleId],
   );
-  await pool.query("update utenti set centro_ascolto_id=$1 where id=$2", [
-    centre.id,
-    f.users.requester.id,
-  ]);
   await page.goto("/login");
   await page
     .getByLabel(/username|nome utente/i)
@@ -75,7 +72,15 @@ test("M67-32: real logistics session edits its calendar slot, rejects stale vers
       [centre.id, today],
     )
   ).rows[0];
+  const actor = await page.request.get("/api/auth/me");
+  expect(actor.status()).toBe(200);
+  expect(await actor.json()).toMatchObject({
+    areaOperativaId: f.area,
+    centroAscoltoId: null,
+  });
   await page.goto("/turni");
+  await expect(page.locator("#turni-area")).toBeDisabled();
+  await selectOption(page, page.locator("#turni-centro"), centre.nome);
   const slot = page
     .getByRole("tabpanel", { name: "Pianificazione" })
     .getByRole("button")
@@ -129,6 +134,7 @@ test("M67-32: real logistics session edits its calendar slot, rejects stale vers
     ).status(),
   ).toBe(403);
   await page.reload();
+  await selectOption(page, page.locator("#turni-centro"), centre.nome);
   await expect(slot).toBeDisabled();
   expect(
     (await pool.query("select versione from turni where id=$1", [initial.id]))

@@ -30,7 +30,7 @@ test.afterEach(async ({ page }, info) => {
     });
 });
 
-test("M67-21 residual: direct warehouse UI transfer reaches assigned Mensa without creating a request", async ({
+test("M67-21 residual: direct warehouse UI transfer reaches a Mensa in the Area without creating a request", async ({
   page,
   browser,
 }) => {
@@ -141,6 +141,11 @@ test("M67-21 residual: direct warehouse UI transfer reaches assigned Mensa witho
     const receiver = await context.newPage();
     await signIn(receiver, f.users.receiver);
     await receiver.goto("/mensa/trasferimenti");
+    await selectOption(
+      receiver,
+      receiver.getByRole("combobox", { name: "Mensa", exact: true }),
+      f.canteens[0].nome,
+    );
     const incoming = receiver.locator("article").filter({
       has: receiver.getByRole("heading", {
         name: new RegExp(transfer.codice),
@@ -185,15 +190,11 @@ test("M67-21 residual: direct warehouse UI transfer reaches assigned Mensa witho
   }
 });
 
-test("M67-26 residual: late request list cannot contaminate another assigned Mensa", async ({
+test("M67-26 residual: late request list cannot contaminate another Mensa in the Area", async ({
   page,
   request,
 }) => {
   const f = await m67aMensaFixture();
-  await pool.query(
-    "insert into utenti_mense(utente_id,mensa_id,assegnata_da) values($1,$2,$1)",
-    [f.users.requester.id, f.canteens[1].id],
-  );
   expect(
     (
       await request.post("/api/auth/login", { data: f.users.requester })

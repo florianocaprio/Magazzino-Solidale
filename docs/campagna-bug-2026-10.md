@@ -2719,3 +2719,6 @@ Ulteriore adeguamento 09: la fixture Interventi/Richieste usa il Centro del bene
 
 
 Test finali 09: corretti esclusivamente otto spec browser rimasti su flussi precedenti alle decisioni UAT (Area, tessera, ritorno alla coda, gestione servizi dal form, etichette Carico). Tutte le ripetizioni mirate sono positive; API completo con originali FSE: 2.103 PASS / 2 SKIP AGEA. Ciclo CI completo e ricevuta della ricompilazione 8082 associati alla [PR #28](https://github.com/florianocaprio/Magazzino-Solidale/pull/28), riferimento anche per l’esito dell’integrazione Git autorizzata. Codice applicativo identico all’ultima UAT. Dettagli in `docs/Campagna-BUG-Test-Finali-20261020.md`.
+
+
+Prosecuzione 09: FSE/replay e suite successive hanno evidenziato ulteriori fixture/selettori precedenti alle decisioni UAT. Il rapporto finale traccia quattordici spec E2E adeguati, lasciando applicazione/API/schema invariati. Ripetizioni complete più recenti: Richieste contestuali 10 PASS, Turni/Maps 10 PASS, residui Mensa 15 PASS, sessioni UDS fra Aree 5 PASS. I cicli CI con KO non vengono dichiarati positivi; nuovo checkpoint sottoposto ai gate completi e prosecuzione delle ultime regressioni locali.

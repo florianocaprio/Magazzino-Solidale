@@ -51,7 +51,7 @@ La verifica delle suite non raggiunte dal primo ciclo ha rilevato due ulteriori 
 
 ### Provenienza e passaggi finali
 
-Dal codice UAT `fb2ba4b` cambiano soltanto dieci test browser e tre documenti: applicazione, API, schema, migration, dipendenze e configurazione restano identici. Le evidenze API/originali FSE e la UAT personale sono quindi riutilizzabili per i rispettivi input invariati. Il nuovo checkpoint richiede comunque un ciclo CI completo su tutti i 49 spec; un KO o una suite non eseguita non costituiscono PASS.
+Dal codice UAT `fb2ba4b` cambiano soltanto quattordici test browser e tre documenti: applicazione, API, schema, migration, dipendenze e configurazione restano identici. Le evidenze API/originali FSE e la UAT personale sono quindi riutilizzabili per i rispettivi input invariati. Il nuovo checkpoint richiede comunque un ciclo CI completo su tutti i 49 spec; un KO o una suite non eseguita non costituiscono PASS.
 
 Il riferimento stabile alla PR raccoglie la SHA verificata, il run finale, i conteggi complessivi, le immagini effettivamente installate e l’eventuale SHA di merge. La nuova build personale deve conservare PostgreSQL, uploads, ledger 63/63 e le impronte delle 45 tabelle applicative, dopo backup e ripristino di prova isolato. Nessuna suite mutativa va eseguita sulla 8082. Non è previsto alcun aggiornamento Hetzner in questo mandato.
 
@@ -64,3 +64,15 @@ Sul checkpoint `04ea7fc` il run [39462914762](https://github.com/florianocaprio/
 - `m4b1-prenotazioni.spec.ts`: in CI il bottone Avvia non risultava visibile dopo il replay POST riuscito. Il medesimo test non modificato è passato integralmente in locale (10 PASS / 10 SKIP), quindi la causa applicativa non è dimostrata. La sincronizzazione ora richiede sia lo stato della risposta replay sia la rilettura canonica del documento prima degli assert UI/stock. Nessuna soglia o timeout aumentato; restano identici intenzione, un solo movimento e quantità. Ripetizione completa dopo l’adeguamento: **10 PASS / 10 SKIP**.
 
 Evidenze: `/private/tmp/bug09-browser-round2-diag`, `/private/tmp/bug09-browser-round2-sync`, `/private/tmp/bug09-ci-round2-api` e partizioni browser omonime. Applicazione, schema e dipendenze restano invariati; nuovo ciclo completo richiesto prima del merge. I risultati delle partizioni ancora attive del secondo ciclo restano separati dal candidato aggiornato.
+
+
+### Suite successive delle partizioni 0 e 2
+
+Sul checkpoint `5e83e4f`, il run [39464966653](https://github.com/florianocaprio/Magazzino-Solidale/actions/runs/39464966653) ha superato i precedenti KO FSE/replay, poi ha individuato due test successivi ancora basati sul comportamento precedente alla UAT: ritorno al dettaglio Richiesta e Centro dell’utente nei Turni. Statico/Docker e API sono PASS; il run resta complessivamente non rilasciabile. Nel precedente run `39462914762` le partizioni 1 e 3 sono entrambe PASS complete.
+
+- `m5c2a-r2-continuity-real.spec.ts`: «Ritorna alle Richieste» chiude i dettagli e conserva `filter=keep`; la richiesta viene riaperta dalla coda. Restano due righe persistite, consegna completata, richiesta chiusa, intervento invariato e residuo esatto di otto. Ripetizione completa: **10 PASS**.
+- `m67-p4-final-residuals.spec.ts`: utente con Area e senza Centro, selezione esplicita del Centro dei Turni anche dopo reload; conservati aggiornamento/versione obsoleta/revoca, 16 combinazioni Maps e nessuna ulteriore scrittura dopo revoca. Ripetizione completa: **10 PASS**.
+- `m67-p4-residuals.spec.ts`: scelta esplicita Mensa nell’Area prima della ricezione; nessuna assegnazione ad hoc della seconda Mensa. Restano stock partenza 10/destinazione 2, due movimenti, nessuna Richiesta implicita, isolamento fra risposte tardive e recupero del carico senza duplicazione. Ripetizione completa della versione aggiornata: **15 PASS**.
+- `m67-p4-uds-session.spec.ts`: il confine dell’utente è l’Area, quindi le fixture di diniego usano due Aree distinte, senza Centro/Zona assegnati agli attori. La persona esterna è assente dalla directory e negata sul dettaglio; restano report territoriali, assenza di note riservate, revoca nella stessa sessione e percorso UDS corrente. Ripetizione completa: **5 PASS**.
+
+Le prime due suite sono in `/private/tmp/bug09-browser-downstream`; il successivo test Mensa di quella esecuzione era stato raccolto con la vecchia fixture e non è considerato PASS della versione aggiornata. Ripetizioni complete positive Mensa/UDS in `/private/tmp/bug09-browser-downstream2`. Lo stesso runner prosegue sulle cinque suite successive non ancora raggiunte dai cicli CI; gli esiti futuri non sono anticipati. Nessuna modifica applicativa, soglia o timeout.
