@@ -17,6 +17,12 @@ import type { BeneficiarioStatoAnagrafica } from "./beneficiarioStatoAnagrafica"
  */
 export interface Beneficiario {
   /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /**
    * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
    * @maxLength 255
    * @nullable

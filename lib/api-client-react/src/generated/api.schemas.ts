@@ -4387,6 +4387,12 @@ export const BeneficiarioCreditoSolidaleStato = {
  */
 export interface Beneficiario {
   /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /**
    * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
    * @maxLength 255
    * @nullable
@@ -4792,6 +4798,12 @@ export interface Consegna {
 }
 
 export interface BeneficiarioDettaglio {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   /**
    * @maxLength 255
    * @nullable
@@ -5364,6 +5376,12 @@ export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazioneInput {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   creditoSolidaleAbilitato?: boolean;
   creditoSolidaleStato?: CreditoSolidaleConfigurazioneInputCreditoSolidaleStato;
   /** @nullable */
@@ -5395,6 +5413,12 @@ export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazione {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   beneficiarioId: number;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: CreditoSolidaleConfigurazioneCreditoSolidaleStato;
@@ -10831,6 +10855,18 @@ export interface BeneficiarioServizioStatoUds {
   disponibile: boolean;
   /** @nullable */
   stato: string | null;
+}
+
+export interface BeneficiarioServizioStato {
+  disponibile: boolean;
+  /** @nullable */
+  stato: string | null;
+}
+
+export interface BeneficiarioServiziRiepilogo {
+  emporio: BeneficiarioServizioStato;
+  mensa: BeneficiarioServizioStato;
+  tessera: BeneficiarioServizioStato;
 }
 
 export interface BeneficiarioStatiServiziUds {

@@ -14,6 +14,8 @@ const { createCardMutate, updateNucleoMutate, recoverCard, pdf, requests, getZon
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useGetBeneficiarioStatiServizi: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" }, tessera: { disponibile: true, stato: "attiva" } } }),
+  getGetBeneficiarioStatiServiziQueryKey: (id: number) => ["stati-servizi", id],
   useGetBeneficiarioStatiServiziUds: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" } } }),
   getGetBeneficiarioStatiServiziUdsQueryKey: (id: number) => ["stati-uds", id],
   useGetOrCreateBeneficiarioTesseraDocumento: () => ({ mutateAsync: recoverCard, isPending: false }),
@@ -275,6 +277,10 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
   it("riconosce la tessera legacy attiva e richiede il motivo prima della sostituzione", async () => {
     await act(async () => root.render(<BeneficiarioDettaglio />));
     expect(document.body.textContent).toContain("Tessera attiva legacy");
+    expect(document.body.textContent).not.toContain("blocco04.cardDownload");
+    expect(document.body.textContent).not.toContain("Sostituisci tessera");
+    const edit = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"));
+    await act(async () => edit?.click());
     expect(document.body.textContent).toContain("blocco04.cardDownload");
     const replace = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Sostituisci tessera"),
@@ -313,7 +319,7 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
 
     expect(
       document.querySelectorAll('[data-testid="beneficiario-mensa-card"]'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(document.body.textContent).toContain("Abilita alla Mensa");
   });
 
@@ -361,6 +367,10 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     await act(async () => root.render(<BeneficiarioDettaglio />));
     expect(document.body.textContent).toContain("Fascia: 18_29");
     expect(document.querySelector('[name="fasciaEta"]')).toBeNull();
+
+    expect(document.querySelector('button[aria-label="Modifica componente"]')).toBeNull();
+    const edit = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"));
+    await act(async () => edit?.click());
 
     const editMember = document.querySelector<HTMLButtonElement>(
       'button[aria-label="Modifica componente"]',

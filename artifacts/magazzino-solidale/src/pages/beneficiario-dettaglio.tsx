@@ -137,6 +137,8 @@ import { emporioReadableData } from "@/hooks/use-emporio-security";
 import { registerBlocco07 } from "@/lib/i18n/namespaces/blocco07";
 registerBlocco07(i18n);
 import { BeneficiarioFseCard } from "@/components/beneficiario-fse-card";
+import { BeneficiarioServiziRiepilogo } from "@/components/beneficiario-servizi-riepilogo";
+import { BeneficiarioCreditoPolicy } from "@/components/beneficiario-credito-policy";
 
 registerLogisticaCampaign(i18n);
 
@@ -177,11 +179,13 @@ export default function BeneficiarioDettaglio() {
     query: { enabled: !!id, queryKey: getGetBeneficiarioQueryKey(numId) },
   });
   const { data: centri } = useListCentriAscolto();
+  const { data: completionAreas } = useListAreeOperative();
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user, hasArea, hasPermission } = useAuth();
   const canManage = hasPermission("beneficiari.manage");
+  const canOpenEdit = canManage || (!udsContext && ["emporio.eligibility.manage", "mensa.eligibility.manage", "beneficiari.cards.manage", "credito.quota.manage", "credito.adjust", "beneficiari.fse.manage", "emporio.access.manage"].some(hasPermission));
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canViewRequests =
     !udsContext && hasArea("sociale") &&
@@ -206,13 +210,13 @@ export default function BeneficiarioDettaglio() {
   const canViewFse = hasPermission("beneficiari.fse.view");
   const canManageFse = hasPermission("beneficiari.fse.manage");
   const canViewEmporioAccess = !udsContext && hasPermission("emporio.access.view");
-  const canManageEmporioAccess = !udsContext && hasPermission("emporio.access.manage");
   const authorizeExport = useAuthorizeBeneficiariExport();
   const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionCentroId, setCompletionCentroId] = useState("");
+  const [completionAreaId, setCompletionAreaId] = useState("");
   const [replaceCardOpen, setReplaceCardOpen] = useState(false);
   const [replacementReason, setReplacementReason] = useState("");
   const { data: tessereBeneficiario, isLoading: tessereLoading } =
@@ -432,10 +436,11 @@ export default function BeneficiarioDettaglio() {
           </p>
         </div>
         <div className="flex gap-2">
-          {canManage && b.statoAnagrafica === "provvisoria" && (
+          {udsContext && canManage && b.statoAnagrafica === "provvisoria" && (
             <Button
               variant="outline"
               onClick={() => {
+                setCompletionAreaId(String(b.areaOperativaId ?? user?.areaOperativaId ?? ""));
                 setCompletionCentroId(
                   String(b.centroAscoltoId ?? user?.centroAscoltoId ?? ""),
                 );
@@ -445,9 +450,8 @@ export default function BeneficiarioDettaglio() {
               Completa anagrafica
             </Button>
           )}
-          {!udsContext && hasPermission("beneficiari.cards.manage") && activeTessera && <Button variant="outline" onClick={() => setReplaceCardOpen(true)}><RefreshCw className="w-4 h-4" /> Sostituisci tessera</Button>}
           {canExport && <SchedaExportButtons b={b} size="default" />}
-          {canManage && (
+          {canOpenEdit && (
             <Button
               variant="outline"
               className="gap-2"
@@ -475,15 +479,24 @@ export default function BeneficiarioDettaglio() {
               registrata nell’audit.
             </p>
             <Select
+              value={completionAreaId}
+              onValueChange={(value) => { setCompletionAreaId(value); setCompletionCentroId(""); }}
+              disabled={user?.areaOperativaId != null}
+            >
+              <SelectTrigger aria-label={t("udsAnagrafica.fAreaOperativa")}><SelectValue placeholder={t("udsAnagrafica.fAreaOperativa")} /></SelectTrigger>
+              <SelectContent>{completionAreas?.filter((area) => area.attivo).map((area) => <SelectItem key={area.id} value={String(area.id)} className="whitespace-normal break-words">{area.nome}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select
               value={completionCentroId}
               onValueChange={setCompletionCentroId}
+              disabled={!completionAreaId}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleziona il Centro di Ascolto" />
               </SelectTrigger>
               <SelectContent>
                 {centri
-                  ?.filter((centro) => centro.attivo)
+                  ?.filter((centro) => centro.attivo && String(centro.areaOperativaId) === completionAreaId)
                   .map((centro) => (
                     <SelectItem key={centro.id} value={String(centro.id)}>
                       {centro.nome}
@@ -497,7 +510,7 @@ export default function BeneficiarioDettaglio() {
               Annulla
             </Button>
             <Button
-              disabled={!completionCentroId || updateBeneficiario.isPending}
+              disabled={!completionAreaId || !completionCentroId || updateBeneficiario.isPending}
               onClick={() =>
                 updateBeneficiario.mutate(
                   {
@@ -505,6 +518,7 @@ export default function BeneficiarioDettaglio() {
                     data: {
                       statoAnagrafica: "completa",
                       centroAscoltoId: Number(completionCentroId),
+                      areaOperativaId: Number(completionAreaId),
                       versione: b.versione,
                     },
                   },
@@ -575,6 +589,7 @@ export default function BeneficiarioDettaglio() {
         <EditBeneficiarioSheet
           b={b}
           udsContext={udsContext}
+          onReplaceTessera={activeTessera && hasPermission("beneficiari.cards.manage") ? () => { setEditing(false); setReplaceCardOpen(true); } : undefined}
           onClose={() => setEditing(false)}
           onSaved={() => {
             queryClient.invalidateQueries({
@@ -591,11 +606,10 @@ export default function BeneficiarioDettaglio() {
       )}
 
       {!udsContext && hasPermission("credito.view") && (
-        <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
+        <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} readOnly />
       )}
 
-      {udsContext ? <><UdsServiceStates id={b.id} /><UdsTerritoryFields b={b} /></> : <><BeneficiarioEmporioSection key={b.id} beneficiario={b} /><BeneficiarioMensaSection beneficiario={b} /></>}
-      <TesseraDocumentoSection b={b} udsContext={udsContext} />
+      {udsContext ? <><UdsServiceStates id={b.id} /><UdsTerritoryFields b={b} /><TesseraDocumentoSection b={b} udsContext /></> : <BeneficiarioServiziRiepilogo id={b.id} />}
 
       {canViewRequests && (
         <Card>
@@ -668,16 +682,7 @@ export default function BeneficiarioDettaglio() {
                   : "-"}
               </div>
             </div>
-            {canManageEmporioAccess &&
-              b.attivo &&
-              b.creditoSolidaleStato === "attivo" &&
-              emporioEligibility?.statoEffettivo === "attivo" && (
-                <Button asChild className="gap-2">
-                  <Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>
-                    {t("accessiEmporio.pianificaDaBeneficiario")}
-                  </Link>
-                </Button>
-              )}
+
           </CardContent>
         </Card>
       )}
@@ -740,7 +745,12 @@ export default function BeneficiarioDettaglio() {
               </div>
             </div>
 
-            {canManage && (
+            {!udsContext && <div className="space-y-2 border-t pt-4 text-sm">
+              <p>{t("udsAnagrafica.fAreaOperativa")}: {b.areaOperativaNome ?? completionAreas?.find((area) => area.id === b.areaOperativaId)?.nome ?? t("common.none")}</p>
+              <p>{t("beneficiarioDettaglio.centroRiferimento")}: {b.centroAscoltoNome ?? t("common.none")}</p>
+              <p>{t("beneficiarioDettaglio.udsLabel")}: {b.uds ? t("common.yes") : t("common.no")}</p>
+            </div>}
+            {udsContext && canManage && (
               <div className="pt-4 border-t border-border mt-4">
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-muted-foreground" />{" "}
@@ -831,7 +841,7 @@ export default function BeneficiarioDettaglio() {
           <div className="md:col-span-2">
             <BeneficiarioFseCard
               beneficiarioId={numId}
-              canManage={canManageFse}
+              canManage={udsContext && canManageFse}
             />
           </div>
         )}
@@ -858,7 +868,7 @@ export default function BeneficiarioDettaglio() {
               <TabsContent value="nucleo" className="mt-4">
                 <NucleoSection
                   b={b}
-                  canManage={canManage}
+                  canManage={udsContext && canManage}
                   onChanged={() =>
                     queryClient.invalidateQueries({
                       queryKey: getGetBeneficiarioQueryKey(numId),
@@ -1029,7 +1039,7 @@ export default function BeneficiarioDettaglio() {
   );
 }
 
-const makeEditSchema = (t: (k: string) => string) =>
+const makeEditSchema = (t: (k: string) => string, imported = false) =>
   z.object({
     cognome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     nome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
@@ -1042,12 +1052,9 @@ const makeEditSchema = (t: (k: string) => string) =>
         isNotFutureDateOnly,
         t("logisticaCampaign.birthInvalid"),
       ),
-    sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
+    sesso: imported ? z.string() : z.string().trim().min(1, t("beneficiari.sessoRequired")),
     cittadinanza: z.string().optional(),
-    areaProvenienza: z
-      .string()
-      .trim()
-      .min(1, t("beneficiarioDettaglio.required")),
+    areaProvenienza: imported ? z.string().optional() : z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     residenza: z.string().optional(),
     domicilio: z.string().optional(),
     comune: z.string().optional(),
@@ -1119,7 +1126,7 @@ function CreditoSolidaleCalcoloPanel({
             <span className="text-muted-foreground">
               {t("creditoSolidale.politicaApplicata")}
             </span>
-            <span className="text-right font-medium">
+            <span className="min-w-0 break-words text-right font-medium">
               {data.politicaNome} ·{" "}
               {t(`creditoSolidale.origin.${data.politicaOrigine}`)}
             </span>
@@ -1345,13 +1352,15 @@ function CreditoSolidaleQuotaPanel({
 function CreditoSolidaleSaldoPanel({
   b,
   emporioAbilitato,
+  readOnly = false,
 }: {
   b: BeneficiarioDettaglioType;
   emporioAbilitato: boolean;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
-  const canAdjust = hasPermission("credito.adjust");
+  const canAdjust = !readOnly && hasPermission("credito.adjust");
   const servizio = emporioReadableData(useBeneficiarioEmporio(b.id));
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1538,18 +1547,22 @@ export function EditBeneficiarioSheet({
   udsContext = false,
   onClose,
   onSaved,
+  onReplaceTessera,
 }: {
   b: BeneficiarioDettaglioType;
   udsContext?: boolean;
   onClose: () => void;
   onSaved: () => void;
+  onReplaceTessera?: () => void;
 }) {
   const { t } = useTranslation();
   const updateBeneficiario = useUpdateBeneficiario();
   const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
   const { toast } = useToast();
-  const editSchema = useMemo(() => makeEditSchema(t), [t]);
+  const queryClient = useQueryClient();
+  const editSchema = useMemo(() => makeEditSchema(t, Boolean(b.fascicolo)), [t, b.fascicolo]);
   const { user, hasPermission } = useAuth();
+  const canManageAnagrafica = hasPermission("beneficiari.manage");
   const servizio = emporioReadableData(useBeneficiarioEmporio(b.id, !udsContext));
   const canManageCredito =
     !udsContext && hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
@@ -1559,7 +1572,7 @@ export function EditBeneficiarioSheet({
   const { data: areaOperativaList } = useListAreeOperative({
     query: {
       queryKey: getListAreeOperativeQueryKey(),
-      enabled: isAreaOperativaGlobal,
+      enabled: true,
     },
   });
   const { data: centri } = useListCentriAscolto();
@@ -1627,6 +1640,18 @@ export function EditBeneficiarioSheet({
       ? parseInt(form.watch("areaOperativaId")!)
       : undefined
     : (user?.areaOperativaId ?? undefined);
+  const territoryUnsaved = formAreaOperativa !== b.areaOperativaId ||
+    (centroAscoltoIdSelezionato && centroAscoltoIdSelezionato !== NONE_VALUE ? Number(centroAscoltoIdSelezionato) : null) !== b.centroAscoltoId;
+  useEffect(() => {
+    if (!form.getValues("areaOperativaId")) {
+      const area = b.areaOperativaId ?? user?.areaOperativaId ?? centri?.find((c) => c.id === b.centroAscoltoId)?.areaOperativaId;
+      if (area != null) form.setValue("areaOperativaId", String(area));
+    }
+  }, [b.areaOperativaId, b.centroAscoltoId, centri, user?.areaOperativaId, form]);
+  useEffect(() => {
+    if (!form.formState.dirtyFields.creditoSolidaleAbilitato) form.setValue("creditoSolidaleAbilitato", b.creditoSolidaleAbilitato ?? false);
+    if (!form.formState.dirtyFields.creditoSolidaleStato) form.setValue("creditoSolidaleStato", b.creditoSolidaleStato ?? "non_abilitato");
+  }, [b.creditoSolidaleAbilitato, b.creditoSolidaleStato, form]);
   const { data: udsZone } = useListZoneUds(
     formAreaOperativa ? { areaOperativaId: formAreaOperativa } : undefined,
     {
@@ -1637,7 +1662,7 @@ export function EditBeneficiarioSheet({
     },
   );
 
-  const onSubmit = async (data: EditValues) => {
+  const onSubmit = async (data: EditValues, complete = false) => {
     const {
       uds,
       areaOperativaId,
@@ -1650,7 +1675,7 @@ export function EditBeneficiarioSheet({
       ...rest
     } = data;
     // A area operativa-global admin must pin a area operativa when flagging a person as UDS.
-    if (uds && isAreaOperativaGlobal && !areaOperativaId) {
+    if (isAreaOperativaGlobal && !areaOperativaId) {
       form.setError("areaOperativaId", {
         type: "manual",
         message: t("common.requiredField"),
@@ -1679,7 +1704,7 @@ export function EditBeneficiarioSheet({
       ...rest,
       uds,
       dataNascita: data.dataNascita || null,
-      sesso: data.sesso,
+      sesso: data.sesso || undefined,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim()
         ? data.codiceFiscale.trim().toUpperCase()
@@ -1693,6 +1718,8 @@ export function EditBeneficiarioSheet({
           ? parseInt(magazzinoEmporioPreferitoId)
           : null,
     };
+    if (complete) payload.statoAnagrafica = "completa";
+    if (!udsContext) payload.areaOperativaId = isAreaOperativaGlobal ? Number(areaOperativaId) : user?.areaOperativaId;
     if (uds) {
       if (isAreaOperativaGlobal && areaOperativaId)
         payload.areaOperativaId = parseInt(areaOperativaId);
@@ -1744,7 +1771,8 @@ export function EditBeneficiarioSheet({
         </SheetHeader>
         <div className="mt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit((data) => onSubmit(data))} className="space-y-4">
+            <fieldset disabled={!canManageAnagrafica} className="min-w-0 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -2022,6 +2050,16 @@ export function EditBeneficiarioSheet({
                 />
               </div>
 
+              <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
+                <FormItem><FormLabel>{t("udsAnagrafica.fAreaOperativa")} *</FormLabel>
+                  <Select value={field.value || ""} disabled={udsContext || !isAreaOperativaGlobal} onValueChange={(value) => {
+                    field.onChange(value); form.setValue("centroAscoltoId", NONE_VALUE); form.setValue("zonaUdsId", NONE_VALUE); form.setValue("magazzinoEmporioPreferitoId", NONE_VALUE);
+                  }}><FormControl><SelectTrigger aria-label={t("udsAnagrafica.fAreaOperativa")}><SelectValue placeholder={t("udsAnagrafica.fAreaOperativa")} /></SelectTrigger></FormControl>
+                    <SelectContent className="max-h-[min(18rem,var(--radix-select-content-available-height))] max-w-[calc(100vw-2rem)]">{areaOperativaList?.filter((area) => area.attivo).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
+              )} />
+
               <FormField
                 control={form.control}
                 name="centroAscoltoId"
@@ -2034,7 +2072,7 @@ export function EditBeneficiarioSheet({
                         form.clearErrors("centroAscoltoId");
                       }}
                       value={udsContext ? String(b.centroAscoltoId ?? NONE_VALUE) : field.value || NONE_VALUE}
-                      disabled={udsContext || isCentroLocked}
+                      disabled={udsContext || isCentroLocked || formAreaOperativa == null}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -2045,7 +2083,7 @@ export function EditBeneficiarioSheet({
                         <SelectItem value={NONE_VALUE}>
                           {t("common.none")}
                         </SelectItem>
-                        {centri?.map((c) => (
+                        {centri?.filter((c) => c.attivo && c.areaOperativaId === formAreaOperativa).map((c) => (
                           <SelectItem key={c.id} value={String(c.id)}>
                             {c.nome}
                           </SelectItem>
@@ -2105,8 +2143,9 @@ export function EditBeneficiarioSheet({
                 )}
               />
 
+              </fieldset>
               {canManageCredito && (
-                <div className="rounded-md border p-3 space-y-3">
+                <fieldset disabled={territoryUnsaved} className="min-w-0 rounded-md border p-3 space-y-3">
                   <div>
                     <h4 className="text-sm font-medium">
                       {t("beneficiari.creditoSolidaleSection")}
@@ -2161,7 +2200,7 @@ export function EditBeneficiarioSheet({
                           {t("beneficiari.creditoSolidaleStato")}
                         </FormLabel>
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => { if (value) field.onChange(value); }}
                           value={field.value}
                           disabled={
                             !emporioAbilitato || !creditoSolidaleAbilitato
@@ -2263,6 +2302,18 @@ export function EditBeneficiarioSheet({
                       </FormItem>
                     )}
                   />
+                  <Button type="button" variant="outline" disabled={updateCredito.isPending || !emporioAbilitato} onClick={async () => {
+                    try {
+                      await updateCredito.mutateAsync({ beneficiarioId: b.id, data: {
+                        creditoSolidaleAbilitato: form.getValues("creditoSolidaleAbilitato"),
+                        creditoSolidaleStato: form.getValues("creditoSolidaleAbilitato") ? form.getValues("creditoSolidaleStato") : "non_abilitato",
+                        creditoSolidaleNote: form.getValues("creditoSolidaleNote") || null,
+                      } });
+                      await queryClient.invalidateQueries({ predicate: (q) => /\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0])) });
+                      toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
+                    } catch (cause) { toast({ title: t("beneficiarioDettaglio.error"), description: apiErrorMessage(cause, t("creditoSolidale.calculateError")), variant: "destructive" }); }
+                  }}>{t("creditoSolidale.saveConfiguration")}</Button>
+                  <BeneficiarioCreditoPolicy b={b} disabled={territoryUnsaved || !creditoSolidaleAbilitato || !emporioAbilitato} />
                   <CreditoSolidaleCalcoloPanel
                     beneficiarioId={b.id}
                     enabled={creditoSolidaleAbilitato && emporioAbilitato}
@@ -2272,11 +2323,11 @@ export function EditBeneficiarioSheet({
                     enabled={creditoSolidaleAbilitato}
                     emporioAbilitato={emporioAbilitato}
                   />
-                </div>
+                </fieldset>
               )}
 
-              {!udsContext && <><BeneficiarioEmporioSection key={b.id} beneficiario={b} /><BeneficiarioMensaSection beneficiario={b} compact /></>}
 
+              <fieldset disabled={!canManageAnagrafica} className="min-w-0 space-y-4">
               {udsContext ? <UdsTerritoryFields b={b} /> : <div className="rounded-md border p-3 space-y-3">
                 {!unitaStradaAbilitata && (
                   <p className="text-xs text-muted-foreground">
@@ -2308,45 +2359,6 @@ export function EditBeneficiarioSheet({
                 />
                 {watchUds && (
                   <>
-                    {isAreaOperativaGlobal && (
-                      <FormField
-                        control={form.control}
-                        name="areaOperativaId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              {t("udsAnagrafica.fAreaOperativa")}
-                            </FormLabel>
-                            <Select
-                              value={field.value || ""}
-                              onValueChange={(v) => {
-                                field.onChange(v);
-                                form.setValue("zonaUdsId", NONE_VALUE);
-                              }}
-                              disabled={!unitaStradaAbilitata}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue
-                                    placeholder={t(
-                                      "udsAnagrafica.fAreaOperativa",
-                                    )}
-                                  />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {areaOperativaList?.map((c) => (
-                                  <SelectItem key={c.id} value={String(c.id)}>
-                                    {c.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
                     <FormField
                       control={form.control}
                       name="zonaUdsId"
@@ -2383,7 +2395,8 @@ export function EditBeneficiarioSheet({
                 )}
               </div>}
 
-              <div className="pt-6 flex justify-end gap-2">
+              <div className="pt-6 flex flex-wrap justify-end gap-2">
+                {!udsContext && b.statoAnagrafica === "provvisoria" && <Button type="button" onClick={form.handleSubmit((data) => onSubmit(data, true))} disabled={updateBeneficiario.isPending}>Completa anagrafica</Button>}
                 <Button type="button" variant="outline" onClick={onClose}>
                   {t("common.cancel")}
                 </Button>
@@ -2396,8 +2409,20 @@ export function EditBeneficiarioSheet({
                   {t("common.save")}
                 </Button>
               </div>
+            </fieldset>
             </form>
           </Form>
+          {!udsContext && <div className="mt-6 space-y-4">
+            <p className="text-sm text-muted-foreground">{t("creditoSolidale.savedTerritoryHelp")}</p>
+            <BeneficiarioEmporioSection beneficiario={b} readOnly={territoryUnsaved} />
+            <BeneficiarioMensaSection beneficiario={b} readOnly={territoryUnsaved} />
+            <TesseraDocumentoSection b={b} />
+            {onReplaceTessera && <Button type="button" variant="outline" onClick={onReplaceTessera}>Sostituisci tessera</Button>}
+            {hasPermission("credito.view") && <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />}
+            {hasPermission("beneficiari.fse.view") && <BeneficiarioFseCard beneficiarioId={b.id} canManage={hasPermission("beneficiari.fse.manage")} />}
+            {hasPermission("beneficiari.sensitive.view") && <NucleoSection b={b} canManage={hasPermission("beneficiari.manage")} onChanged={() => { void queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) }); }} />}
+            {hasPermission("emporio.access.manage") && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo" && servizio?.statoEffettivo === "attivo" && <Button asChild><Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>{t("accessiEmporio.pianificaDaBeneficiario")}</Link></Button>}
+          </div>}
         </div>
       </SheetContent>
     </Sheet>

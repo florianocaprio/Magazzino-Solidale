@@ -298,6 +298,17 @@ router.post(
             .where(eq(emporioAbilitazioniTable.id, before.id))
             .returning()
         : await tx.insert(emporioAbilitazioniTable).values(values).returning();
+      // The first Emporio activation also enables Credit; never overwrite an
+      // explicit financial suspension/revocation or change balances/quotas.
+      const enableCredit = stato === "attivo" && !b.creditoSolidaleAbilitato &&
+        b.creditoSolidaleStato === "non_abilitato" && b.creditoSolidaleDataAbilitazione == null;
+      if (enableCredit) {
+        await tx.update(beneficiariTable).set({
+          creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo",
+          creditoSolidaleDataAbilitazione: new Date(),
+          versione: b.versione + 1, dataAggiornamento: new Date(),
+        }).where(eq(beneficiariTable.id, id));
+      }
       await auditEmporioTx(tx, {
         entityType: "abilitazione",
         entityId: after.id,
@@ -312,6 +323,7 @@ router.post(
           beneficiarioId: id,
           areaOperativaId: area.id,
           stato,
+          primaAbilitazioneCredito: enableCredit,
           dataEffetto: after.dataEffetto.toISOString(),
         },
       });

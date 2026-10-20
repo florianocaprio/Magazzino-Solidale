@@ -6576,6 +6576,21 @@ paths:
         '404':
           description: Persona o tessera non trovata
 
+  /beneficiari/{id}/stati-servizi:
+    get:
+      operationId: getBeneficiarioStatiServizi
+      tags: [beneficiari]
+      summary: Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Stati dei servizi nel perimetro autorizzato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiarioServiziRiepilogo' }
+        "403": { description: Beneficiario non accessibile }
+
   /beneficiari/{id}/stati-servizi-uds:
     get:
       operationId: getBeneficiarioStatiServiziUds
@@ -16095,6 +16110,10 @@ components:
       type: object
       description: Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         fascicolo:
           type: [string, "null"]
           maxLength: 255
@@ -16236,6 +16255,10 @@ components:
     BeneficiarioDettaglio:
       type: object
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         fascicolo:
           type: [string, "null"]
           maxLength: 255
@@ -17015,6 +17038,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         creditoSolidaleAbilitato: { type: boolean }
         creditoSolidaleStato:
           { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
@@ -17028,6 +17055,10 @@ components:
     CreditoSolidaleConfigurazione:
       type: object
       properties:
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
         beneficiarioId: { type: integer }
         creditoSolidaleAbilitato: { type: boolean }
         creditoSolidaleStato:
@@ -23513,6 +23544,20 @@ components:
           type:
           - string
           - 'null'
+    BeneficiarioServiziRiepilogo:
+      type: object
+      properties:
+        emporio: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+        mensa: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+        tessera: { $ref: '#/components/schemas/BeneficiarioServizioStato' }
+      required: [emporio, mensa, tessera]
+    BeneficiarioServizioStato:
+      type: object
+      properties:
+        disponibile: { type: boolean }
+        stato: { type: [string, 'null'] }
+      required: [disponibile, stato]
+
     BeneficiarioStatiServiziUds:
       type: object
       required:

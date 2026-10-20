@@ -126,6 +126,7 @@ export function TesseraDocumentoSection({
   const { t } = useTranslation();
   const { user, hasArea, hasPermission } = useAuth();
   const mutation = useGetOrCreateBeneficiarioTesseraDocumento();
+  const queryClient = useQueryClient();
   const [card, setCard] = useState<TesseraBeneficiario | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -148,6 +149,7 @@ export function TesseraDocumentoSection({
     try {
       const stored = await mutation.mutateAsync({ id: b.id });
       setCard(stored);
+      await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith(`/api/beneficiari/${b.id}/`) });
       const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
       await generateTesseraPdf({
         beneficiario: {

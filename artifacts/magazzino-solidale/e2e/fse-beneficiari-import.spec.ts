@@ -175,6 +175,7 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
     await page.request.get(`/api/beneficiari/${list[0].id}`)
   ).json();
   expect(importedDetail.fascicolo).toMatch(/^FSE-[12]-/);
+  expect(importedDetail.statoAnagrafica).toBe("completa");
   const warehouseResponse = await page.request.post("/api/magazzini", {
     data: { nome: `Bolla FSE ${suffix}`, areaOperativaId: areas[0].id },
   });
@@ -206,6 +207,95 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
     path: testInfo.outputPath("fascicolo-importato.png"),
     fullPage: true,
   });
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Modifica anagrafica", exact: true });
+  const saved = page.waitForResponse((r) => r.url().endsWith(`/api/beneficiari/${list[0].id}`) && r.request().method() === "PATCH");
+  await edit.getByRole("button", { name: "Salva", exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(edit).toHaveCount(0);
+  const afterEdit = await (await page.request.get(`/api/beneficiari/${list[0].id}`)).json();
+  expect(afterEdit).toMatchObject({ statoAnagrafica: "completa", dataNascita: importedDetail.dataNascita, sesso: importedDetail.sesso });
+});
+
+test("FSE+ accettato: Area e Centro in modifica, Emporio attiva il Credito e politica selezionabile", async ({ page }, testInfo) => {
+  await login(page);
+  const suffix = `${Date.now()}-${testInfo.project.name}`;
+  const areas: Array<{ id: number; nome: string }> = [];
+  const centres: Array<{ id: number; nome: string }> = [];
+  for (const letter of ["A", "B"]) {
+    const areaResponse = await page.request.post("/api/aree-operative", { data: { nome: `Servizi ${letter} ${suffix}` } });
+    expect(areaResponse.status()).toBe(201);
+    const area = await areaResponse.json();
+    areas.push(area);
+    const centreResponse = await page.request.post("/api/centri-ascolto", { data: { nome: `Riferimento ${letter} ${suffix}`, areaOperativaId: area.id, attivo: true } });
+    expect(centreResponse.status()).toBe(201);
+    centres.push(await centreResponse.json());
+  }
+  const policies: Array<{ id: number; nome: string }> = [];
+  for (const [index, amount] of [21, 45, 999].entries()) {
+    const response = await page.request.post("/api/politiche-credito-solidale", { data: {
+      nome: `Scelta ${index} ${suffix}`, areaOperativaId: index === 0 ? null : areas[index - 1].id,
+      creditoBaseNucleo: amount, creditoPerComponente: 0, bonusMinore: 0, bonusAnziano: 0, bonusDisabile: 0, creditoMinimoMensile: 0,
+    } });
+    expect(response.status()).toBe(201);
+    policies.push(await response.json());
+  }
+  await page.goto("/beneficiari");
+  await page.getByRole("button", { name: "Importa FSE+", exact: true }).click();
+  const imported = page.getByRole("dialog", { name: "Importa FSE+" });
+  await selectOption(page, imported.getByRole("combobox", { name: "Area Operativa FSE+" }), areas[0].nome);
+  await selectOption(page, imported.getByRole("combobox", { name: "Centro di Ascolto FSE+" }), centres[0].nome);
+  await imported.locator('input[type="file"]').setInputFiles({
+    name: "Elenco_Fascicoli_Sociali_Massivo-servizi.xlsm", mimeType: "application/vnd.ms-excel.sheet.macroEnabled.12",
+    buffer: massivoFixture({ CodiceFascicolo: `SERV-${suffix}`, CognomeReferenteNucleoFamiliare: `Servizi ${suffix}` }),
+  });
+  await imported.getByRole("button", { name: "Carica e analizza" }).click();
+  await expect(imported.getByRole("button", { name: "Importazione completa" })).toBeEnabled();
+  const importedResponse = page.waitForResponse((r) => r.url().endsWith("/api/beneficiari/fse/import") && r.request().method() === "POST");
+  await imported.getByRole("button", { name: "Importazione completa" }).click();
+  expect((await importedResponse).status()).toBe(200);
+  await imported.getByRole("button", { name: "Chiudi", exact: true }).click();
+  const list = await (await page.request.get(`/api/beneficiari?areaOperativaId=${areas[0].id}`)).json();
+  expect(list).toHaveLength(1);
+  const id = list[0].id;
+  const detail = () => page.request.get(`/api/beneficiari/${id}`).then((r) => r.json());
+  expect(await detail()).toMatchObject({ statoAnagrafica: "completa", areaOperativaId: areas[0].id, centroAscoltoId: centres[0].id });
+  await page.goto(`/beneficiari/${id}`);
+  await expect(page.getByRole("region", { name: "Stati dei servizi" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Completa anagrafica", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abilita all'Emporio", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Modifica anagrafica", exact: true });
+  const areaSelect = edit.getByRole("combobox", { name: "Area Operativa", exact: true });
+  const centreSelect = edit.getByRole("combobox", { name: "Centro di Ascolto di riferimento", exact: true });
+  await selectOption(page, areaSelect, areas[1].nome);
+  await centreSelect.click();
+  await expect(page.getByRole("option", { name: centres[0].nome, exact: true })).toHaveCount(0);
+  await page.getByRole("option", { name: centres[1].nome, exact: true }).click();
+  await selectOption(page, areaSelect, areas[0].nome);
+  await selectOption(page, centreSelect, centres[0].nome);
+  const emporio = edit.getByRole("region", { name: "Emporio Solidale", exact: true });
+  await emporio.getByRole("textbox", { name: "Motivo dell'abilitazione o della variazione" }).fill("Accettazione servizio E2E");
+  await emporio.getByRole("button", { name: "Abilita all'Emporio", exact: true }).click();
+  await expect(emporio.getByText("ATTIVO", { exact: true })).toBeVisible();
+  expect(await detail()).toMatchObject({ creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo", creditoSolidaleSaldo: 0 });
+  const policySelect = edit.getByRole("combobox", { name: "Politica per questo beneficiario", exact: true });
+  await policySelect.click();
+  await expect(page.getByRole("option", { name: new RegExp(policies[1].nome) })).toBeVisible();
+  await expect(page.getByRole("option", { name: new RegExp(policies[2].nome) })).toHaveCount(0);
+  await page.getByRole("option", { name: new RegExp(policies[0].nome) }).click();
+  await edit.getByRole("button", { name: "Applica politica", exact: true }).click();
+  await expect.poll(async () => (await detail()).politicaCreditoSolidaleId).toBe(policies[0].id);
+  const calculation = await (await page.request.get(`/api/credito-solidale/calcola-beneficiario/${id}`)).json();
+  expect(calculation).toMatchObject({ politicaId: policies[0].id, totaleSuggerito: 21 });
+  expect(await detail()).toMatchObject({ creditoSolidaleMensileAssegnato: 21, creditoSolidaleSaldo: 0 });
+  await policySelect.scrollIntoViewIfNeeded();
+  expect(await edit.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath("servizi-politica-in-modifica.png") });
+  await edit.getByRole("button", { name: "Salva", exact: true }).click();
+  await expect(edit).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Stati dei servizi" }).getByText("ATTIVO", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Abilita all'Emporio", exact: true })).toHaveCount(0);
 });
 
 test("Fascicolo facoltativo inserito manualmente e modificato nell’anagrafica", async ({

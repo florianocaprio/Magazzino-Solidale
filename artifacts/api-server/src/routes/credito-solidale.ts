@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
+import { creditoPolicyApplicable } from "../lib/creditoPolicyScope";
 import {
   rettificaCredito,
   esitoRettificaCredito,
@@ -201,9 +202,17 @@ async function requireAccessibleBeneficiario(
 
 async function findPolicyByBeneficiario(
   beneficiario: typeof beneficiariTable.$inferSelect,
+  executor: Pick<typeof db, "select"> = db,
 ): Promise<{ politica: PoliticaCalcolo; origine: PoliticaOrigine }> {
+  if (beneficiario.politicaCreditoSolidaleId != null) {
+    const [selected] = await executor.select().from(politicheCreditoSolidaleTable)
+      .where(eq(politicheCreditoSolidaleTable.id, beneficiario.politicaCreditoSolidaleId));
+    if (!selected || !creditoPolicyApplicable(selected, beneficiario))
+      throw new EmporioScopeError(409, "La politica scelta non è attiva o non è applicabile al territorio del beneficiario.");
+    return { politica: selected, origine: selected.centroAscoltoId != null ? "centro" : selected.areaOperativaId != null ? "areaOperativa" : "globale" };
+  }
   if (beneficiario.centroAscoltoId != null) {
-    const [row] = await db
+    const [row] = await executor
       .select()
       .from(politicheCreditoSolidaleTable)
       .where(
@@ -221,7 +230,7 @@ async function findPolicyByBeneficiario(
   }
 
   if (beneficiario.areaOperativaId != null) {
-    const [row] = await db
+    const [row] = await executor
       .select()
       .from(politicheCreditoSolidaleTable)
       .where(
@@ -239,7 +248,7 @@ async function findPolicyByBeneficiario(
     if (row) return { politica: row, origine: "areaOperativa" };
   }
 
-  const [globalPolicy] = await db
+  const [globalPolicy] = await executor
     .select()
     .from(politicheCreditoSolidaleTable)
     .where(
@@ -992,7 +1001,7 @@ router.patch(
       );
       const enabled =
         input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
-      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined) {
+      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined || input.politicaCreditoSolidaleId !== undefined) {
         await requireEmporioEligibilityTx(tx, existing);
         if (!existing.attivo)
           throw new EmporioScopeError(400, "Beneficiario non attivo.");
@@ -1006,7 +1015,7 @@ router.patch(
           "Associa un Centro di Ascolto prima di abilitare il Credito Solidale.",
         );
       }
-      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined) {
+      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined || input.politicaCreditoSolidaleId !== undefined) {
         const [area] = await tx
           .select()
           .from(areeOperativeTable)
@@ -1034,6 +1043,21 @@ router.patch(
       };
       if (input.creditoSolidaleNote !== undefined)
         updates.creditoSolidaleNote = input.creditoSolidaleNote;
+      if (input.politicaCreditoSolidaleId !== undefined) {
+        if (input.politicaCreditoSolidaleId != null) {
+          const [policy] = await tx.select().from(politicheCreditoSolidaleTable)
+            .where(eq(politicheCreditoSolidaleTable.id, input.politicaCreditoSolidaleId)).for("share");
+          if (!policy || !creditoPolicyApplicable(policy, existing))
+            throw new EmporioScopeError(400, "Politica non disponibile per l’Area e il Centro selezionati.");
+        }
+        updates.politicaCreditoSolidaleId = input.politicaCreditoSolidaleId;
+        if (!existing.creditoSolidaleMensileManuale && input.creditoSolidaleMensileAssegnato === undefined) {
+          const { politica } = await findPolicyByBeneficiario({ ...existing, politicaCreditoSolidaleId: input.politicaCreditoSolidaleId }, tx);
+          updates.creditoSolidaleMensileAssegnato = decimalString(calculate(existing, politica).totaleSuggerito);
+          updates.creditoSolidaleMensileManuale = false;
+          updates.creditoSolidaleDataUltimaModificaQuota = new Date();
+        }
+      }
       if (input.creditoSolidaleMensileAssegnato !== undefined) {
         const assegnato = input.creditoSolidaleMensileAssegnato;
         updates.creditoSolidaleMensileAssegnato =
@@ -1061,6 +1085,7 @@ router.patch(
         chiave: `beneficiario:${beneficiarioId}:credito-solidale`,
         azione: "configurazione-credito",
         valorePrecedente: {
+          politicaId: existing.politicaCreditoSolidaleId,
           abilitato: existing.creditoSolidaleAbilitato,
           stato: existing.creditoSolidaleStato,
           quota:
@@ -1069,6 +1094,7 @@ router.patch(
               : Number(existing.creditoSolidaleMensileAssegnato),
         },
         valoreNuovo: {
+          politicaId: updated.politicaCreditoSolidaleId,
           abilitato: updated.creditoSolidaleAbilitato,
           stato: updated.creditoSolidaleStato,
           quota:
@@ -1083,6 +1109,7 @@ router.patch(
     });
     res.json({
       beneficiarioId: row.id,
+      politicaCreditoSolidaleId: row.politicaCreditoSolidaleId ?? null,
       creditoSolidaleAbilitato: row.creditoSolidaleAbilitato,
       creditoSolidaleStato: row.creditoSolidaleStato,
       creditoSolidaleNote: row.creditoSolidaleNote ?? null,

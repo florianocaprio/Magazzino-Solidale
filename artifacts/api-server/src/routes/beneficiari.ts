@@ -419,6 +419,7 @@ function fmtBenef(
     creditoSolidaleStato: r.creditoSolidaleStato ?? "non_abilitato",
     creditoSolidaleDataAbilitazione: r.creditoSolidaleDataAbilitazione?.toISOString() ?? null,
     creditoSolidaleNote: r.creditoSolidaleNote ?? null,
+    politicaCreditoSolidaleId: r.politicaCreditoSolidaleId ?? null,
     magazzinoEmporioPreferitoId: r.magazzinoEmporioPreferitoId ?? null,
     magazzinoEmporioPreferitoNome: magazzinoEmporioPreferitoNome ?? null,
     creditoSolidaleMensileAssegnato: r.creditoSolidaleMensileAssegnato == null ? null : Number(r.creditoSolidaleMensileAssegnato),
@@ -453,7 +454,7 @@ function fmtBenefForRequest(
   }
   if (!hasPermission(req, "credito.view")) {
     for (const key of Object.keys(result)) {
-      if (key.startsWith("creditoSolidale")) delete result[key];
+      if (key.startsWith("creditoSolidale") || key === "politicaCreditoSolidaleId") delete result[key];
     }
   }
   return result;
@@ -836,6 +837,34 @@ router.post("/beneficiari/export/authorize", requirePermission("beneficiari.expo
     ip: req.ip ?? req.socket.remoteAddress ?? null,
   }).returning({ id: auditConfigurazioniTable.id });
   res.json({ autorizzato: true, auditId: audit.id });
+});
+
+// Minimal read-only service status; no card tokens, financial or social data.
+router.get("/beneficiari/:id/stati-servizi", requirePermission("beneficiari.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  const [emporioEnabled, mensaEnabled] = await Promise.all([isModuloAttivo("EMPORIO_SOLIDALE"), isModuloAttivo("MENSA")]);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.view");
+      const [person] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, id)).for("share");
+      if (!person || !canAccessBeneficiarioRecord(person, req) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
+      const [right] = emporioEnabled ? await tx.select({ stato: emporioEligibilityState() }).from(emporioAbilitazioniTable).where(and(eq(emporioAbilitazioniTable.beneficiarioId, id), eq(emporioAbilitazioniTable.areaOperativaId, person.areaOperativaId ?? -1))) : [];
+      const history = mensaEnabled ? await tx.select().from(mensaAbilitazioniTable).where(eq(mensaAbilitazioniTable.beneficiarioId, id)).orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id)) : [];
+      const cards = await tx.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, id)).orderBy(desc(tessereBeneficiariTable.id));
+      const today = dataCivileEuropeRome(new Date());
+      const card = cards.find((c) => c.stato === "attiva" && !c.dataRevoca && (!c.dataScadenza || c.dataScadenza >= today)) ?? cards[0];
+      return {
+        emporio: { disponibile: emporioEnabled, stato: emporioEnabled ? right?.stato ?? "non_abilitato" : null },
+        mensa: { disponibile: mensaEnabled, stato: mensaEnabled ? riepilogoAbilitazioneMensa(history as MensaRiepilogoHistoryRow[], today).stato : null },
+        tessera: { disponibile: true, stato: card ? (card.dataRevoca ? "revocata" : card.dataScadenza && card.dataScadenza < today ? "scaduta" : card.stato) : "non_emessa" },
+      };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
 });
 
 // Le capacità UDS aggiungono solo stati minimizzati e prima tessera/recupero.

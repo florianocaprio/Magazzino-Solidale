@@ -9243,6 +9243,13 @@ export const getBeneficiarioResponseFascicoloMax = 255;
 export const getBeneficiarioResponseVersioneFascicoloMin = 0;
 
 export const GetBeneficiarioResponse = zod.object({
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+    ),
   fascicolo: zod.string().max(getBeneficiarioResponseFascicoloMax).nullish(),
   versioneFascicolo: zod
     .number()
@@ -9560,6 +9567,13 @@ export const updateBeneficiarioResponseVersioneFascicoloMin = 0;
 
 export const UpdateBeneficiarioResponse = zod
   .object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
     fascicolo: zod
       .string()
       .max(updateBeneficiarioResponseFascicoloMax)
@@ -9666,6 +9680,13 @@ export const updateBeneficiarioStatoResponseVersioneFascicoloMin = 0;
 
 export const UpdateBeneficiarioStatoResponse = zod
   .object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
     fascicolo: zod
       .string()
       .max(updateBeneficiarioStatoResponseFascicoloMax)
@@ -15892,6 +15913,28 @@ export const GetBollaBeneficiarioConsegnaResponse = zod.object({
   consegnaDomicilio: zod.boolean(),
 });
 
+/**
+ * @summary Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+ */
+export const GetBeneficiarioStatiServiziParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBeneficiarioStatiServiziResponse = zod.object({
+  emporio: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  mensa: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  tessera: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+});
+
 export const GetBeneficiarioStatiServiziUdsParams = zod.object({
   id: zod.coerce.number().min(1),
 });
@@ -19224,6 +19267,13 @@ export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleM
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax = 99999999;
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+    ),
   creditoSolidaleAbilitato: zod.boolean().optional(),
   creditoSolidaleStato: zod
     .enum(["non_abilitato", "attivo", "sospeso", "revocato"])
@@ -19252,6 +19302,13 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneResponse =
   zod.object({
+    politicaCreditoSolidaleId: zod
+      .number()
+      .min(1)
+      .nullish()
+      .describe(
+        "Politica attiva scelta per il beneficiario, applicabile al suo Centro\/Area oppure globale; null usa la precedenza territoriale automatica.",
+      ),
     beneficiarioId: zod.number(),
     creditoSolidaleAbilitato: zod.boolean(),
     creditoSolidaleStato: zod.enum([

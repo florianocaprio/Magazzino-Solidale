@@ -87,6 +87,7 @@ import type {
   BeneficiarioFseProfile,
   BeneficiarioFseUpdate,
   BeneficiarioInput,
+  BeneficiarioServiziRiepilogo,
   BeneficiarioSimile,
   BeneficiarioStatiServiziUds,
   BeneficiarioStatoInput,
@@ -23251,6 +23252,98 @@ export function useGetBollaBeneficiarioConsegna<
     params,
     options,
   );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetBeneficiarioStatiServiziUrl = (id: number) => {
+  return `/api/beneficiari/${id}/stati-servizi`;
+};
+
+/**
+ * @summary Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+ */
+export const getBeneficiarioStatiServizi = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BeneficiarioServiziRiepilogo> => {
+  return customFetch<BeneficiarioServiziRiepilogo>(
+    getGetBeneficiarioStatiServiziUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetBeneficiarioStatiServiziQueryKey = (id: number) => {
+  return [`/api/beneficiari/${id}/stati-servizi`] as const;
+};
+
+export const getGetBeneficiarioStatiServiziQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBeneficiarioStatiServiziQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>
+  > = ({ signal }) =>
+    getBeneficiarioStatiServizi(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBeneficiarioStatiServiziQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>
+>;
+export type GetBeneficiarioStatiServiziQueryError = ErrorType<void>;
+
+/**
+ * @summary Stati minimizzati Emporio, Mensa e Tessera, senza dati finanziari né token
+ */
+
+export function useGetBeneficiarioStatiServizi<
+  TData = Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBeneficiarioStatiServizi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBeneficiarioStatiServiziQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 import { areeOperativeTable } from "./areeOperative";
 import { zoneUdsTable } from "./zoneUds";
 import { magazziniTable } from "./magazzini";
+import { politicheCreditoSolidaleTable } from "./politicheCreditoSolidale";
 
 export const beneficiariTable = pgTable("beneficiari", {
   id: serial("id").primaryKey(),
@@ -43,6 +44,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleStato: varchar("credito_solidale_stato", { length: 30 }).notNull().default("non_abilitato"),
   creditoSolidaleDataAbilitazione: timestamp("credito_solidale_data_abilitazione"),
   creditoSolidaleNote: text("credito_solidale_note"),
+  politicaCreditoSolidaleId: integer("politica_credito_solidale_id"),
   magazzinoEmporioPreferitoId: integer("magazzino_emporio_preferito_id").references(() => magazziniTable.id),
   creditoSolidaleMensileAssegnato: decimal("credito_solidale_mensile_assegnato", { precision: 10, scale: 2 }),
   creditoSolidaleMensileManuale: boolean("credito_solidale_mensile_manuale").notNull().default(false),
@@ -60,6 +62,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
 }, (table) => [
+  foreignKey({ name: "beneficiari_politica_credito_fk", columns: [table.politicaCreditoSolidaleId], foreignColumns: [politicheCreditoSolidaleTable.id] }),
   check("beneficiari_stato_anagrafica_check", sql`${table.statoAnagrafica} in ('provvisoria', 'completa')`),
   check("beneficiari_zona_richiede_area_check", sql`${table.zonaUdsId} is null or ${table.areaOperativaId} is not null`),
   check("beneficiari_zona_richiede_uds_check", sql`${table.zonaUdsId} is null or ${table.uds} = true`),

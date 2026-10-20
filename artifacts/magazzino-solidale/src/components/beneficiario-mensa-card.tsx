@@ -126,9 +126,11 @@ function errorMessage(error: unknown): string {
 export function BeneficiarioMensaSection({
   beneficiario,
   compact = false,
+  readOnly = false,
 }: {
   beneficiario: BeneficiarioMensa;
   compact?: boolean;
+  readOnly?: boolean;
 }) {
   const { hasArea, hasPermission } = useAuth();
   const { mensaAbilitato } = useModuloFlags();
@@ -140,7 +142,7 @@ export function BeneficiarioMensaSection({
   return (
     <BeneficiarioMensaCard
       beneficiario={beneficiario}
-      canManage={canViewMensa && hasPermission("mensa.eligibility.manage")}
+      canManage={!readOnly && canViewMensa && hasPermission("mensa.eligibility.manage")}
       compact={compact}
     />
   );
@@ -218,6 +220,7 @@ export function BeneficiarioMensaCard({
           await queryClient.invalidateQueries({
             queryKey: getListMensaAbilitazioniQueryKey(historyParams),
           });
+          await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith(`/api/beneficiari/${beneficiario.id}/`) });
           setDialogOpen(false);
           toast({ title: "Beneficiario abilitato alla Mensa" });
         },

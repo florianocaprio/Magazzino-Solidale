@@ -905,7 +905,7 @@ router.post(
             const mono = row.numeroComponenti === 1;
             const [created] = await tx.insert(beneficiariTable).values({
               codice: await allocateBeneficiaryCode(tx, scoped.centro.areaOperativaId),
-              statoAnagrafica: "provvisoria",
+              statoAnagrafica: "completa",
               centroAscoltoId: scoped.centro.id,
               areaOperativaId: scoped.centro.areaOperativaId,
               ...anagraficaImportValues(row),

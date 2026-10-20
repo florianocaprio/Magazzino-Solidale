@@ -485,6 +485,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     expect(beneficiary).toMatchObject({
       areaOperativaId: areaA,
       centroAscoltoId: centerA,
+      statoAnagrafica: "completa",
       sesso: "F",
       fasciaEtaPresunta: "30_64",
     });

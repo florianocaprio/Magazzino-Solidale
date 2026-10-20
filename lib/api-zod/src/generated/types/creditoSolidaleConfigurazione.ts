@@ -8,6 +8,12 @@
 import type { CreditoSolidaleConfigurazioneCreditoSolidaleStato } from "./creditoSolidaleConfigurazioneCreditoSolidaleStato";
 
 export interface CreditoSolidaleConfigurazione {
+  /**
+   * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
+   * @minimum 1
+   * @nullable
+   */
+  politicaCreditoSolidaleId?: number | null;
   beneficiarioId: number;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: CreditoSolidaleConfigurazioneCreditoSolidaleStato;
