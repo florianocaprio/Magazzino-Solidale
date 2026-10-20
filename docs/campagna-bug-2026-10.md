@@ -2722,3 +2722,59 @@ Test finali 09: corretti esclusivamente otto spec browser rimasti su flussi prec
 
 
 Prosecuzione 09: FSE/replay e suite successive hanno evidenziato ulteriori fixture/selettori precedenti alle decisioni UAT. Il rapporto finale traccia quattordici spec E2E adeguati, lasciando applicazione/API/schema invariati. Ripetizioni complete più recenti: Richieste contestuali 10 PASS, Turni/Maps 10 PASS, residui Mensa 15 PASS, sessioni UDS fra Aree 5 PASS. I cicli CI con KO non vengono dichiarati positivi; nuovo checkpoint sottoposto ai gate completi e prosecuzione delle ultime regressioni locali.
+
+## Ciclo 2 — avvio, BUG 22–26 — 20/10/2026
+
+### Continuità, base e mandato
+
+Floriano conferma il funzionamento su Hetzner del primo ciclo e richiede il primo prompt della cartella BUG 5 con ricompilazione della 8082. Attivato **soltanto `00_Avvio_Ciclo_2.txt`**: preparazione del contesto e del registro, nessuna correzione applicativa C2A/C2B/C2C iniziata. La ricompilazione locale è autorizzata direttamente dal messaggio; nessun nuovo merge o deploy produttivo autorizzato da questo incarico.
+
+- Repository: `https://github.com/florianocaprio/Magazzino-Solidale`.
+- Base effettiva: `main d9d34d72178faa56b5c75e80642e883899750dd7`, merge della PR #28; albero `7e8f4ca2d7f218dd23dcda1375dba715a6f2e1ad`, identico al candidato finale del primo ciclo `b956f9329322558d26d316631f94f3aebd0ed3f7`.
+- Branch unico nuovo: `codex/bugfix-ciclo2-ottobre-2026`, creato dalla main verificata. Il branch precedente è già integrato; nessun ritorno alla vecchia baseline `f668b7e`.
+- Candidato applicativo iniziale: la base main sopra indicata. Il checkpoint di avvio modifica soltanto questo registro; nessuna correzione dei BUG 22–26 è ancora sviluppata.
+- Primo ciclo: UAT 01–08 confermate, gate finali e merge completati. Floriano conferma ora anche la prova produttiva. Rilascio Hetzner già eseguito su `d9d34d7`: API/WEB con revision label, 63 migration applicate senza anomalie, prova di ripristino reale. Ricevuta locale `docs/BUG09-Rilascio-Hetzner-20261020.md`, documento preesistente non incluso nello staging di avvio.
+- Conservati cinque documenti locali non tracciati, incluso il rapporto Hetzner; nessuna modifica ai loro contenuti. Nessuna suite applicativa mutativa sulla 8082 o in produzione.
+
+Letti i prompt 00, C2A, C2B, C2C e LEGGIMI del pacchetto. `SPECIFICA_CICLO_2.txt`, citata dagli stessi file, non è presente né nella cartella BUG 5 né fra i file del percorso `Desktop/Magazzino/Bug`; non ricostruita come documento originale. I requisiti e i criteri dettagliati dei tre prompt consentono questo avvio senza blocco. La loro lettura non attiva lo sviluppo. Nessuna skill aggiuntiva necessaria per questa ricognizione documentale.
+
+### Decisioni e conservazione del primo ciclo
+
+| Decisione | Stato e significato |
+| --- | --- |
+| D2-01 | Confermata nel prompt 00: Tipo bisogno = Richiesta/Azione pianificata (`richiesta`/`azione`), separato da stato e tipo intervento. |
+| D2-02 | Confermata: Altro credito riusa Quota mensile assegnata con motivazione; 60 suggeriti e 80 assegnati significano 80 totali. Nessun nuovo extra, Rettifica o selettore individuale introdotto per soddisfare questo requisito. |
+| D2-03 | Confermata: una variazione effettiva rilevante del nucleo interrompe la deroga, anche se il totale calcolato resta uguale; salvataggi identici o campi estranei la conservano. Saldi e movimenti maturati invariati. |
+| D01–D04 | Conferme del primo ciclo conservate, incluse la precisazione sulle pratiche Aperte e la gestione Enti globali. Nessuna domanda riaperta. |
+
+Il codice corrente comprende il selettore individuale di politica richiesto e approvato da Floriano nel primo ciclo, successivo alla baseline studiata dal pacchetto. In avvio viene conservato. In C2B il resolver e il riuso della quota vanno valutati sul codice effettivo, senza rimuovere silenziosamente una funzione già approvata né aggiungere un secondo selettore. Conservati contesto CdA/UDS, tessera, Centro/Zona e viste UDS di sola lettura del BUG 21.
+
+### Consegne e criteri da verificare
+
+| BUG | Consegna | Stato | Criteri da soddisfare | Commit/test/UAT nuovi |
+| --- | --- | --- | --- | --- |
+| 22 | C2A — Interventi UDS | DA SVILUPPARE | BUG22-01–07: identificazione integrata, filtri opzionali/applicati, date e snapshot, paginazione, azioni di riga, scope. | Nessuno; UAT non svolta. |
+| 23 | C2A — Report operativo/PDF | DA SVILUPPARE | BUG23-01–06: incontro distinto, contenuti separati, bisogni batch, stato corrente, PDF completo, autorizzazioni storiche. | Nessuno; UAT non svolta. |
+| 24 | C2B — Attivazione Emporio/credito | DA SVILUPPARE | BUG24-01–05: comando integrato atomico, prima quota unica, quota totale motivata, ricevuta/idempotenza, permessi. | Nessuno; UAT non svolta. |
+| 25 | C2B — Ricalcolo mensile/nucleo | DA SVILUPPARE | BUG25-01–06: motore unico, cambio nucleo e writer, deroga, concorrenza, calendario/coorte, nessuna retroattività. | Nessuno; UAT non svolta. |
+| 26 | C2C — Mensa nell'Area | DA SVILUPPARE | BUG26-01–12: diritto ordinario multi-sede della stessa Area, catena scan/pasto, unicità, scope, azioni CdA e soli stati UDS. | Nessuno; UAT non svolta. |
+
+C2A, C2B e C2C sono **DA SVILUPPARE**. Nessuna modifica a contratti, generati, schema o migration in questo avvio. Un solo registro; tre consegne funzionali con UAT di Floriano. `04_TEST_Riutilizzabile.txt` e `05_MERGE_Finale.txt` restano incarichi distinti non attivati.
+
+### Ricognizione tecnica circoscritta
+
+Manifest/workflow confermano React/Vite/TypeScript, Express, PostgreSQL/Drizzle, Node 24 e pnpm 10.34.5. Workflow qualità su PR/main, nessun deploy. Canonici `scripts/quality-gates-run.mjs`, `scripts/quality-gates-plan.mjs` e `.github/workflows/quality-gates.yml`; nessun allentamento dei gate o delle guardie.
+
+Delta pertinente dalla baseline del pacchetto: UdsPersonaSheet conserva le modifiche del primo ciclo; card Emporio/Mensa e route credito comprendono abilitazione/contesto e politica individuale. Registro UDS, report giornaliero e job mensile non risultano modificati dal primo ciclo nei punti indicati: riferimenti dei prompt da confermare durante ogni sviluppo, senza presumere i nuovi BUG già risolti.
+
+8082 identificata prima della ricompilazione: progetto `magazzino-solidale`, API `magazzino-api`, WEB `magazzino-web`, PostgreSQL `magazzino-postgres` (porta host 5434). API/WEB su candidato primo ciclo `b956f93`, albero identico alla nuova main; volumi `magazzino-solidale_magazzino_pgdata` e `magazzino-solidale_magazzino_uploads`. Catena Compose recuperata dalle label effettive, senza sostituirla con il solo file base. Le ricevute della ricompilazione di avvio seguiranno qui; non rappresentano implementazione o UAT del Ciclo 2.
+
+### Ricevuta avvio e ricompilazione 8082
+
+API/WEB ricompilate da archivio Git esatto della base `d9d34d72178faa56b5c75e80642e883899750dd7`, installazione frozen prevista dai Dockerfile e build riuscite. API `magazzino-bugfix-uat-api:sha-d9d34d72178f`, ID `sha256:26508edc010c9a05fecadd8de41feda6c71ac45d96ae0a0a08359a323c81c0b9`; WEB `magazzino-bugfix-uat-web:sha-d9d34d72178f`, ID `sha256:cd0ef0bf48d6413a685dfd757ff7e86c8440af747afeb2aa85e83b355dc4163f`. Revision label e asset JS/CSS effettivamente serviti verificati. Budget iniziale **387,9/400 KiB gzip**.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-AVVIO-d9d34d72178f-2026-10-20T19-27-24-425Z`: dump DB e uploads con SHA256 e indici verificati, ripristino reale su PostgreSQL effimero isolato e replay canonico **63→63** riusciti, nessun dato modificato. Ricreati solo API/WEB sulla catena Compose effettiva; PostgreSQL conserva ID/avvio/volume, uploads conserva il volume. Confrontate **45 tabelle**, impronte identiche prima/dopo. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Nginx conserva limite upload 10 MB. Ricevuta privata `/private/tmp/ciclo2-avvio-release-result.json`.
+
+Produzione ricontrollata esclusivamente tramite metadati SSH: API/WEB con revision `d9d34d7` e immagini coincidenti con il rilascio precedente; nessuna modifica remota in questo incarico. Nessun typecheck o suite applicativa estesa rieseguiti per il solo aggiornamento documentale, come richiesto dal prompt 00; build, budget, restore e controlli di rilascio sopra sono esecuzioni reali. Nessun nuovo contratto o migration. Nessun impedimento concreto all'avvio C2A; specifica separata mancante registrata come limite documentale, senza inventarne il contenuto.
+
+**PRONTO PER C2A.** Si attende l'incarico `01_Interventi_Report_UDS.txt`; nessuna UAT o implementazione del secondo ciclo è dichiarata conclusa e nessun nuovo merge/produzione è avviato.
