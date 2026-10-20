@@ -217,7 +217,7 @@ test("C2C: abilitazione motivata dal CdA, seconda Mensa ordinaria e soli stati U
     .click();
   await expect(d.locator('[aria-invalid="true"]')).toHaveCount(1);
   await d
-    .getByLabel("Motivo dell’abilitazione o della variazione", { exact: true })
+    .getByLabel(/Motivo dell.abilitazione o della variazione/)
     .fill("Servizio nell’Area C2C");
   await d
     .getByRole("button", { name: "Conferma abilitazione", exact: true })
@@ -264,7 +264,7 @@ test("C2C: abilitazione motivata dal CdA, seconda Mensa ordinaria e soli stati U
   ).toEqual([{ mensa_id: f.canteens[1].id, eccezione_id: null }]);
   card = await openEdit();
   await card
-    .getByLabel("Motivo dell’abilitazione o della variazione", { exact: true })
+    .getByLabel(/Motivo dell.abilitazione o della variazione/)
     .fill("Sospensione dall’Area");
   await card
     .getByRole("button", { name: "Sospendi Mensa", exact: true })
