@@ -143,6 +143,12 @@ export function FseBeneficiariActions({
   const [resolutions, setResolutions] = useState<
     Record<number, BeneficiariFseImportResolution>
   >({});
+  const [confirmSelected, setConfirmSelected] = useState(false);
+  const [selectedOutcome, setSelectedOutcome] = useState<{
+    imported: number;
+    remaining: number;
+    unchanged: number;
+  } | null>(null);
   const [date, setDate] = useState(todayEuropeRome());
   const busy =
     reading ||
@@ -150,6 +156,19 @@ export function FseBeneficiariActions({
     importMutation.isPending ||
     preflightMutation.isPending ||
     exportMutation.isPending;
+  const selectedRows = (preview?.righe ?? []).filter(
+    (row) =>
+      ["nuovo", "possibile_duplicato", "da_aggiornare"].includes(
+        row.classificazione,
+      ) &&
+      !row.errori.length &&
+      resolutions[row.numeroRiga] != null &&
+      resolutions[row.numeroRiga].azione !== "salta",
+  );
+  const unchangedRows = (preview?.righe ?? []).filter(
+    (row) => row.classificazione === "invariato",
+  ).length;
+  const rowsToManage = (preview?.righe.length ?? 0) - unchangedRows;
 
   const reset = () => {
     generation.current++;
@@ -163,6 +182,8 @@ export function FseBeneficiariActions({
     setExportPreflight(null);
     setFilePayload(null);
     setResolutions({});
+    setConfirmSelected(false);
+    setSelectedOutcome(null);
     if (!lockedCentroId) setCentroId("");
   };
 
@@ -197,6 +218,8 @@ export function FseBeneficiariActions({
       setFilePayload(payload);
       setImportResult(null);
       setResolutions({});
+      setConfirmSelected(false);
+      setSelectedOutcome(null);
       const result = await previewMutation.mutateAsync({ data: payload });
       if (generation.current === current) setPreview(result);
     } catch (error) {
@@ -214,31 +237,60 @@ export function FseBeneficiariActions({
     }
   };
 
-  const confirmImport = async () => {
-    if (!filePayload) return;
-    try {
-      const result = await importMutation.mutateAsync({
-        data: {
-          ...filePayload,
-          risoluzioni: JSON.stringify([
-            ...Object.values(resolutions),
-            ...(preview?.righe ?? [])
-              .filter(
-                (row) =>
-                  row.classificazione === "invariato" &&
-                  row.beneficiarioId != null &&
-                  !resolutions[row.numeroRiga],
-              )
-              .map((row) => ({
+  const confirmImport = async (onlySelected = false) => {
+    if (
+      !filePayload ||
+      !preview ||
+      busy ||
+      (onlySelected ? !selectedRows.length : importBlocked)
+    )
+      return;
+    const selectedNumbers = new Set(selectedRows.map((row) => row.numeroRiga));
+    const decisions: BeneficiariFseImportResolution[] = onlySelected
+      ? preview.righe.map((row) =>
+          selectedNumbers.has(row.numeroRiga)
+            ? resolutions[row.numeroRiga]
+            : { numeroRiga: row.numeroRiga, azione: "salta" },
+        )
+      : [
+          ...Object.values(resolutions),
+          ...preview.righe
+            .filter(
+              (row) =>
+                row.classificazione === "invariato" &&
+                row.beneficiarioId != null &&
+                !resolutions[row.numeroRiga],
+            )
+            .map(
+              (row): BeneficiariFseImportResolution => ({
                 numeroRiga: row.numeroRiga,
                 azione: "aggiorna",
                 beneficiarioId: row.beneficiarioId,
                 versioneBeneficiario: row.versioneBeneficiario,
                 versioneFascicolo: row.versioneFascicolo,
-              })),
-          ]),
+              }),
+            ),
+        ];
+    try {
+      setInlineError("");
+      const result = await importMutation.mutateAsync({
+        data: {
+          ...filePayload,
+          risoluzioni: JSON.stringify(decisions),
         },
       });
+      const imported =
+        result.creati + result.collegati + result.aggiornati + result.invariati;
+      setSelectedOutcome(
+        onlySelected
+          ? {
+              imported,
+              remaining: Math.max(0, rowsToManage - imported),
+              unchanged: unchangedRows,
+            }
+          : null,
+      );
+      setConfirmSelected(false);
       setImportResult(result);
       onImported();
       toast({
@@ -252,6 +304,7 @@ export function FseBeneficiariActions({
         }),
       });
     } catch (error) {
+      setInlineError(apiErrorMessage(error, t("reporting.fse.importFailed")));
       toast({
         title: t("reporting.fse.import"),
         description: apiErrorMessage(error, t("reporting.fse.importFailed")),
@@ -356,15 +409,46 @@ export function FseBeneficiariActions({
         <DialogContent className="max-h-[90vh] min-w-0 max-w-3xl grid-cols-1 overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {mode === "import"
-                ? t("reporting.fse.import")
-                : t("reporting.fse.export")}
+              {confirmSelected
+                ? t("blocco07.selectedImportTitle")
+                : mode === "import"
+                  ? t("reporting.fse.import")
+                  : t("reporting.fse.export")}
             </DialogTitle>
             <DialogDescription>
-              {t("reporting.fse.scopeDescription")}
+              {t(
+                confirmSelected
+                  ? "blocco07.selectedImportHelp"
+                  : "reporting.fse.scopeDescription",
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-w-0 space-y-4">
+          {confirmSelected && (
+            <section
+              className="space-y-3 rounded-md border p-4 text-sm"
+              aria-live="polite"
+            >
+              <p>
+                {t("blocco07.selectedImportCount", {
+                  count: selectedRows.length,
+                })}
+              </p>
+              <p>
+                {t("blocco07.remainingImportCount", {
+                  count: rowsToManage - selectedRows.length,
+                })}
+              </p>
+              <p className="text-muted-foreground">
+                {t("blocco07.alreadyAlignedCount", { count: unchangedRows })}
+              </p>
+              {inlineError && (
+                <p role="alert" className="text-destructive">
+                  {inlineError}
+                </p>
+              )}
+            </section>
+          )}
+          <div hidden={confirmSelected} className="min-w-0 space-y-4">
             <Select
               value={areaId}
               disabled={lockedArea != null || busy}
@@ -507,10 +591,12 @@ export function FseBeneficiariActions({
               </>
             )}
 
-            {preview && (
+            {preview && !importResult && (
               <>
                 <div className="text-sm font-medium">
-                  {t("reporting.fse.rowsRead", { count: preview.numeroRighe })}
+                  {t("reporting.fse.rowsRead", {
+                    count: preview.numeroRighe,
+                  })}
                   {preview.formatoFile && (
                     <Badge variant="outline" className="ml-2">
                       {t(`blocco07.fileFormat.${preview.formatoFile}`)}
@@ -568,6 +654,7 @@ export function FseBeneficiariActions({
                 {preview.righe
                   .filter((row) =>
                     [
+                      "nuovo",
                       "possibile_duplicato",
                       "da_aggiornare",
                       "conflitto",
@@ -578,6 +665,7 @@ export function FseBeneficiariActions({
                       resolutions[row.numeroRiga]?.azione === "salta";
                     const duplicate =
                       row.classificazione === "possibile_duplicato";
+                    const isNew = row.classificazione === "nuovo";
                     const incoming = (field: string) =>
                       row.confronto?.find((item) => item.campo === field)
                         ?.importato ?? "";
@@ -599,7 +687,8 @@ export function FseBeneficiariActions({
                           {incoming("nome")} {incoming("cognome")} ·{" "}
                           {row.codiceFascicolo}
                         </p>
-                        {row.confronto &&
+                        {!isNew &&
+                          row.confronto &&
                           (!duplicate || !row.duplicati?.length) && (
                             <FseBeneficiariComparison
                               fields={row.confronto}
@@ -681,10 +770,14 @@ export function FseBeneficiariActions({
                           </div>
                         ))}
                         <p className="text-xs text-muted-foreground">
-                          {t("blocco07.mergeHelp")}
+                          {t(
+                            isNew
+                              ? "blocco07.newImportSelectionHelp"
+                              : "blocco07.mergeHelp",
+                          )}
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {duplicate && (
+                          {(duplicate || isNew) && (
                             <Button
                               type="button"
                               size="sm"
@@ -711,6 +804,7 @@ export function FseBeneficiariActions({
                             </Button>
                           )}
                           {!duplicate &&
+                            !isNew &&
                             row.classificazione !== "conflitto" && (
                               <Button
                                 type="button"
@@ -775,6 +869,31 @@ export function FseBeneficiariActions({
 
             {importResult && (
               <div className="space-y-2 rounded border p-3 text-sm">
+                {selectedOutcome && (
+                  <div
+                    role="status"
+                    className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950"
+                  >
+                    <p>
+                      {t("blocco07.selectedImportedCount", {
+                        count: selectedOutcome.imported,
+                      })}
+                    </p>
+                    <p>
+                      {t("blocco07.remainingImportCount", {
+                        count: selectedOutcome.remaining,
+                      })}
+                    </p>
+                    <p>
+                      {t("blocco07.alreadyAlignedCount", {
+                        count: selectedOutcome.unchanged,
+                      })}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {t("blocco07.selectedImportHelp")}
+                    </p>
+                  </div>
+                )}
                 <div className="font-medium">
                   {t("reporting.fse.importResult", {
                     batchId: importResult.batchId,
@@ -790,16 +909,21 @@ export function FseBeneficiariActions({
                     errori: importResult.errori,
                   })}
                 </div>
-                <p>
-                  {t("blocco07.skippedRows", {
-                    count: importResult.saltati ?? 0,
-                  })}
-                </p>
+                {!selectedOutcome && (
+                  <p>
+                    {t("blocco07.skippedRows", {
+                      count: importResult.saltati ?? 0,
+                    })}
+                  </p>
+                )}
                 {importResult.dettagli
                   .filter((detail) => detail.errori.length)
                   .map((detail) => (
                     <div key={detail.numeroRiga} className="text-destructive">
-                      {t("reporting.fse.row", { number: detail.numeroRiga })} ·{" "}
+                      {t("reporting.fse.row", {
+                        number: detail.numeroRiga,
+                      })}{" "}
+                      ·{" "}
                       {detail.codiceFascicolo ?? t("reporting.fse.missingCode")}
                       : {detail.errori.join(", ")}
                     </div>
@@ -831,19 +955,50 @@ export function FseBeneficiariActions({
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={busy} onClick={reset}>
-              {importResult
-                ? t("reporting.fse.close")
-                : t("reporting.fse.cancel")}
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={
+                confirmSelected ? () => setConfirmSelected(false) : reset
+              }
+            >
+              {confirmSelected
+                ? t("blocco07.backToSelection")
+                : importResult
+                  ? t("reporting.fse.close")
+                  : t("reporting.fse.cancel")}
             </Button>
-            {mode === "import" && !importResult && (
-              <Button
-                onClick={() => void confirmImport()}
-                disabled={importBlocked || busy}
-              >
-                {t("reporting.fse.confirmImport")}
-              </Button>
-            )}
+            {mode === "import" &&
+              !importResult &&
+              (confirmSelected ? (
+                <Button
+                  onClick={() => void confirmImport(true)}
+                  disabled={!selectedRows.length || busy}
+                >
+                  {t("blocco07.importSelected")}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setInlineError("");
+                      setConfirmSelected(true);
+                    }}
+                    disabled={
+                      !preview || !filePayload || !selectedRows.length || busy
+                    }
+                  >
+                    {t("blocco07.importSelected")}
+                  </Button>
+                  <Button
+                    onClick={() => void confirmImport()}
+                    disabled={importBlocked || busy}
+                  >
+                    {t("blocco07.importComplete")}
+                  </Button>
+                </>
+              ))}
             {mode === "export" && !exportPreflight && (
               <Button
                 onClick={() => void preflight()}

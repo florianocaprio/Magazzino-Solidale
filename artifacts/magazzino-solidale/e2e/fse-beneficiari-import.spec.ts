@@ -136,12 +136,12 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
   expect(response.status()).toBe(200);
   expect((await response.json()).numeroRighe).toBe(2);
   await expect(
-    dialog.getByRole("button", { name: "Conferma importazione" }),
+    dialog.getByRole("button", { name: "Importazione completa" }),
   ).toBeEnabled();
   // Changing Area invalidates the previous preview and forces a new centre choice.
   await selectOption(page, areaSelect, areas[1].nome);
   await expect(
-    dialog.getByRole("button", { name: "Conferma importazione" }),
+    dialog.getByRole("button", { name: "Importazione completa" }),
   ).toBeDisabled();
   await expect(
     dialog.getByRole("button", { name: "Carica e analizza" }),
@@ -150,14 +150,14 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
   await selectOption(page, centreSelect, centres[0].nome);
   await dialog.getByRole("button", { name: "Carica e analizza" }).click();
   await expect(
-    dialog.getByRole("button", { name: "Conferma importazione" }),
+    dialog.getByRole("button", { name: "Importazione completa" }),
   ).toBeEnabled();
   const imported = page.waitForResponse(
     (r) =>
       r.url().endsWith("/api/beneficiari/fse/import") &&
       r.request().method() === "POST",
   );
-  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  await dialog.getByRole("button", { name: "Importazione completa" }).click();
   const result = await imported;
   expect(result.status()).toBe(200);
   expect({
@@ -340,7 +340,7 @@ test("confronta il beneficiario registrato con il file e distingue collega, salt
     first.getByText("Non presente nel file", { exact: true }),
   ).toHaveCount(0);
   await expect(
-    dialog.getByRole("button", { name: "Conferma importazione" }),
+    dialog.getByRole("button", { name: "Importazione completa" }),
   ).toBeDisabled();
   expect(
     await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -365,7 +365,7 @@ test("confronta il beneficiario registrato con il file e distingue collega, salt
       r.url().endsWith("/api/beneficiari/fse/import") &&
       r.request().method() === "POST",
   );
-  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  await dialog.getByRole("button", { name: "Importazione completa" }).click();
   const response = await imported;
   expect(response.status()).toBe(200);
   expect(await response.json()).toMatchObject({
@@ -391,6 +391,75 @@ test("confronta il beneficiario registrato con il file e distingue collega, salt
     )
   ).json();
   expect(list).toHaveLength(2);
+});
+
+test("importa solo i selezionati dopo il riepilogo e riprende le righe restanti con lo stesso file", async ({ page }, testInfo) => {
+  await login(page);
+  const suffix = `selected-${Date.now()}-${testInfo.project.name}`;
+  const areaResponse = await page.request.post("/api/aree-operative", { data: { nome: `Selezionati ${suffix}` } });
+  expect(areaResponse.status()).toBe(201);
+  const area = await areaResponse.json();
+  const centreResponse = await page.request.post("/api/centri-ascolto", { data: { nome: `Centro ${suffix}`, areaOperativaId: area.id, attivo: true } });
+  expect(centreResponse.status()).toBe(201);
+  const centre = await centreResponse.json();
+  const book = XLSX.read(workbook(suffix));
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets.Table1, { header: 1 });
+  rows[2][0] = "Altra persona";
+  book.Sheets.Table1 = XLSX.utils.aoa_to_sheet(rows);
+  const buffer = Buffer.from(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
+  await page.goto("/beneficiari");
+  const open = async () => {
+    await page.getByRole("button", { name: "Importa FSE+", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Importa FSE+", exact: true });
+    await selectOption(page, dialog.getByRole("combobox", { name: "Area Operativa FSE+" }), area.nome);
+    await selectOption(page, dialog.getByRole("combobox", { name: "Centro di Ascolto FSE+" }), centre.nome);
+    await dialog.getByLabel("File FSE+", { exact: true }).setInputFiles({ name: "ElencoFascicoliSociali-selezionati.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer });
+    await dialog.getByRole("button", { name: "Carica e analizza" }).click();
+    return dialog;
+  };
+  let dialog = await open();
+  await expect(dialog.locator('[data-fse-review-row="2"]')).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Importa solo selezionati", exact: true })).toBeDisabled();
+  await dialog.locator('[data-fse-review-row="2"]').getByRole("button", { name: "Crea nuovo", exact: true }).click();
+  await dialog.getByRole("button", { name: "Importa solo selezionati", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "Conferma importazione selezionati", exact: true });
+  await expect(confirmation.getByText("Anagrafiche da importare: 1", { exact: true })).toBeVisible();
+  await expect(confirmation.getByText("Restano da gestire: 1", { exact: true })).toBeVisible();
+  await expect(confirmation.getByText("Già allineate: 0", { exact: true })).toBeVisible();
+  expect(await confirmation.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+  const listUrl = `/api/beneficiari?areaOperativaId=${area.id}&centroAscoltoId=${centre.id}`;
+  expect(await (await page.request.get(listUrl)).json()).toHaveLength(0);
+  await page.screenshot({ path: testInfo.outputPath("importa-selezionati-riepilogo.png"), fullPage: true });
+  await confirmation.getByRole("button", { name: "Torna alla selezione", exact: true }).click();
+  await expect(dialog.locator('[data-fse-review-row="2"]').getByRole("button", { name: "Crea nuovo", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await dialog.getByRole("button", { name: "Importa solo selezionati", exact: true }).click();
+  const firstImport = page.waitForResponse((r) => r.url().endsWith("/api/beneficiari/fse/import") && r.request().method() === "POST");
+  await confirmation.getByRole("button", { name: "Importa solo selezionati", exact: true }).click();
+  expect(await (await firstImport).json()).toMatchObject({ creati: 1, saltati: 1, errori: 0, conflitti: 0 });
+  dialog = page.getByRole("dialog", { name: "Importa FSE+", exact: true });
+  await expect(dialog.getByText("Anagrafiche importate: 1", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Restano da gestire: 1", { exact: true })).toBeVisible();
+  const firstList = await (await page.request.get(listUrl)).json();
+  expect(firstList).toHaveLength(1);
+  const existing = await (await page.request.get(`/api/beneficiari/${firstList[0].id}`)).json();
+  await dialog.getByRole("button", { name: "Chiudi", exact: true }).click();
+  dialog = await open();
+  await expect(dialog.locator('[data-fse-review-row="2"]')).toHaveCount(0);
+  await expect(dialog.locator('[data-fse-review-row="3"]')).toBeVisible();
+  await dialog.locator('[data-fse-review-row="3"]').getByRole("button", { name: "Crea nuovo", exact: true }).click();
+  await dialog.getByRole("button", { name: "Importa solo selezionati", exact: true }).click();
+  await expect(confirmation.getByText("Anagrafiche da importare: 1", { exact: true })).toBeVisible();
+  await expect(confirmation.getByText("Restano da gestire: 0", { exact: true })).toBeVisible();
+  await expect(confirmation.getByText("Già allineate: 1", { exact: true })).toBeVisible();
+  const secondImport = page.waitForResponse((r) => r.url().endsWith("/api/beneficiari/fse/import") && r.request().method() === "POST");
+  await confirmation.getByRole("button", { name: "Importa solo selezionati", exact: true }).click();
+  expect(await (await secondImport).json()).toMatchObject({ creati: 1, aggiornati: 0, saltati: 1, errori: 0, conflitti: 0 });
+  dialog = page.getByRole("dialog", { name: "Importa FSE+", exact: true });
+  await expect(dialog.getByText("Restano da gestire: 0", { exact: true })).toBeVisible();
+  expect(await (await page.request.get(listUrl)).json()).toHaveLength(2);
+  const unchanged = await (await page.request.get(`/api/beneficiari/${existing.id}`)).json();
+  expect(unchanged.versione).toBe(existing.versione);
+  expect(unchanged.versioneFascicolo).toBe(existing.versioneFascicolo);
 });
 
 test("Massivo XLSM: propone solo differenze, aggiorna l’anagrafica e non ripropone righe identiche", async ({
@@ -470,7 +539,7 @@ test("Massivo XLSM: propone solo differenze, aggiorna l’anagrafica e non ripro
     review.getByRole("button", { name: "Aggiorna anagrafica", exact: true }),
   ).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Conferma importazione" }),
+    dialog.getByRole("button", { name: "Importazione completa" }),
   ).toBeDisabled();
   await review
     .getByRole("button", { name: "Aggiorna anagrafica", exact: true })
@@ -490,7 +559,7 @@ test("Massivo XLSM: propone solo differenze, aggiorna l’anagrafica e non ripro
       r.url().endsWith("/api/beneficiari/fse/import") &&
       r.request().method() === "POST",
   );
-  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  await dialog.getByRole("button", { name: "Importazione completa" }).click();
   expect(await (await imported).json()).toMatchObject({
     aggiornati: 1,
     creati: 0,
@@ -514,7 +583,7 @@ test("Massivo XLSM: propone solo differenze, aggiorna l’anagrafica e non ripro
       r.url().endsWith("/api/beneficiari/fse/import") &&
       r.request().method() === "POST",
   );
-  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  await dialog.getByRole("button", { name: "Importazione completa" }).click();
   expect(await (await replay).json()).toMatchObject({
     invariati: 1,
     aggiornati: 0,

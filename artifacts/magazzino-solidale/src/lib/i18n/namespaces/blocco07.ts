@@ -21,6 +21,18 @@ export const blocco07 = {
     updateExisting: "Aggiorna anagrafica",
     skipRow: "Salta questa riga",
     skippedRows: "Righe saltate: {{count}}",
+    importComplete: "Importazione completa",
+    importSelected: "Importa solo selezionati",
+    selectedImportTitle: "Conferma importazione selezionati",
+    selectedImportHelp:
+      "Le righe non selezionate o saltate restano disponibili: ricarica il file per gestirle. Le righe già allineate non richiedono un nuovo import.",
+    selectedImportCount: "Anagrafiche da importare: {{count}}",
+    remainingImportCount: "Restano da gestire: {{count}}",
+    alreadyAlignedCount: "Già allineate: {{count}}",
+    selectedImportedCount: "Anagrafiche importate: {{count}}",
+    backToSelection: "Torna alla selezione",
+    newImportSelectionHelp:
+      "Seleziona Crea nuovo per includere questa anagrafica nell’importazione dei selezionati. L’importazione completa include tutte le nuove anagrafiche non saltate.",
     mergeHelp:
       "Conferma per aggiornare i dati locali mostrati. I valori assenti dal file vengono conservati. I totali del nucleo per età vengono aggiornati; i singoli componenti già registrati restano invariati.",
     comparisonFields: {
@@ -138,6 +150,18 @@ export const blocco07 = {
     updateExisting: "Update personal record",
     skipRow: "Skip this row",
     skippedRows: "Skipped rows: {{count}}",
+    importComplete: "Complete import",
+    importSelected: "Import selected only",
+    selectedImportTitle: "Confirm selected import",
+    selectedImportHelp:
+      "Unselected or skipped rows remain available: upload the file again to review them. Already aligned rows do not need another import.",
+    selectedImportCount: "Records to import: {{count}}",
+    remainingImportCount: "Remaining to review: {{count}}",
+    alreadyAlignedCount: "Already aligned: {{count}}",
+    selectedImportedCount: "Records imported: {{count}}",
+    backToSelection: "Back to selection",
+    newImportSelectionHelp:
+      "Select Create new to include this record in the selected import. Complete import includes all new records that have not been skipped.",
     mergeHelp:
       "Confirm to update the local values shown. Values missing from the file are preserved. Household age totals are updated; existing individual members are kept.",
     comparisonFields: {
@@ -255,6 +279,18 @@ export const blocco07 = {
     updateExisting: "Actualizar ficha",
     skipRow: "Omitir esta fila",
     skippedRows: "Filas omitidas: {{count}}",
+    importComplete: "Importación completa",
+    importSelected: "Importar solo seleccionados",
+    selectedImportTitle: "Confirmar importación seleccionada",
+    selectedImportHelp:
+      "Las filas no seleccionadas u omitidas siguen disponibles: vuelve a cargar el archivo para revisarlas. Las filas ya coincidentes no necesitan otra importación.",
+    selectedImportCount: "Fichas por importar: {{count}}",
+    remainingImportCount: "Pendientes de revisar: {{count}}",
+    alreadyAlignedCount: "Ya coincidentes: {{count}}",
+    selectedImportedCount: "Fichas importadas: {{count}}",
+    backToSelection: "Volver a la selección",
+    newImportSelectionHelp:
+      "Selecciona Crear nuevo para incluir esta ficha en la importación seleccionada. La importación completa incluye todas las fichas nuevas no omitidas.",
     mergeHelp:
       "Confirma para actualizar los valores locales mostrados. Los datos ausentes se conservan. Se actualizan los totales por edad y se mantienen los miembros individuales registrados.",
     comparisonFields: {
@@ -372,6 +408,18 @@ export const blocco07 = {
     updateExisting: "Actualiser la fiche",
     skipRow: "Ignorer cette ligne",
     skippedRows: "Lignes ignorées : {{count}}",
+    importComplete: "Importation complète",
+    importSelected: "Importer uniquement la sélection",
+    selectedImportTitle: "Confirmer l’importation sélectionnée",
+    selectedImportHelp:
+      "Les lignes non sélectionnées ou ignorées restent disponibles : rechargez le fichier pour les examiner. Les lignes déjà identiques ne nécessitent pas de nouvelle importation.",
+    selectedImportCount: "Fiches à importer : {{count}}",
+    remainingImportCount: "Restant à examiner : {{count}}",
+    alreadyAlignedCount: "Déjà identiques : {{count}}",
+    selectedImportedCount: "Fiches importées : {{count}}",
+    backToSelection: "Retour à la sélection",
+    newImportSelectionHelp:
+      "Sélectionnez Créer un nouveau pour inclure cette fiche dans l’importation sélectionnée. L’importation complète inclut toutes les nouvelles fiches non ignorées.",
     mergeHelp:
       "Confirmez pour actualiser les valeurs locales affichées. Les données absentes sont conservées. Les totaux par âge sont actualisés ; les membres individuels restent inchangés.",
     comparisonFields: {
@@ -488,6 +536,18 @@ export const blocco07 = {
     updateExisting: "Stammdaten aktualisieren",
     skipRow: "Diese Zeile überspringen",
     skippedRows: "Übersprungene Zeilen: {{count}}",
+    importComplete: "Vollständiger Import",
+    importSelected: "Nur ausgewählte importieren",
+    selectedImportTitle: "Ausgewählten Import bestätigen",
+    selectedImportHelp:
+      "Nicht ausgewählte oder übersprungene Zeilen bleiben verfügbar: Laden Sie die Datei erneut zur Prüfung hoch. Bereits übereinstimmende Zeilen müssen nicht erneut importiert werden.",
+    selectedImportCount: "Zu importierende Datensätze: {{count}}",
+    remainingImportCount: "Noch zu prüfen: {{count}}",
+    alreadyAlignedCount: "Bereits übereinstimmend: {{count}}",
+    selectedImportedCount: "Importierte Datensätze: {{count}}",
+    backToSelection: "Zurück zur Auswahl",
+    newImportSelectionHelp:
+      "Wählen Sie Neu erstellen, um diesen Datensatz in den ausgewählten Import aufzunehmen. Der vollständige Import umfasst alle nicht übersprungenen neuen Datensätze.",
     mergeHelp:
       "Die Bestätigung aktualisiert die gezeigten lokalen Werte. Fehlende Angaben bleiben erhalten. Haushaltssummen nach Alter werden aktualisiert; einzelne Mitglieder bleiben unverändert.",
     comparisonFields: {
@@ -605,6 +665,18 @@ export const blocco07 = {
     updateExisting: "تحديث البيانات الشخصية",
     skipRow: "تخطي هذا السطر",
     skippedRows: "الأسطر المتخطاة: {{count}}",
+    importComplete: "استيراد كامل",
+    importSelected: "استيراد المحدد فقط",
+    selectedImportTitle: "تأكيد استيراد المحدد",
+    selectedImportHelp:
+      "تبقى الصفوف غير المحددة أو المتخطاة متاحة: أعد تحميل الملف لمراجعتها. لا تحتاج الصفوف المتطابقة إلى استيراد آخر.",
+    selectedImportCount: "السجلات المطلوب استيرادها: {{count}}",
+    remainingImportCount: "المتبقي للمراجعة: {{count}}",
+    alreadyAlignedCount: "متطابقة بالفعل: {{count}}",
+    selectedImportedCount: "السجلات المستوردة: {{count}}",
+    backToSelection: "العودة إلى التحديد",
+    newImportSelectionHelp:
+      "اختر إنشاء جديد لتضمين هذا السجل في الاستيراد المحدد. يشمل الاستيراد الكامل جميع السجلات الجديدة التي لم يتم تخطيها.",
     mergeHelp:
       "أكد تحديث القيم المحلية المعروضة. تُحفظ القيم غير الموجودة في الملف. يتم تحديث إجماليات الأسرة حسب العمر مع إبقاء الأفراد المسجلين دون تغيير.",
     comparisonFields: {

@@ -814,6 +814,42 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     expect((await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)))[0]).toEqual(before);
   });
 
+  it("importa solo le risoluzioni selezionate e riprende le righe restanti senza cambiare quelle già allineate", async () => {
+    const [area] = await db.insert(areeOperativeTable).values({ nome: `Selezionati ${suffix}` }).returning(); areaIds.push(area.id);
+    const [selectedCentre] = await db.insert(centriAscoltoTable).values({ nome: `Selezionati ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(selectedCentre.id);
+    const selectedApp = app({ areaOperativaId: area.id });
+    const codes = [1, 2, 3].map((n) => `SELECTED-${suffix}-${n}`);
+    const initial = row(codes[0], { "Nome Referente fascicolo": "Azzurra", "Cognome Referente fascicolo": "Boschi" });
+    expect((await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, [initial])).status).toBe(200);
+    const rows = [{ ...initial, "Numero componenti fascicolo": 2, Donne: 2, "Età 30-64": 2 }, row(codes[1], { "Nome Referente fascicolo": "Teresa", "Cognome Referente fascicolo": "Landi" }), row(codes[2], { "Nome Referente fascicolo": "Sergio", "Cognome Referente fascicolo": "Galli" })];
+    const before = await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows);
+    expect(before.body.righe.map((r: { classificazione: string }) => r.classificazione)).toEqual(["da_aggiornare", "nuovo", "nuovo"]);
+    const target = before.body.righe[0];
+    const partial = await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, rows, { risoluzioni: [
+      { numeroRiga: 2, azione: "aggiorna", beneficiarioId: target.beneficiarioId, versioneBeneficiario: target.versioneBeneficiario, versioneFascicolo: target.versioneFascicolo },
+      { numeroRiga: 3, azione: "crea" },
+      { numeroRiga: 4, azione: "salta" },
+    ] });
+    expect(partial.status).toBe(200);
+    expect(partial.body).toMatchObject({ aggiornati: 1, creati: 1, saltati: 1, conflitti: 0, errori: 0 });
+    expect(await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes[2].toLowerCase()))).toHaveLength(0);
+    const profiles = await db.select().from(fseFascicoliSocialiTable).where(inArray(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes.slice(0, 2).map((c) => c.toLowerCase()))).orderBy(fseFascicoliSocialiTable.id);
+    const ids = profiles.map((p) => p.beneficiarioId);
+    const beneficiaries = await db.select().from(beneficiariTable).where(inArray(beneficiariTable.id, ids)).orderBy(beneficiariTable.id);
+    const snapshots = await db.select().from(fseFascicoliSocialiSnapshotTable).where(inArray(fseFascicoliSocialiSnapshotTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiSnapshotTable.id);
+    expect(beneficiaries.find((b) => b.id === target.beneficiarioId)?.numComponenti).toBe(2);
+    const resumed = await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows);
+    expect(resumed.body.righe.map((r: { classificazione: string }) => r.classificazione)).toEqual(["invariato", "invariato", "nuovo"]);
+    const final = await upload(selectedApp, "/beneficiari/fse/import", selectedCentre.id, rows, { risoluzioni: [
+      { numeroRiga: 2, azione: "salta" }, { numeroRiga: 3, azione: "salta" }, { numeroRiga: 4, azione: "crea" },
+    ] });
+    expect(final.body).toMatchObject({ creati: 1, aggiornati: 0, saltati: 2, conflitti: 0, errori: 0 });
+    expect(await db.select().from(beneficiariTable).where(inArray(beneficiariTable.id, ids)).orderBy(beneficiariTable.id)).toEqual(beneficiaries);
+    expect(await db.select().from(fseFascicoliSocialiTable).where(inArray(fseFascicoliSocialiTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiTable.id)).toEqual(profiles);
+    expect(await db.select().from(fseFascicoliSocialiSnapshotTable).where(inArray(fseFascicoliSocialiSnapshotTable.beneficiarioId, ids)).orderBy(fseFascicoliSocialiSnapshotTable.id)).toEqual(snapshots);
+    expect((await upload(selectedApp, "/beneficiari/fse/preview", selectedCentre.id, rows)).body.conteggi.invariato).toBe(3);
+  });
+
   it("aggiorna esplicitamente nascita, codice fiscale e riepilogo per età dal Massivo; conserva i componenti e nasconde il replay invariato", async () => {
     const target = await insertBeneficiary({ nome: "Persona", cognome: "Massiva", numComponenti: 1 });
     const buffer = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}` });
