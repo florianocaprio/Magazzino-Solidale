@@ -28,7 +28,7 @@ describe("M3B — ingresso UI Importa file FSE+", () => {
     expect(wizardSource).toContain("analyzeFsePracticeImport");
     expect(wizardSource).toContain("useAddFseImportToPractice");
     expect(wizardSource).toContain("practiceVersion: practice.versione");
-    expect(wizardSource).toContain("{step > 0 && (");
+    expect(wizardSource).toContain("{step > 0 && step < 3 && (");
     expect(wizardSource).not.toContain("step > 0 && step < 2");
     expect(wizardSource).toContain('"DA_COMPLETARE", "IN_PRATICA"');
     expect(wizardSource).not.toContain("useRegistraCaricoPratica");

@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { ProducerLotLookup } from "@/components/producer-lot-lookup";
 import i18nInstance from "@/lib/i18n";
 import { registerBlocco05 } from "@/lib/i18n/namespaces/blocco05";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -6,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetCaricoPraticaQueryKey,
   getListCaricoPraticheQueryKey,
-  getListLottiQueryKey,
   getListLottiLogiciQueryKey,
   useAddCaricoPraticaRiga,
   useCancelCaricoPratica,
@@ -17,7 +18,6 @@ import {
   useListAreeOperative,
   useListCaricoPratiche,
   useListLottiLogici,
-  useListLotti,
   useListFornitori,
   useListMagazzini,
   useListProdotti,
@@ -83,11 +83,7 @@ import {
 } from "@/hooks/use-unsaved-changes-guard";
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/api-error";
-import {
-  scannedPhysicalLotDraft,
-  suggestedPhysicalLotDraft,
-  suggestedPhysicalLots,
-} from "@/lib/carico-lotti";
+import { scannedPhysicalLotDraft } from "@/lib/carico-lotti";
 import {
   blocksCaricoDraftSave,
   caricoDraftFromRow,
@@ -224,6 +220,7 @@ function CarichiContent() {
   const [productPanelOpen, setProductPanelOpen] = useState(false);
   const [panelFocusReleased, setPanelFocusReleased] = useState(true);
   const [addedProductName, setAddedProductName] = useState("");
+  const [importedRowIds, setImportedRowIds] = useState<Set<number>>(new Set());
   const [rowToReveal, setRowToReveal] = useState<{
     practiceId: number;
     rowId: number;
@@ -263,16 +260,6 @@ function CarichiContent() {
   const { data: warehouses = [] } = useListMagazzini();
   const { data: products = [] } = useListProdotti();
   const { data: suppliers = [] } = useListFornitori();
-  const knownLotsParams = {
-    magazzinoId: header.magazzinoId ? Number(header.magazzinoId) : undefined,
-    includeEsauriti: true,
-  };
-  const { data: knownLots = [] } = useListLotti(knownLotsParams, {
-    query: {
-      enabled: Boolean(header.magazzinoId),
-      queryKey: getListLottiQueryKey(knownLotsParams),
-    },
-  });
   const selectedAreaId = header.areaOperativaId
     ? Number(header.areaOperativaId)
     : null;
@@ -742,6 +729,7 @@ function CarichiContent() {
           prodottoId: row.prodottoId,
           fondoOrigine: draft.fondoOrigine,
           quantita: draft.quantita ? normalizeUiQuantity(draft.quantita) : null,
+          lottoProduttoreId: draft.lottoProduttoreId ?? null,
           codiceLottoProduttore: draft.codiceLottoProduttore.trim() || null,
           dataScadenza: draft.dataScadenza || null,
           fattoreKgLtPezzo: draft.fattoreKgLtPezzo
@@ -1706,7 +1694,11 @@ function CarichiContent() {
                 <div
                   key={row.id}
                   data-testid={`carico-row-${row.id}`}
-                  className="grid min-w-0 gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-4"
+                  className={cn(
+                    "grid min-w-0 gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-4",
+                    importedRowIds.has(row.id) &&
+                      "border-teal-400 bg-teal-50/40 dark:bg-teal-950/20",
+                  )}
                 >
                   <div className="flex items-start gap-2">
                     <Checkbox
@@ -1881,6 +1873,7 @@ function CarichiContent() {
                             [row.id]: {
                               ...draft,
                               codiceLottoProduttore: event.target.value,
+                              lottoProduttoreId: null,
                             },
                           }));
                         }}
@@ -1891,49 +1884,28 @@ function CarichiContent() {
                         onScan={(value) =>
                           setRowDrafts((current) => ({
                             ...current,
-                            [row.id]: scannedPhysicalLotDraft(draft, value),
+                            [row.id]: {
+                              ...scannedPhysicalLotDraft(draft, value),
+                              lottoProduttoreId: null,
+                            },
                           }))
                         }
                       />
                     </div>
-                    {suggestedPhysicalLots(
-                      knownLots,
-                      row.prodottoId,
-                      practice.magazzinoId,
-                    ).length > 0 && (
-                      <Select
-                        onValueChange={(id) => {
-                          const lot = knownLots.find(
-                            (entry) => entry.id === Number(id),
-                          );
-                          if (!lot) return;
+                    {canEditManual && (
+                      <ProducerLotLookup
+                        key={`${practice.areaOperativaId}:${row.prodottoId}:${row.id}`}
+                        areaId={practice.areaOperativaId}
+                        productId={row.prodottoId}
+                        draft={draft}
+                        disabled={pending}
+                        onSelect={(next) =>
                           setRowDrafts((current) => ({
                             ...current,
-                            [row.id]: suggestedPhysicalLotDraft(draft, lot),
-                          }));
-                        }}
-                      >
-                        <SelectTrigger
-                          aria-label={t("uxCaricoLotti.suggestedLots")}
-                        >
-                          <SelectValue
-                            placeholder={t("uxCaricoLotti.suggestedLots")}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suggestedPhysicalLots(
-                            knownLots,
-                            row.prodottoId,
-                            practice.magazzinoId,
-                          ).map((lot) => (
-                            <SelectItem key={lot.id} value={String(lot.id)}>
-                              {lot.codiceLotto} · {lot.dataScadenza ?? "—"} ·{" "}
-                              {lot.lottoLogicoDescrizione ?? "—"} ·{" "}
-                              {lot.fondoOrigine} · {lot.fornitoreNome ?? "—"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            [row.id]: next,
+                          }))
+                        }
+                      />
                     )}
                     {fieldError("codiceLottoProduttore") && (
                       <p
@@ -2445,6 +2417,18 @@ function CarichiContent() {
           practice={practice}
           products={products}
           onPracticeReady={(practiceId) => {
+            const before = new Set(practice.righe.map((row) => row.id));
+            void detailQuery
+              .refetch()
+              .then((result) =>
+                setImportedRowIds(
+                  new Set(
+                    result.data?.righe
+                      .filter((row) => !before.has(row.id))
+                      .map((row) => row.id) ?? [],
+                  ),
+                ),
+              );
             setSelectedId(practiceId);
             void queryClient.invalidateQueries({
               queryKey: ["/api/carico-pratiche"],

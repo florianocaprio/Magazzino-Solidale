@@ -732,6 +732,7 @@ export default function Prodotti() {
                     </TableCell>
                     <TableCell>
                       <ProductLotRequirementLabel
+                        fsePlus={prodotto.fsePlus}
                         name={prodotto.nome}
                         description={prodotto.descrizione}
                         lotRequired={prodotto.lottoFisicoObbligatorio}

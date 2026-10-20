@@ -786,7 +786,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <Sidebar
           side={
-            location.startsWith("/report") && i18n.dir() === "rtl"
+            (location.startsWith("/report") ||
+              location.startsWith("/carico-merce")) &&
+            i18n.dir() === "rtl"
               ? "right"
               : "left"
           }

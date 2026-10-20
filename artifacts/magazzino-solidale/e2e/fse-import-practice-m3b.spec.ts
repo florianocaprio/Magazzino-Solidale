@@ -361,6 +361,12 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       page.getByText(/Le giacenze non cambiano finché non registri la merce/),
     ).toBeVisible();
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
+    await expect(
+      page.getByText(
+        "Righe selezionate aggiunte alla pratica. Controlla i prodotti e premi Conferma carico a magazzino per aggiornare le giacenze.",
+      ),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Torna alla pratica" }).click();
     expect(await readStock(page)).toBe(before);
 
     const baseURL = new URL(page.url()).origin;
@@ -651,6 +657,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
     expect((await retryAttach).status()).toBe(200);
+    await page.getByRole("button", { name: "Torna alla pratica" }).click();
     expect(attachPayloads).toHaveLength(2);
     expect(attachPayloads[1]).toEqual(attachPayloads[0]);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -672,6 +679,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
     expect((await secondAttach).status()).toBe(201);
+    await page.getByRole("button", { name: "Torna alla pratica" }).click();
     expect(attachPayloads).toHaveLength(3);
     expect(attachPayloads[2].idempotencyKey).not.toBe(
       attachPayloads[0].idempotencyKey,
@@ -829,6 +837,12 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
     expect((await balanceAttach).status()).toBe(201);
+    await expect(
+      page.getByText(
+        "Righe selezionate aggiunte alla pratica. Controlla i prodotti e premi Conferma carico a magazzino per aggiornare le giacenze.",
+      ),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Torna alla pratica" }).click();
 
     const detailResponse = await page.request.get(
       `/api/carico-pratiche/${practice.id}`,
@@ -1001,6 +1015,7 @@ test.describe("M3B — viewport tablet", () => {
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
+    await page.getByRole("button", { name: "Torna alla pratica" }).click();
     await page.getByRole("checkbox").check();
     const register = page.getByRole("button", {
       name: /conferma carico a magazzino/i,
@@ -1010,4 +1025,155 @@ test.describe("M3B — viewport tablet", () => {
     await expect(register).toBeEnabled();
     await assertViewportSafe(page);
   });
+});
+
+test("BUG18 — Saldo sintetico con due file, esito esplicito e stock solo alla conferma", async ({
+  page,
+}, testInfo) => {
+  await login(page);
+  const suffix = `${Date.now()}-${testInfo.project.name}`;
+  const base = await ensureContext(page, Date.now());
+  const warehouseResponse = await page.request.post("/api/magazzini", {
+    data: { nome: `Saldo BUG18 ${suffix}`, areaOperativaId: base.area.id },
+  });
+  expect(warehouseResponse.status()).toBe(201);
+  const warehouse = (await warehouseResponse.json()) as Warehouse;
+  const context = { ...base, warehouse };
+  const source = await createSource(page, base.area, suffix);
+  const productResponse = await page.request.post("/api/prodotti", {
+    data: {
+      nome: `Prodotto Saldo BUG18 ${suffix}`,
+      tipoProdotto: "alimentare",
+      unitaMisura: "pz",
+      lottoFisicoObbligatorio: true,
+      gestioneScadenza: false,
+      fsePlus: true,
+    },
+  });
+  expect(productResponse.status()).toBe(201);
+  const product = (await productResponse.json()) as Product;
+  const description = `Pratica Saldo BUG18 ${suffix}`;
+  const practice = await createPractice(page, context, description);
+  const stockBook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    stockBook,
+    XLSX.utils.aoa_to_sheet([
+      [
+        "Denominazione OpN",
+        "Denominazione OpC",
+        "Denominazione OpT",
+        "CodiceAccesso",
+        "Fondo",
+        "Prodotto",
+        "Lotto",
+        "PesoUnita",
+        "UnitaMisuraPeso",
+        "GiacenzaPesoVolume",
+        "GiacenzaPezzi",
+        "PezziPerCollo",
+        "GiacenzaColli",
+        "CheckModificaGiacenza",
+        "Scadenza",
+      ],
+      [
+        "OpN sintetico",
+        "OpC sintetico",
+        "OpT sintetico",
+        "sintetico",
+        "Fondo Nazionale",
+        product.nome,
+        "006544",
+        null,
+        null,
+        null,
+        10,
+        null,
+        0,
+        false,
+        null,
+      ],
+    ]),
+    "Giacenze sintetiche",
+  );
+  await page.goto("/carico-merce");
+  await openPractice(page, base.area, description);
+  await page.getByRole("button", { name: "Importa file FSE+" }).click();
+  await selectOption(
+    page,
+    page.getByRole("combobox", { name: "Scopo dell'importazione" }),
+    "Imposta giacenza iniziale",
+  );
+  await selectOption(
+    page,
+    page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+    source.descrizione,
+  );
+  await page
+    .getByLabel(/Registro FSE\+/)
+    .setInputFiles({
+      name: "Registro sintetico.xlsx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: registryFixture(product.nome, `DOC-SALDO-${suffix}`),
+    });
+  await page
+    .getByLabel(/Giacenze FSE\+/)
+    .setInputFiles({
+      name: "Giacenze sintetiche.xlsx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from(
+        XLSX.write(stockBook, { type: "buffer", bookType: "xlsx" }),
+      ),
+    });
+  await page.getByLabel("Data di riferimento").fill("2026-09-17");
+  await expect(
+    page.getByRole("button", { name: "Carica e analizza" }),
+  ).toBeDisabled();
+  await page
+    .getByText(/Confermo che il Registro copre lo storico necessario/)
+    .click();
+  await page.getByRole("button", { name: "Carica e analizza" }).click();
+  const mapping = page.getByRole("combobox", {
+    name: `Associa a un prodotto esistente: ${product.nome}`,
+  });
+  await selectOption(page, mapping, `${product.codice} — ${product.nome}`);
+  await page.getByRole("button", { name: "Associa", exact: true }).click();
+  await page.getByRole("button", { name: "Vai al riepilogo" }).click();
+  await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
+  await expect(
+    page.getByText(
+      "Righe selezionate aggiunte alla pratica. Controlla i prodotti e premi Conferma carico a magazzino per aggiornare le giacenze.",
+    ),
+  ).toBeVisible();
+  const stockUrl = `/api/giacenze?areaOperativaId=${base.area.id}&magazzinoId=${warehouse.id}`;
+  expect(await (await page.request.get(stockUrl)).json()).toHaveLength(0);
+  await page.getByRole("button", { name: "Torna alla pratica" }).click();
+  await expect(page.getByTestId(/^carico-row-/)).toHaveCount(1);
+  await page
+    .getByTestId(/^carico-row-/)
+    .getByRole("checkbox")
+    .check();
+  await page
+    .getByRole("button", { name: /conferma carico a magazzino/i })
+    .click();
+  const registered = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/carico-pratiche/${practice.id}/registra`) &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: /conferma carico$/i })
+    .click();
+  expect((await registered).status()).toBe(201);
+  const stock = (await (await page.request.get(stockUrl)).json()) as Stock[];
+  expect(stock.reduce((sum, row) => sum + row.giacenzaFisica, 0)).toBe(10);
+  const masters = await (
+    await page.request.get(
+      `/api/lotti-produttore?areaOperativaId=${base.area.id}&prodottoId=${product.id}`,
+    )
+  ).json();
+  expect(masters.items).toHaveLength(1);
+  expect(masters.items[0].origine).toBe("IMPORTATO");
 });

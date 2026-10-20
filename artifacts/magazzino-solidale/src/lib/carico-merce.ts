@@ -5,6 +5,7 @@ import type {
 } from "@workspace/api-client-react";
 
 export type CaricoRowDraft = {
+  lottoProduttoreId?: number | null;
   quantita: string;
   fondoOrigine:
     | "NESSUN_FONDO"
@@ -134,6 +135,7 @@ export function reconcileCaricoDrafts(
 
 export function caricoDraftFromRow(row: CaricoPraticaRiga): CaricoRowDraft {
   return {
+    lottoProduttoreId: row.lottoProduttoreId ?? null,
     quantita: row.quantita?.toString() ?? "",
     fondoOrigine: row.fondoOrigine,
     codiceLottoProduttore: row.codiceLottoProduttore ?? "",
@@ -172,6 +174,7 @@ function normalizeComparableQuantity(value: string): string {
 
 function comparableRowDraft(draft: CaricoRowDraft): CaricoRowDraft {
   return {
+    lottoProduttoreId: draft.lottoProduttoreId ?? null,
     quantita: normalizeComparableQuantity(draft.quantita),
     fondoOrigine: draft.fondoOrigine,
     codiceLottoProduttore: draft.codiceLottoProduttore.trim(),

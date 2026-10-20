@@ -1,3 +1,6 @@
+import { registerBlocco07 } from "@/lib/i18n/namespaces/blocco07";
+import i18n from "@/lib/i18n";
+registerBlocco07(i18n);
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -129,6 +132,16 @@ export function FseImportPracticeWizard({
     canManageMappings && Boolean(user?.isAdmin || user?.isSuperAdmin);
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
   const [step, setStep] = useState(0);
+  const [inlineError, setInlineError] = useState("");
+  const [addedPracticeId, setAddedPracticeId] = useState<number | null>(null);
+  const acquiredRegistry = useRef<{
+    file: File;
+    context: string;
+    sessionId: number;
+  } | null>(null);
+  const registryInput = useRef<HTMLInputElement>(null),
+    stockInput = useRef<HTMLInputElement>(null);
+  const createdProducts = useRef<Record<string, number>>({});
   const [mode, setMode] = useState<FseImportMode>("NUOVI_CARICHI");
   const [sourceId, setSourceId] = useState("");
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -177,6 +190,12 @@ export function FseImportPracticeWizard({
   const createProduct = useCreateProdotto();
   const reviseRow = useReviseFseImportRow();
   const detail = detailQuery.data;
+  const registryAcquired = detail?.files?.find(
+    (file) => file.profilo === "REGISTRO",
+  );
+  const stockAcquired = detail?.files?.find(
+    (file) => file.profilo === "GIACENZE",
+  );
   const pending =
     busy ||
     createSource.isPending ||
@@ -198,8 +217,22 @@ export function FseImportPracticeWizard({
         initialize,
       ),
     );
+    if (initialize) {
+      if (!busy)
+        setReferenceDate(
+          detail.dataRiferimentoSaldo ??
+            detail.files?.find((file) => file.profilo === "GIACENZE")
+              ?.dataRiferimento ??
+            "",
+        );
+      if (
+        detail.modalita === "SALDO_INIZIALE" &&
+        !detail.files?.some((file) => file.profilo === "GIACENZE")
+      )
+        setStep(0);
+    }
     selectedSession.current = detail.id;
-  }, [detail]);
+  }, [detail, busy]);
 
   useEffect(() => {
     if (!sourceId && sourcesQuery.data?.length === 1)
@@ -220,16 +253,51 @@ export function FseImportPracticeWizard({
     [detail],
   );
 
-  const showError = (error: unknown) =>
+  const showError = (error: unknown) => {
+    setInlineError(errorMessage(error, t("caricoPratiche.error")));
     toast({
       title: t("caricoPratiche.fseError"),
       description: errorMessage(error, t("caricoPratiche.error")),
       variant: "destructive",
     });
+  };
+
+  const disabledReason = !sourceId
+    ? t("blocco07.missingSource")
+    : !registryFile && !registryAcquired
+      ? t("blocco07.missingRegistry")
+      : mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired
+        ? t("blocco07.missingStock")
+        : mode === "SALDO_INIZIALE" && !referenceDate
+          ? t("blocco07.missingDate")
+          : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
+            ? t("blocco07.missingCoverage")
+            : "";
+  const chooseFile = (file: File | null, registry: boolean) => {
+    if (
+      file &&
+      (file.size > 10 * 1024 * 1024 || !/\.(xlsx|xls|csv)$/i.test(file.name))
+    ) {
+      setInlineError(t("blocco07.formats"));
+      return;
+    }
+    setInlineError("");
+    if (registry) {
+      setRegistryFile(file);
+      acquiredRegistry.current = null;
+      setSessionId(null);
+    } else setStockFile(file);
+  };
 
   const upload = async () => {
-    if (!registryFile || !sourceId) return;
-    if (mode === "SALDO_INIZIALE" && (!stockFile || !referenceDate)) return;
+    if ((!registryFile && !registryAcquired) || disabledReason || pending)
+      return;
+    setInlineError("");
+    if (
+      mode === "SALDO_INIZIALE" &&
+      ((!stockFile && !stockAcquired) || !referenceDate)
+    )
+      return;
     setBusy(true);
     try {
       const base = {
@@ -240,12 +308,34 @@ export function FseImportPracticeWizard({
         caricoPraticaId: practice.id,
         modalita: mode,
       } as const;
-      const registry = await analyzeFsePracticeImport(registryFile, {
-        ...base,
-        profilo: "REGISTRO",
-        nomeFile: registryFile.name,
-      });
-      let acquiredSessionId = registry.sessionId;
+      const context = JSON.stringify(base);
+      let acquiredSessionId =
+        acquiredRegistry.current?.file === registryFile &&
+        acquiredRegistry.current.context === context
+          ? acquiredRegistry.current.sessionId
+          : registryAcquired &&
+              detail?.sourceRegistryId === Number(sourceId) &&
+              detail.modalita === mode
+            ? detail.id
+            : null;
+      if (acquiredSessionId == null && registryFile) {
+        const registry = await analyzeFsePracticeImport(registryFile, {
+          ...base,
+          profilo: "REGISTRO",
+          nomeFile: registryFile.name,
+        });
+        acquiredSessionId = registry.sessionId;
+        acquiredRegistry.current = {
+          file: registryFile,
+          context,
+          sessionId: acquiredSessionId,
+        };
+        setSessionId(acquiredSessionId);
+        await queryClient.invalidateQueries({
+          queryKey: ["/api/fse-importazioni/sessioni"],
+        });
+      }
+      if (acquiredSessionId == null) return;
       if (stockFile) {
         const stock = await analyzeFsePracticeImport(stockFile, {
           ...base,
@@ -258,6 +348,10 @@ export function FseImportPracticeWizard({
         acquiredSessionId = stock.sessionId;
       }
       setSessionId(acquiredSessionId);
+      // Registry can already be cached while Stock is still being acquired.
+      await queryClient.invalidateQueries({
+        queryKey: getGetFseImportSessionQueryKey(acquiredSessionId),
+      });
       setStep(1);
       await queryClient.invalidateQueries({
         queryKey: ["/api/fse-importazioni/sessioni"],
@@ -306,26 +400,35 @@ export function FseImportPracticeWizard({
       });
       await detailQuery.refetch();
       attachIntent.current = null;
+      return true;
     } catch (error) {
       showError(error);
+      return false;
     }
   };
 
   const createAndMapProduct = async () => {
     if (!newProductFor || !newProduct.name.trim()) return;
     try {
-      const created = await createProduct.mutateAsync({
-        data: {
-          nome: newProduct.name.trim(),
-          tipoProdotto: "alimentare",
-          unitaMisura: newProduct.unit,
-          codiceBarre: newProduct.barcode.trim() || undefined,
-          quantitaFrazionabile: newProduct.fractional,
-          lottoFisicoObbligatorio: newProduct.physicalLot,
-          gestioneScadenza: newProduct.expiry,
-          fsePlus: true,
-        },
-      });
+      const created = createdProducts.current[`${detail?.id}:${newProductFor}`]
+        ? { id: createdProducts.current[`${detail?.id}:${newProductFor}`] }
+        : await createProduct.mutateAsync({
+            data: {
+              nome: newProduct.name.trim(),
+              tipoProdotto: "alimentare",
+              unitaMisura: newProduct.unit,
+              codiceBarre: newProduct.barcode.trim() || undefined,
+              quantitaFrazionabile: newProduct.fractional,
+              lottoFisicoObbligatorio: newProduct.physicalLot,
+              gestioneScadenza: newProduct.expiry,
+              fsePlus: true,
+            },
+          });
+      createdProducts.current[`${detail?.id}:${newProductFor}`] = created.id;
+      setMappingProduct((current) => ({
+        ...current,
+        [newProductFor]: String(created.id),
+      }));
       await queryClient.invalidateQueries({ queryKey: ["/api/prodotti"] });
       await confirmMapping(newProductFor, created.id);
       setNewProductFor(null);
@@ -396,8 +499,9 @@ export function FseImportPracticeWizard({
         }),
         description: t("caricoPratiche.fseNoStockChange"),
       });
-      onOpenChange(false);
-      onPracticeReady(result.practiceId);
+      setAddedPracticeId(result.practiceId);
+      setInlineError("");
+      setStep(3);
     } catch (error) {
       if (!retainFseAttachIntentAfterError(error)) attachIntent.current = null;
       showError(error);
@@ -406,6 +510,9 @@ export function FseImportPracticeWizard({
 
   const reset = () => {
     setStep(0);
+    setInlineError("");
+    setAddedPracticeId(null);
+    acquiredRegistry.current = null;
     setSessionId(null);
     setRegistryFile(null);
     setStockFile(null);
@@ -423,6 +530,8 @@ export function FseImportPracticeWizard({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (pending) return;
+        if (!next && addedPracticeId != null) onPracticeReady(addedPracticeId);
         onOpenChange(next);
         if (!next) reset();
       }}
@@ -435,15 +544,48 @@ export function FseImportPracticeWizard({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[70vh] pr-4">
+        <nav
+          aria-label={t("caricoPratiche.fseImport")}
+          className="flex flex-wrap gap-2 text-sm"
+        >
+          {["stepFiles", "stepMap", "stepSummary", "stepAdded"].map(
+            (key, index) => (
+              <span
+                key={key}
+                aria-current={step === index ? "step" : undefined}
+                className={
+                  step === index
+                    ? "font-semibold text-primary"
+                    : "text-muted-foreground"
+                }
+              >
+                {index + 1}. {t(`blocco07.${key}`)}
+              </span>
+            ),
+          )}
+        </nav>
+        {inlineError && (
+          <p
+            role="alert"
+            className="rounded-md border border-destructive p-3 text-sm text-destructive"
+          >
+            {inlineError}
+          </p>
+        )}
+        <ScrollArea className="max-h-[60vh] pr-4">
           {step === 0 && (
             <div className="space-y-5">
+              <h3 className="font-semibold">{t("blocco07.source")}</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t("caricoPratiche.fseMode")}</Label>
                   <Select
                     value={mode}
-                    onValueChange={(value) => setMode(value as FseImportMode)}
+                    onValueChange={(value) => {
+                      setMode(value as FseImportMode);
+                      acquiredRegistry.current = null;
+                      setSessionId(null);
+                    }}
                   >
                     <SelectTrigger aria-label={t("caricoPratiche.fseMode")}>
                       <SelectValue />
@@ -462,7 +604,14 @@ export function FseImportPracticeWizard({
                 </div>
                 <div className="space-y-2">
                   <Label>{t("caricoPratiche.fseSource")}</Label>
-                  <Select value={sourceId} onValueChange={setSourceId}>
+                  <Select
+                    value={sourceId}
+                    onValueChange={(value) => {
+                      setSourceId(value);
+                      acquiredRegistry.current = null;
+                      setSessionId(null);
+                    }}
+                  >
                     <SelectTrigger aria-label={t("caricoPratiche.fseSource")}>
                       <SelectValue
                         placeholder={t("caricoPratiche.fseSelectSource")}
@@ -507,19 +656,48 @@ export function FseImportPracticeWizard({
                 </div>
               )}
 
+              <div className="border-t pt-4">
+                <h3 className="font-semibold">{t("blocco07.files")}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {t("blocco07.formats")}
+                </p>
+              </div>
+              {(acquiredRegistry.current || registryAcquired) && (
+                <p role="status" className="text-sm text-teal-700">
+                  {t("blocco07.registryAcquired")} · #
+                  {acquiredRegistry.current?.sessionId ?? sessionId}
+                </p>
+              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="fse-registry-file">
                     {t("caricoPratiche.fseRegistryFile")}
                   </Label>
                   <Input
+                    ref={registryInput}
+                    className="sr-only"
                     id="fse-registry-file"
                     type="file"
                     accept=".xlsx,.xls,.csv"
                     onChange={(event) =>
-                      setRegistryFile(event.target.files?.[0] ?? null)
+                      chooseFile(event.target.files?.[0] ?? null, true)
                     }
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-auto whitespace-normal text-left"
+                    disabled={pending}
+                    onClick={() => registryInput.current?.click()}
+                  >
+                    {t("blocco07.registryPicker")}
+                  </Button>
+                  <p className="text-sm break-all">
+                    {registryFile?.name ?? registryAcquired?.nomeFile}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("blocco07.registryHelp")}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="fse-stock-file">
@@ -528,13 +706,30 @@ export function FseImportPracticeWizard({
                     })}
                   </Label>
                   <Input
+                    ref={stockInput}
+                    className="sr-only"
                     id="fse-stock-file"
                     type="file"
                     accept=".xlsx,.xls,.csv"
                     onChange={(event) =>
-                      setStockFile(event.target.files?.[0] ?? null)
+                      chooseFile(event.target.files?.[0] ?? null, false)
                     }
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-auto whitespace-normal text-left"
+                    disabled={pending}
+                    onClick={() => stockInput.current?.click()}
+                  >
+                    {t("blocco07.stockPicker")}
+                  </Button>
+                  <p className="text-sm break-all">
+                    {stockFile?.name ?? stockAcquired?.nomeFile}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("blocco07.stockHelp")}
+                  </p>
                 </div>
               </div>
               {(mode === "SALDO_INIZIALE" || stockFile) && (
@@ -671,6 +866,14 @@ export function FseImportPracticeWizard({
                     {canManageProducts && (
                       <Button
                         variant="outline"
+                        disabled={
+                          pending ||
+                          Boolean(
+                            createdProducts.current[
+                              `${detail?.id}:${description}`
+                            ],
+                          )
+                        }
                         onClick={() => setNewProductFor(description)}
                       >
                         <PackagePlus className="mr-2 h-4 w-4" />
@@ -678,6 +881,13 @@ export function FseImportPracticeWizard({
                       </Button>
                     )}
                   </div>
+                  {createdProducts.current[`${detail?.id}:${description}`] && (
+                    <p role="status" className="md:col-span-3">
+                      {t("caricoPratiche.fseSelectProduct")}: #
+                      {createdProducts.current[`${detail?.id}:${description}`]}{" "}
+                      · {newProduct.name}
+                    </p>
+                  )}
                   {newProductFor === description && (
                     <div className="grid gap-2 rounded bg-muted/40 p-3 md:grid-cols-3">
                       <Input
@@ -967,6 +1177,14 @@ export function FseImportPracticeWizard({
             </div>
           )}
 
+          {step === 3 && (
+            <div
+              role="status"
+              className="rounded-md border border-teal-300 bg-teal-50 p-5 text-teal-950 dark:bg-teal-950/30 dark:text-teal-100"
+            >
+              {t("blocco07.added")}
+            </div>
+          )}
           {step === 2 && detail && (
             <div className="space-y-4 text-center">
               <FileSpreadsheet className="mx-auto h-12 w-12 text-primary" />
@@ -990,8 +1208,24 @@ export function FseImportPracticeWizard({
           )}
         </ScrollArea>
 
+        {step === 0 && disabledReason && (
+          <p id="fse-disabled-reason" className="text-sm text-muted-foreground">
+            {disabledReason}
+          </p>
+        )}
         <DialogFooter>
-          {step > 0 && (
+          {step === 3 && (
+            <Button
+              onClick={() => {
+                if (addedPracticeId != null) onPracticeReady(addedPracticeId);
+                onOpenChange(false);
+                reset();
+              }}
+            >
+              {t("blocco07.backToPractice")}
+            </Button>
+          )}
+          {step > 0 && step < 3 && (
             <Button
               variant="outline"
               onClick={() => setStep(step - 1)}
@@ -1003,12 +1237,8 @@ export function FseImportPracticeWizard({
           {step === 0 && (
             <Button
               onClick={() => void upload()}
-              disabled={
-                pending ||
-                !sourceId ||
-                !registryFile ||
-                (mode === "SALDO_INIZIALE" && (!stockFile || !referenceDate))
-              }
+              aria-describedby="fse-disabled-reason"
+              disabled={pending || Boolean(disabledReason)}
             >
               {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("caricoPratiche.fseAnalyze")}

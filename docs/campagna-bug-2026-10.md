@@ -2508,8 +2508,8 @@ Orval ufficiale, senza modifiche manuali ai generati.
 
 ### Interfaccia 07
 
-Candidato locale in verifica: questa parte verrà inclusa nel checkpoint 07,
-dopo le prove browser. Nessuna installazione intermedia del solo backend.
+Interfaccia validata sul backend del checkpoint 06 `410419d`. La consegna
+completa 07 viene installata sulla 8082 soltanto dopo i controlli seguenti.
 
 Carico Merce → Lotti fisici: preregistrazione senza quantità/fondo/magazzino,
 ricerca e filtro delle tre origini, scheda con metadati e saldi territoriali,
@@ -2549,5 +2549,96 @@ rigenerazione ufficiale ripetuta: 986 file generati identici. I quattro document
 locali preesistenti conservano gli SHA-256 iniziali e restano fuori dal commit.
 
 UI: 789 test PASS in 122 file. Build e budget PASS, 386,7/400 KiB gzip.
-Browser e ricevuta Docker della consegna completa 07 ancora da aggiungere.
+Browser canonico su DB temporanei: **32 PASS + 28 SKIP**, quattro spec.
+Carico/lotti 10/0, pratiche M3A 2/8, FSE M3B 10/20, nuova preregistrazione
+10/0. Gli SKIP sono la matrice preesistente dei flussi mutativi e il caso con
+Excel originali non forniti al runner; nessun nuovo skip/timeout/retry.
+Il Saldo sintetico aggiunto gira invece su tutti i cinque viewport, senza file
+esterni: acquisisce Registro/Giacenze, aggiunge una riga con stock zero,
+registra 10 pezzi soltanto alla conferma e verifica origine IMPORTATO.
+
+Il nuovo browser verifica le sei lingue su mobile/tablet/desktop, preregistra
+senza partite, filtra l'origine e salva sulla pratica un diverso ID scelto dal
+lookup. Corretto il contenimento dei campi con nomi lunghi. La barra laterale
+araba nella sola pagina Carico Merce ora usa la stessa scelta destra/sinistra
+già impiegata dai report; restano invariati menu, ruoli e permessi. Screenshot
+sintetici ispezionati in privato, esclusi da Git.
+
+Aggiornamento sessione esplicito dopo il secondo file per evitare dati del
+Registro ancora in cache durante l'acquisizione di Giacenze; la data scelta
+non viene cancellata mentre l'acquisizione è in corso. I tre test DOM coprono
+anche retry del solo file fallito e ripresa Saldo da sessione conservata.
+
+Evidenze browser: `/private/tmp/blocco0607-browser` (prime due spec),
+`/private/tmp/blocco0607-browser-final` (FSE e nuova anagrafica). UI definitiva:
+789 PASS/122 file; typecheck PASS; build e budget 386,7/400 KiB gzip. Gate e
+asserzioni non indeboliti. La ricevuta Docker segue dopo backup/restore.
 Nessun test funzionale sul DB personale; nessun merge/main/produzione.
+
+
+### Elenco file della consegna 06–07
+
+- `artifacts/api-server/src/lib/ageaImportService.ts`
+- `artifacts/api-server/src/lib/areas.ts`
+- `artifacts/api-server/src/lib/inventoryLedger.ts`
+- `artifacts/api-server/src/lib/producerLots.ts`
+- `artifacts/api-server/src/routes/approvvigionamenti.ts`
+- `artifacts/api-server/src/routes/carico-pratiche.ts`
+- `artifacts/api-server/src/routes/index.ts`
+- `artifacts/api-server/src/routes/lotti-produttore.ts`
+- `artifacts/api-server/src/routes/lotti.ts`
+- `artifacts/api-server/src/routes/trasferimenti.ts`
+- `artifacts/api-server/tests/agea-import.test.ts`
+- `artifacts/api-server/tests/carichi-magazzino-2-0a.test.ts`
+- `artifacts/api-server/tests/carico-pratiche-m3a.test.ts`
+- `artifacts/api-server/tests/db-lotti-produttore-migration.test.ts`
+- `artifacts/api-server/tests/fse-import-practice-m3b.test.ts`
+- `artifacts/api-server/tests/helpers.ts`
+- `artifacts/api-server/tests/lotti-produttore.test.ts`
+- `artifacts/api-server/tests/m2-catalogo-lotti-logici.test.ts`
+- `artifacts/api-server/tests/mensa.test.ts`
+- `artifacts/api-server/tests/scope-helpers.ts`
+- `artifacts/magazzino-solidale/e2e/fse-import-practice-m3b.spec.ts`
+- `artifacts/magazzino-solidale/e2e/lotti-produttore.spec.ts`
+- `artifacts/magazzino-solidale/src/components/carico-merce-tabs.test.tsx`
+- `artifacts/magazzino-solidale/src/components/carico-merce-tabs.tsx`
+- `artifacts/magazzino-solidale/src/components/fse-import-practice-wizard-interactions.test.tsx`
+- `artifacts/magazzino-solidale/src/components/fse-import-practice-wizard.test.tsx`
+- `artifacts/magazzino-solidale/src/components/fse-import-practice-wizard.tsx`
+- `artifacts/magazzino-solidale/src/components/layout.tsx`
+- `artifacts/magazzino-solidale/src/components/lotti-produttore-panel.tsx`
+- `artifacts/magazzino-solidale/src/components/producer-lot-lookup.tsx`
+- `artifacts/magazzino-solidale/src/components/producer-lot-origin-badge.tsx`
+- `artifacts/magazzino-solidale/src/components/product-lot-requirement-label.test.tsx`
+- `artifacts/magazzino-solidale/src/components/product-lot-requirement-label.tsx`
+- `artifacts/magazzino-solidale/src/lib/carico-merce.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/blocco07.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/prodotti.ts`
+- `artifacts/magazzino-solidale/src/pages/carico-merce.tsx`
+- `artifacts/magazzino-solidale/src/pages/prodotti.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/caricoMagazzinoRigaInput.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaRiga.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaRigaInput.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/listLottiProduttore200.ts`
+- `lib/api-zod/src/generated/types/listLottiProduttoreOrigine.ts`
+- `lib/api-zod/src/generated/types/listLottiProduttoreParams.ts`
+- `lib/api-zod/src/generated/types/lotto.ts`
+- `lib/api-zod/src/generated/types/lottoInput.ts`
+- `lib/api-zod/src/generated/types/lottoOrigineAnagrafica.ts`
+- `lib/api-zod/src/generated/types/lottoProduttore.ts`
+- `lib/api-zod/src/generated/types/lottoProduttoreInput.ts`
+- `lib/api-zod/src/generated/types/lottoProduttoreOrigine.ts`
+- `lib/api-zod/src/generated/types/lottoProduttorePartita.ts`
+- `lib/api-zod/src/generated/types/lottoProduttorePreregisResult.ts`
+- `lib/api-zod/src/generated/types/lottoProduttoreStatoPartite.ts`
+- `lib/db/src/schema/caricoPratiche.ts`
+- `lib/db/src/schema/index.ts`
+- `lib/db/src/schema/lotti.ts`
+- `lib/db/src/schema/lottiProduttore.ts`
+- `lib/db/updates/20261020_lotti_produttore.sql`

@@ -6,12 +6,14 @@ const requiredTextClass = "text-blue-700 dark:text-blue-300";
 type ProductLotRequirementLabelProps = {
   name: string;
   lotRequired: boolean;
+  fsePlus?: boolean;
   description?: string | null;
 };
 
 export function ProductLotRequirementLabel({
   name,
   lotRequired,
+  fsePlus = false,
   description,
 }: ProductLotRequirementLabelProps) {
   const { t } = useTranslation();
@@ -27,6 +29,11 @@ export function ProductLotRequirementLabel({
         >
           {name}
         </span>
+        {fsePlus && (
+          <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md border border-purple-300 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-300">
+            FSE+
+          </span>
+        )}
         {lotRequired && (
           <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300">
             {t("uxCaricoLotti.lotRequired")}
