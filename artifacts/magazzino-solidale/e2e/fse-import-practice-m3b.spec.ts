@@ -452,6 +452,9 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await page
       .getByRole("button", { name: "Crea prodotto", exact: true })
       .click();
+    await expect(page.getByPlaceholder("Nome del prodotto")).toHaveValue(
+      externalProduct,
+    );
     await page
       .getByPlaceholder("Nome del prodotto")
       .fill(`Catalogo da FSE ${suffix}`);

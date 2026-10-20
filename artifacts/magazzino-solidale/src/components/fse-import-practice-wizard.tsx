@@ -859,7 +859,12 @@ export function FseImportPracticeWizard({
                             ],
                           )
                         }
-                        onClick={() => setNewProductFor(description)}
+                        onClick={() => {
+                          if (newProductFor !== description) {
+                            setNewProduct({ ...emptyProduct, name: description });
+                          }
+                          setNewProductFor(description);
+                        }}
                       >
                         <PackagePlus className="mr-2 h-4 w-4" />
                         {t("caricoPratiche.fseCreateProduct")}
