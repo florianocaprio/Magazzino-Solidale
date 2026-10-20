@@ -2879,3 +2879,31 @@ Installazione frozen, codegen riproducibile, typecheck, build API e WEB riusciti
 Preflight 8082 in sola lettura: mensilità `2026-10` già completata, zero destinatari pendenti/errore. Il nuovo avvio non viene usato per provare ricariche sui dati personali. Installazione preceduta da dump/uploads, restore effimero e confronto di integrità; esiti e SHA saranno registrati sotto.
 
 Prova proposta a Floriano: dal CdA confermare Emporio con motivo e prima quota; verificare deroga 80 sul suggerito 60 (80 totali); riaprire e salvare dati identici mantenendo la deroga; aumentare e diminuire il nucleo e verificare ritorno automatico senza variazione del saldo già maturato; vista UDS con soli stati. Le mensilità future sono provate soltanto sul database temporaneo con clock interno iniettato. **C2B non è dichiarato chiuso prima dell'OK di Floriano.**
+
+
+### Verifiche finali e ricevuta 8082 — C2B pronta
+
+Checkpoint applicativo **`9f6f21fa1a3003c34965f5ad68f665ec27178b60`**; correzione della sola fixture browser **`8d65ada5c3f8d6e1cb5d68ffa86f076cebd244b7`**, SHA esatta compilata e installata. Fra i due commit nessun cambiamento applicativo: aggiunti alla fixture owner il permesso quota composto e l'attesa della prima quota dovuta (100 + 60 = 160). Nessun nuovo grant dei ruoli reali.
+
+Verifiche conclusive realmente eseguite:
+
+- `pnpm install --frozen-lockfile`: PASS; nessuna modifica manifest/lockfile. Restano le controparti native macOS temporanee già documentate in C2A, senza variazione delle dipendenze del prodotto.
+- `pnpm --filter @workspace/api-spec run codegen`: PASS e ripetizione con SHA256 dei generati identici; `pnpm run typecheck`: PASS.
+- `pnpm --filter @workspace/magazzino-solidale test`: **839 PASS / 129 file**, zero failure.
+- `node scripts/quality-gates-run.mjs api general emporio`: **1814 PASS / 7 SKIP**, zero failure. I 7 skip restano quelli degli originali esterni opzionali non forniti, già documentati. Evidenze private `test-results/quality-gates/api/456f50e4-59f3-4138-b5fb-12c8df79704f`. Migrazioni/replay/ledger finali PASS, PostgreSQL/reti usa e getta rimossi.
+- Browser canonico `credito-automatico-f1.spec.ts`: **40 PASS**, tutte e cinque le viewport; flusso integrato 60→80, motivo obbligatorio, prima quota unica e riapertura senza ripetizione. Evidenze `test-results/quality-gates/browser/d162407d-94af-4e27-b985-ab7a99d9e399`.
+- Browser canonico `emporio-uat-f1.spec.ts`: **90 PASS**, zero skip/failure/flaky, inclusi Cassa/Resi/ricevute/PDF e transizioni/caching. Evidenze `test-results/quality-gates/browser/11a146aa-eec9-4405-ae0f-b0992d4120fd`. Il primo avvio di questa suite è stato interrotto con SIGINT al solo Playwright verificato per correggere la fixture obsoleta senza quota.manage/ancora senza primo credito; il runner ha rimosso database/rete e rilasciato il lock. Nessuna rimozione manuale di guardie/lock, nessuna attestazione costruita a mano. La seconda esecuzione completa è verde. Totale finale **130 browser PASS**.
+- Build API/WEB locali e Docker da `git archive` della SHA esatta: PASS. Budget immagine WEB **390,1/400 KiB gzip**, soglia invariata. `git diff --check`: PASS.
+
+BUG24-01–05: conferma integrata, caso diritto già attivo/non configurato, totale motivato, zero durevole, ricevute/replay/concorrenza/rollback e revoca grant coperti. BUG25-01–06: calcolo corrente/manuale, aumento/diminuzione/limite invariato, writer anagrafico/dettagliato/FSE, versione obsoleta e calendario/coorte/storico coperti. Nessun movimento stock aggiunto e nessun saldo modificato dalle variazioni del nucleo. Le prove di date future usano soltanto clock interno sui database isolati.
+
+Installazione personale eseguita su **`8d65ada5c3f8d6e1cb5d68ffa86f076cebd244b7`**:
+
+- API `magazzino-bugfix-uat-api:sha-8d65ada5c3f8`, ID `sha256:5275d6a2115ce9b081a84d39a794d9c82ae81c1f747b5d0e41063654a77d86af`.
+- WEB `magazzino-bugfix-uat-web:sha-8d65ada5c3f8`, ID `sha256:0ee2a215ff28fd2cd7343a948511d325c6181e857c4de5bc05429384b18bf937`.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2B-8d65ada5c3f8-2026-10-20T20-52-46-339Z`: dump PostgreSQL e uploads con SHA256/indici verificati, restore reale su PostgreSQL effimero isolato senza porte host, replay canonico **63→63**. Ricreati soltanto API/WEB mediante override della catena Compose reale; PostgreSQL conserva ID/avvio/volume e gli uploads conservano il volume. Integrità prima/dopo identica su **48 tabelle**, comprese ricevute e run/destinatari mensili. Nessuna suite mutativa, importazione o simulazione del calendario sulla 8082.
+
+Ledger initialized **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Revision label e asset JS/CSS effettivamente serviti verificati per SHA256, incluso nuovo flusso C2B e calcolo mensile API; conservate le verifiche dei blocchi del primo ciclo e C2A. Entry `/assets/index-BR5kU25W.js`; ricevuta privata `/private/tmp/c2b-final-release-result.json`.
+
+**C2B / BUG24 / BUG25: PRONTO PER LE PROVE DI FLORIANO SULLA 8082.** Ricaricare la pagina per caricare gli asset nuovi. Per verificare la prima quota usare una persona nuova o un diritto attivo mai configurato; i record con quota/storico già presenti non vengono retroaccreditati. Nessuna chiusura UAT dedotta dai test. In attesa dell'OK; C2C, merge e Hetzner non avviati. Questo ultimo aggiornamento del registro non cambia il codice applicativo installato.
