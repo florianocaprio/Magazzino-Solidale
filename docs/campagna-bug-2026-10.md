@@ -1,8 +1,8 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-Correttivo UAT FSE+ del 20/10: import Magazzino e Fascicoli verificati con i tre Excel reali, Fascicolo facoltativo collegato all’anagrafica e alle Bolle. API/GUI/browsers PASS; installazione 8082 in preparazione. Dettagli e manifesto: [FSE-Import-Correttivo-20261020.md](FSE-Import-Correttivo-20261020.md).
+Correttivo UAT FSE+ del 20/10: import Magazzino e Fascicoli verificati con i tre Excel reali, Fascicolo facoltativo collegato all’anagrafica e alle Bolle. API/GUI/browser PASS; API e WEB `fc377e3` installati sulla 8082, backup ripristinato e integrità di 43 tabelle verificata. Dettagli e manifesto: [FSE-Import-Correttivo-20261020.md](FSE-Import-Correttivo-20261020.md).
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati e verificati: codice `0519ecc` installato sulla 8082, ledger 62/62. UAT BUG18 da validare con Floriano. Prompt 08 non avviato.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivo FSE+ verificato con i tre Excel reali e installato sulla 8082: codice `fc377e3`, ledger 62/62. UAT BUG18 e correttivo FSE+ da confermare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -125,7 +125,7 @@ I test automatici non sostituiscono la UAT personale. D03 mantiene il comportame
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
 | 17 | C | 03, 04 | CHIUSO; UAT OK | Nessuno; Enti e Fornitori locali/globali verificati | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; skip dichiarati nella ricevuta | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
-| 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 18 | E | 06, 07 | IMPLEMENTATO; CANDIDATO INSTALLATO | Nessuno; correttivo FSE+ e Fascicolo verificati, UAT personale pendente | fc377e3 | PASS; skip dichiarati nella ricevuta | DA CONFERMARE | fc377e3865ee1958b3d753a3b32db0901cd9d396 |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |

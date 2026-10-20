@@ -58,7 +58,7 @@ Controlli sul candidato sorgente conclusi:
 | Browser Beneficiari, incluso pulsante nativo file chooser | **10 PASS**, tutti i cinque viewport |
 | Browser M3B, inclusi i due Excel originali di ottobre | **11 PASS, 19 SKIP** preesistenti per matrice desktop/tablet |
 | Codegen ufficiale ripetuto | **987 file identici byte per byte** |
-| Build web e budget | PASS, entry iniziale 386,8/400 KiB gzip prima della build Docker finale |
+| Build web e budget | PASS, immagine Docker finale: entry iniziale 386,8/400 KiB gzip |
 | Quattro documenti locali preesistenti | SHA-256 invariati, esclusi dai commit |
 
 I due SKIP API riguardano campioni originali del vecchio import AGEA non forniti a questa campagna. I tre Excel della richiesta sono stati effettivamente acquisiti e verificati. I 19 SKIP browser rispettano le limitazioni di viewport dei casi preesistenti; i nuovi flussi Beneficiari e Saldo sintetico sono eseguiti su tutti i cinque schermi.
@@ -67,7 +67,33 @@ La maggiore quantità di dati di prova ha evidenziato una collisione nella fixtu
 
 Evidenze private: `/private/tmp/fse-fix-api-approved`, `/private/tmp/fse-fix-api-final` (gruppo Emporio), `/private/tmp/fse-fix-browser-final`, `/private/tmp/fse-ui-tests-final-pass.log`, `/private/tmp/fse-typecheck-approved.log`, `/private/tmp/fse-codegen-replay.log`. Tutti i database temporanei dei runner sono stati rimossi.
 
-Installazione 8082 e relativa ricevuta da registrare dopo build Docker e preflight.
+### Ricevuta della 8082
+
+Codice installato **`fc377e3865ee1958b3d753a3b32db0901cd9d396`**, compilato da `git archive` del commit verificato. API e WEB ricreati il 20/10/2026; PostgreSQL, volume database, uploads, rete, porte e configurazione conservati. Nessuna importazione dei campioni reali eseguita sul database personale.
+
+| Servizio | Immagine | Image ID |
+| --- | --- | --- |
+| API | `magazzino-bugfix-uat-api:sha-fc377e3865ee` | `sha256:29fd7216d1040a44c56ec519217a1277a342a78d1adbd86b1f7e0da3d0126c47` |
+| WEB | `magazzino-bugfix-uat-web:sha-fc377e3865ee` | `sha256:331d44ec0b08d6c2117b26fad494ebf62c36060e00904248f8ee065c6451470d` |
+
+- Backup privato database e uploads: `/Users/florianocaprio/Backups/Magazzino-Solidale/FSE-IMPORT-FIX-fc377e3865ee-2026-10-20T09-10-16-805Z`. Directory 0700, file 0600.
+- Backup elencato e ripristinato realmente su PostgreSQL isolato senza porte/volumi personali. Migrazioni e replay **62 → 62**, nessuna nuova migrazione.
+- Hash di tutte le colonne di **43 tabelle** confrontati prima/dopo ripristino e installazione: invariati, compresi lotti produttore, beneficiari, fascicoli, import, claim e relativi storici.
+- Ledger effettivo **62/62**, nessun pending, checksum difforme, file mancante o fuori ordine.
+- `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**; `/api/utenti` anonimo: **401**.
+- Entry servita `/assets/index-D4ha--7u.js`; confrontati SHA-256 degli asset effettivamente serviti con quelli estratti dall’immagine, inclusi Beneficiari, dettaglio, Carico Merce, testi FSE+ e Bolla PDF.
+- Override immagini e `rollback-images.json` conservati nel backup. Nessun reset del database e nessuna modifica di ambiente principale/produzione.
+
+Per ripetere anche i due test legacy saltati occorre il loro Registro AGEA storico (agosto/settembre, non il nuovo export di ottobre). Comando dalla checkout, con il percorso del campione valorizzato:
+
+```sh
+AGEA_ACCEPTANCE_XLSX='/percorso/al/Registro-AGEA-storico.xlsx' \
+  PATH=/opt/homebrew/opt/node@24/bin:$PATH \
+  CI_RESULTS_DIR=/private/tmp/fse-legacy-acceptance \
+  node scripts/quality-gates-run.mjs api general
+```
+
+UAT personale ancora da confermare con Floriano; i test automatici e l’installazione non sostituiscono il suo OK.
 
 ## Prova personale
 
