@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BeneficiariFsePreviewResultConteggi } from "./beneficiariFsePreviewResultConteggi";
+import type { BeneficiariFsePreviewResultFormatoFile } from "./beneficiariFsePreviewResultFormatoFile";
 import type { BeneficiariFsePreviewRow } from "./beneficiariFsePreviewRow";
 
 export interface BeneficiariFsePreviewResult {
@@ -16,5 +17,6 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  formatoFile?: BeneficiariFsePreviewResultFormatoFile;
   dataRiferimento: Date;
 }

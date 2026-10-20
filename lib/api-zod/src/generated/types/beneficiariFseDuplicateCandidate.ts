@@ -15,6 +15,8 @@ export interface BeneficiariFseDuplicateCandidate {
   /** @nullable */
   dataNascita?: Date | null;
   collegabile?: boolean;
+  /** @minimum 1 */
+  versione?: number;
   confronto?: BeneficiariFseComparisonField[];
   /** @nullable */
   centroAscoltoId: number | null;

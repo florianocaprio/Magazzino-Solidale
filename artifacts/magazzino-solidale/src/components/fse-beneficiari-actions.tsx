@@ -172,26 +172,22 @@ export function FseBeneficiariActions({
     const current = ++generation.current;
     setReading(true);
     try {
-      if (!/\.xlsx$/i.test(file.name))
-        throw new Error(t("reporting.fse.selectXlsx"));
+      if (!/\.xls[xm]$/i.test(file.name))
+        throw new Error(t("blocco07.beneficiaryFormats"));
       if (file.size === 0 || file.size > 10 * 1024 * 1024)
         throw new Error(t("blocco07.beneficiaryFormats"));
       const bytes = await file.arrayBuffer();
       if (generation.current !== current) return;
-      const workbook = XLSX.read(bytes, { type: "array", cellDates: false });
+      const workbook = XLSX.read(bytes, { type: "array", bookSheets: true });
       if (
-        workbook.SheetNames.length !== 1 ||
-        workbook.SheetNames[0] !== "Table1"
+        !workbook.SheetNames.includes("Configuratore file csv") &&
+        !(
+          workbook.SheetNames.length === 1 &&
+          workbook.SheetNames[0] === "Table1"
+        )
       ) {
-        throw new Error(t("reporting.fse.workbookSingleSheet"));
+        throw new Error(t("blocco07.beneficiaryWorkbook"));
       }
-      const worksheet = workbook.Sheets.Table1;
-      if (!worksheet) throw new Error(t("reporting.fse.workbookMissingSheet"));
-      XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
-        header: 1,
-        raw: true,
-        defval: null,
-      });
       const payload: FilePayload = {
         centroAscoltoId: Number(centroId),
         areaOperativaId: Number(areaId),
@@ -224,7 +220,23 @@ export function FseBeneficiariActions({
       const result = await importMutation.mutateAsync({
         data: {
           ...filePayload,
-          risoluzioni: JSON.stringify(Object.values(resolutions)),
+          risoluzioni: JSON.stringify([
+            ...Object.values(resolutions),
+            ...(preview?.righe ?? [])
+              .filter(
+                (row) =>
+                  row.classificazione === "invariato" &&
+                  row.beneficiarioId != null &&
+                  !resolutions[row.numeroRiga],
+              )
+              .map((row) => ({
+                numeroRiga: row.numeroRiga,
+                azione: "aggiorna",
+                beneficiarioId: row.beneficiarioId,
+                versioneBeneficiario: row.versioneBeneficiario,
+                versioneFascicolo: row.versioneFascicolo,
+              })),
+          ]),
         },
       });
       setImportResult(result);
@@ -299,8 +311,9 @@ export function FseBeneficiariActions({
   const unresolvedDuplicates =
     preview?.righe.some(
       (row) =>
-        row.classificazione === "possibile_duplicato" &&
-        !resolutions[row.numeroRiga],
+        ["possibile_duplicato", "da_aggiornare"].includes(
+          row.classificazione,
+        ) && !resolutions[row.numeroRiga],
     ) ?? false;
   const importBlocked = Boolean(
     !preview ||
@@ -371,7 +384,7 @@ export function FseBeneficiariActions({
                   placeholder={t("reporting.filters.areaOperativa")}
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[min(18rem,var(--radix-select-content-available-height))]">
                 {availableAreas
                   .filter(
                     (area) =>
@@ -401,7 +414,7 @@ export function FseBeneficiariActions({
               <SelectTrigger aria-label={t("reporting.fse.centre")}>
                 <SelectValue placeholder={t("reporting.fse.centre")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[min(18rem,var(--radix-select-content-available-height))]">
                 {centri
                   .filter(
                     (centro) =>
@@ -438,7 +451,7 @@ export function FseBeneficiariActions({
                   <input
                     ref={fileInput}
                     type="file"
-                    accept=".xlsx"
+                    accept=".xlsx,.xlsm"
                     className="hidden"
                     aria-label={t("reporting.fse.file")}
                     disabled={!centroId || !areaId || busy}
@@ -498,6 +511,11 @@ export function FseBeneficiariActions({
               <>
                 <div className="text-sm font-medium">
                   {t("reporting.fse.rowsRead", { count: preview.numeroRighe })}
+                  {preview.formatoFile && (
+                    <Badge variant="outline" className="ml-2">
+                      {t(`blocco07.fileFormat.${preview.formatoFile}`)}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(preview.conteggi).map(([key, value]) => (
@@ -552,7 +570,6 @@ export function FseBeneficiariActions({
                     [
                       "possibile_duplicato",
                       "da_aggiornare",
-                      "invariato",
                       "conflitto",
                     ].includes(row.classificazione),
                   )
@@ -627,7 +644,11 @@ export function FseBeneficiariActions({
                             <Button
                               type="button"
                               size="sm"
-                              disabled={busy || candidate.collegabile === false}
+                              disabled={
+                                busy ||
+                                candidate.collegabile === false ||
+                                candidate.versione == null
+                              }
                               aria-pressed={
                                 resolutions[row.numeroRiga]?.azione ===
                                   "collega" &&
@@ -649,6 +670,8 @@ export function FseBeneficiariActions({
                                     numeroRiga: row.numeroRiga,
                                     azione: "collega",
                                     beneficiarioId: candidate.id,
+                                    aggiornaAnagrafica: true,
+                                    versioneBeneficiario: candidate.versione,
                                   },
                                 }))
                               }
@@ -692,15 +715,34 @@ export function FseBeneficiariActions({
                               <Button
                                 type="button"
                                 size="sm"
-                                disabled={busy}
-                                aria-pressed={!skipped}
-                                variant={!skipped ? "default" : "outline"}
+                                disabled={
+                                  busy ||
+                                  row.beneficiarioId == null ||
+                                  row.versioneBeneficiario == null ||
+                                  row.versioneFascicolo == null
+                                }
+                                aria-pressed={
+                                  resolutions[row.numeroRiga]?.azione ===
+                                  "aggiorna"
+                                }
+                                variant={
+                                  resolutions[row.numeroRiga]?.azione ===
+                                  "aggiorna"
+                                    ? "default"
+                                    : "outline"
+                                }
                                 onClick={() =>
-                                  setResolutions((current) => {
-                                    const next = { ...current };
-                                    delete next[row.numeroRiga];
-                                    return next;
-                                  })
+                                  setResolutions((current) => ({
+                                    ...current,
+                                    [row.numeroRiga]: {
+                                      numeroRiga: row.numeroRiga,
+                                      azione: "aggiorna",
+                                      beneficiarioId: row.beneficiarioId,
+                                      versioneBeneficiario:
+                                        row.versioneBeneficiario,
+                                      versioneFascicolo: row.versioneFascicolo,
+                                    },
+                                  }))
                                 }
                               >
                                 {t("blocco07.updateExisting")}

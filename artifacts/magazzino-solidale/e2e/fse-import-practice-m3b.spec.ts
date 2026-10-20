@@ -419,6 +419,29 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await resumedContext.close();
   });
 
+  test("riprende una sessione salvata e ricarica le proposte dal catalogo aggiornato", async ({ page }) => {
+    const suffix = Date.now();
+    const context = await ensureContext(page, suffix);
+    const source = await createSource(page, context.area, `RESUME-SUGGEST-${suffix}`);
+    const description = `Pratica riaperta ${suffix}`, external = `Alimento riapertura ${suffix}`;
+    await createPractice(page, context, description);
+    await page.goto("/carico-merce"); await openPractice(page, context.area, description);
+    await page.getByRole("button", { name: "Importa file FSE+" }).click();
+    await selectOption(page, page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }), source.descrizione);
+    await page.locator("#fse-registry-file").setInputFiles({ name: "registro-riaperto.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: registryFixture(external, `RESUME-${suffix}`) });
+    await page.getByRole("button", { name: "Carica e analizza" }).click();
+    await expect(page.getByRole("paragraph").filter({ hasText: external })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toBeEnabled();
+    // Session already exists before the catalog product is added.
+    await page.getByRole("dialog").last().getByRole("button", { name: "Close", exact: true }).click();
+    const created = await page.request.post("/api/prodotti", { data: { nome: external, tipoProdotto: "alimentare", unitaMisura: "pz", quantitaFrazionabile: false, lottoFisicoObbligatorio: false, gestioneScadenza: false } });
+    expect(created.status()).toBe(201); const product = await created.json();
+    await page.getByRole("button", { name: "Importa file FSE+" }).click();
+    await page.getByRole("button", { name: /#\d+ · DA_COMPLETARE/ }).click();
+    await page.getByRole("button", { name: `Associa a ${external} · ${product.codice} · pz`, exact: true }).click();
+    await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
+  });
+
   test("crea prodotto e barcode con permesso e impedisce l'aggiramento senza products.manage", async ({
     page,
     browser,

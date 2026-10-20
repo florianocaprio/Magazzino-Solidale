@@ -1,6 +1,11 @@
 import type { i18n } from "i18next";
 export const blocco07 = {
   it: {
+    noProductSuggestions:
+      "Nessuna proposta sufficientemente simile nel catalogo attuale: scegli un prodotto esistente oppure creane uno.",
+    fileFormat: { ELENCO: "Elenco semplice (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "Il Massivo deve contenere Configuratore file csv; l’Elenco semplice un solo foglio Table1.",
     productSuggestions:
       "Possibili prodotti già presenti: controlla nome e unità, poi conferma l’associazione.",
     associateSuggested: "Associa a {{name}}",
@@ -12,13 +17,15 @@ export const blocco07 = {
     compareData: "Confronta i dati",
     alreadyLinked:
       "Possiede già un altro Fascicolo FSE+: puoi creare un nuovo beneficiario oppure saltare la riga.",
-    linkAndUpdate: "Collega e aggiorna FSE+",
-    updateExisting: "Aggiorna FSE+",
+    linkAndUpdate: "Collega e aggiorna anagrafica",
+    updateExisting: "Aggiorna anagrafica",
     skipRow: "Salta questa riga",
     skippedRows: "Righe saltate: {{count}}",
     mergeHelp:
-      "Il collegamento conserva nome, cognome e nascita interni; il file non contiene la nascita. Aggiorna il Fascicolo FSE+, completa la presa in carico se mancante e conserva il nucleo dettagliato e il canale di consegna già verificati.",
+      "Conferma per aggiornare i dati locali mostrati. I valori assenti dal file vengono conservati. I totali del nucleo per età vengono aggiornati; i singoli componenti già registrati restano invariati.",
     comparisonFields: {
+      codiceFiscale: "Codice fiscale",
+      sesso: "Sesso",
       nome: "Nome",
       cognome: "Cognome",
       dataNascita: "Data di nascita",
@@ -40,11 +47,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "Dato interno conservato",
-      aggiorna: "Dato interno aggiornato dal file",
-      solo_fse: "Aggiornato nel Fascicolo FSE+",
+      aggiorna: "Da aggiornare nell’anagrafica",
+      solo_fse: "Da aggiornare nel riepilogo locale del nucleo",
     },
     beneficiaryHelp:
-      "Per i beneficiari usa ElencoFascicoliSociali di FSE+. Registro e Giacenze si importano da Carico Merce.",
+      "Scegli un file: Elenco_Fascicoli_Sociali_Massivo (XLSM), più completo con codice fiscale, nascita e sesso del referente, oppure ElencoFascicoliSociali (XLSX). Entrambi importano il riepilogo del nucleo per età. Registro e Giacenze appartengono a Carico Merce.",
     dossier: "Fascicolo",
     reloadSources: "Ricarica registri",
     modeHelp:
@@ -56,8 +63,8 @@ export const blocco07 = {
       "Il registro FSE+ viene configurato automaticamente al primo import e riutilizzato per evitare duplicazioni. Se nell’Area esistono più registri, seleziona quello corretto.",
     sourceLoading:
       "Attendi il caricamento dei registri FSE+ oppure riprova se non è riuscito.",
-    beneficiaryPicker: "Seleziona file Fascicoli FSE+",
-    beneficiaryFormats: "XLSX · massimo 10 MB",
+    beneficiaryPicker: "Seleziona file Beneficiari FSE+",
+    beneficiaryFormats: "XLSX o XLSM · massimo 10 MB",
     fascicolo: "Fascicolo (facoltativo)",
     registry: "Anagrafiche lotti produttore",
     preregister: "Pre-registra lotto",
@@ -111,6 +118,11 @@ export const blocco07 = {
     associated: "Associazione tecnica",
   },
   en: {
+    noProductSuggestions:
+      "No sufficiently similar match in the current catalogue: select an existing product or create one.",
+    fileFormat: { ELENCO: "Simple list (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "The Massivo file must contain Configuratore file csv; the simple list must contain a single Table1 sheet.",
     productSuggestions:
       "Possible existing products: check name and unit, then confirm the association.",
     associateSuggested: "Associate with {{name}}",
@@ -122,13 +134,15 @@ export const blocco07 = {
     compareData: "Compare data",
     alreadyLinked:
       "Already linked to another FSE+ dossier: create a new beneficiary or skip this row.",
-    linkAndUpdate: "Link and update FSE+",
-    updateExisting: "Update FSE+",
+    linkAndUpdate: "Link and update personal record",
+    updateExisting: "Update personal record",
     skipRow: "Skip this row",
     skippedRows: "Skipped rows: {{count}}",
     mergeHelp:
-      "Linking keeps internal names and birth date; birth dates are not in the file. It updates the FSE+ dossier, fills a missing intake date and preserves verified household details and delivery settings.",
+      "Confirm to update the local values shown. Values missing from the file are preserved. Household age totals are updated; existing individual members are kept.",
     comparisonFields: {
+      codiceFiscale: "Tax ID",
+      sesso: "Sex",
       nome: "First name",
       cognome: "Last name",
       dataNascita: "Birth date",
@@ -150,11 +164,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "Internal value preserved",
-      aggiorna: "Internal value updated from file",
-      solo_fse: "Updated in FSE+ dossier",
+      aggiorna: "To update in the personal record",
+      solo_fse: "To update in the local household summary",
     },
     beneficiaryHelp:
-      "For beneficiaries, use the FSE+ Social Dossiers file. Registry and Stock files belong in Goods Intake.",
+      "Choose one file: Elenco_Fascicoli_Sociali_Massivo (XLSM), with additional tax ID, birth date and sex, or ElencoFascicoliSociali (XLSX). Both import household age totals. Registry and Stock belong to Goods Intake.",
     dossier: "Dossier",
     reloadSources: "Reload registers",
     modeHelp:
@@ -166,8 +180,8 @@ export const blocco07 = {
       "The FSE+ register is configured on first import and reused to prevent duplicates. Select the correct register if the Area has more than one.",
     sourceLoading:
       "Wait for FSE+ registers to load, or retry if loading failed.",
-    beneficiaryPicker: "Select FSE+ Dossiers file",
-    beneficiaryFormats: "XLSX · maximum 10 MB",
+    beneficiaryPicker: "Select FSE+ Beneficiaries file",
+    beneficiaryFormats: "XLSX or XLSM · maximum 10 MB",
     fascicolo: "Dossier (optional)",
     registry: "Producer lot registry",
     preregister: "Pre-register lot",
@@ -221,6 +235,11 @@ export const blocco07 = {
     associated: "Technical association",
   },
   es: {
+    noProductSuggestions:
+      "No hay coincidencias suficientemente similares: selecciona un producto existente o crea uno.",
+    fileFormat: { ELENCO: "Lista simple (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "El Massivo debe contener Configuratore file csv; la lista simple, una sola hoja Table1.",
     productSuggestions:
       "Posibles productos existentes: comprueba nombre y unidad y confirma la asociación.",
     associateSuggested: "Asociar a {{name}}",
@@ -232,13 +251,15 @@ export const blocco07 = {
     compareData: "Comparar datos",
     alreadyLinked:
       "Ya vinculado a otro expediente FSE+: crea un nuevo beneficiario u omite esta fila.",
-    linkAndUpdate: "Vincular y actualizar FSE+",
-    updateExisting: "Actualizar FSE+",
+    linkAndUpdate: "Vincular y actualizar ficha",
+    updateExisting: "Actualizar ficha",
     skipRow: "Omitir esta fila",
     skippedRows: "Filas omitidas: {{count}}",
     mergeHelp:
-      "El vínculo conserva nombres y fecha de nacimiento internos; el archivo no contiene el nacimiento. Actualiza el expediente FSE+, completa la fecha de alta si falta y conserva el núcleo detallado y la entrega verificados.",
+      "Confirma para actualizar los valores locales mostrados. Los datos ausentes se conservan. Se actualizan los totales por edad y se mantienen los miembros individuales registrados.",
     comparisonFields: {
+      codiceFiscale: "Código fiscal",
+      sesso: "Sexo",
       nome: "Nombre",
       cognome: "Apellidos",
       dataNascita: "Fecha de nacimiento",
@@ -260,11 +281,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "Dato interno conservado",
-      aggiorna: "Dato interno actualizado del archivo",
-      solo_fse: "Actualizado en expediente FSE+",
+      aggiorna: "Por actualizar en la ficha",
+      solo_fse: "Por actualizar en el resumen local del hogar",
     },
     beneficiaryHelp:
-      "Para beneficiarios, use ElencoFascicoliSociali de FSE+. Registro y Existencias se importan desde Carga de mercancías.",
+      "Elige un archivo: Elenco_Fascicoli_Sociali_Massivo (XLSM), más completo con código fiscal, nacimiento y sexo, o ElencoFascicoliSociali (XLSX). Ambos importan los totales del hogar por edad. Registro y Existencias pertenecen a Entrada de mercancía.",
     dossier: "Expediente",
     reloadSources: "Recargar registros",
     modeHelp:
@@ -276,8 +297,8 @@ export const blocco07 = {
       "El registro FSE+ se configura en la primera importación y se reutiliza para evitar duplicados. Seleccione el registro si hay varios en el área.",
     sourceLoading:
       "Espere a que se carguen los registros FSE+ o reintente si falla.",
-    beneficiaryPicker: "Seleccionar archivo Expedientes FSE+",
-    beneficiaryFormats: "XLSX · máximo 10 MB",
+    beneficiaryPicker: "Seleccionar archivo de beneficiarios FSE+",
+    beneficiaryFormats: "XLSX o XLSM · máximo 10 MB",
     fascicolo: "Expediente (opcional)",
     registry: "Registro de lotes del fabricante",
     preregister: "Prerregistrar lote",
@@ -331,6 +352,11 @@ export const blocco07 = {
     associated: "Asociación técnica",
   },
   fr: {
+    noProductSuggestions:
+      "Aucune correspondance suffisamment proche : choisissez un produit existant ou créez-en un.",
+    fileFormat: { ELENCO: "Liste simple (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "Le Massivo doit contenir Configuratore file csv ; la liste simple, une seule feuille Table1.",
     productSuggestions:
       "Produits existants possibles : vérifiez le nom et l’unité, puis confirmez l’association.",
     associateSuggested: "Associer à {{name}}",
@@ -342,13 +368,15 @@ export const blocco07 = {
     compareData: "Comparer les données",
     alreadyLinked:
       "Déjà lié à un autre dossier FSE+ : créez un bénéficiaire ou ignorez cette ligne.",
-    linkAndUpdate: "Lier et actualiser FSE+",
-    updateExisting: "Actualiser FSE+",
+    linkAndUpdate: "Lier et actualiser la fiche",
+    updateExisting: "Actualiser la fiche",
     skipRow: "Ignorer cette ligne",
     skippedRows: "Lignes ignorées : {{count}}",
     mergeHelp:
-      "Le lien conserve les noms et la naissance internes ; le fichier ne contient pas la naissance. Il actualise le dossier FSE+, complète la date de prise en charge manquante et conserve les détails du foyer et la livraison vérifiés.",
+      "Confirmez pour actualiser les valeurs locales affichées. Les données absentes sont conservées. Les totaux par âge sont actualisés ; les membres individuels restent inchangés.",
     comparisonFields: {
+      codiceFiscale: "Identifiant fiscal",
+      sesso: "Sexe",
       nome: "Prénom",
       cognome: "Nom",
       dataNascita: "Date de naissance",
@@ -370,11 +398,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "Donnée interne conservée",
-      aggiorna: "Donnée interne actualisée du fichier",
-      solo_fse: "Actualisé dans le dossier FSE+",
+      aggiorna: "À actualiser dans la fiche",
+      solo_fse: "À actualiser dans le récapitulatif local du foyer",
     },
     beneficiaryHelp:
-      "Pour les bénéficiaires, utilisez ElencoFascicoliSociali de FSE+. Registre et Stocks s’importent depuis Réception des marchandises.",
+      "Choisissez un fichier : Elenco_Fascicoli_Sociali_Massivo (XLSM), plus complet avec identifiant fiscal, naissance et sexe, ou ElencoFascicoliSociali (XLSX). Les deux importent les totaux du foyer par âge. Registre et Stocks relèvent de l’Entrée de marchandises.",
     dossier: "Dossier",
     reloadSources: "Recharger les registres",
     modeHelp:
@@ -385,8 +413,8 @@ export const blocco07 = {
     automaticSource:
       "Le registre FSE+ est configuré au premier import puis réutilisé pour éviter les doublons. Sélectionnez le registre si la zone en possède plusieurs.",
     sourceLoading: "Chargement des registres FSE+. Réessayez en cas d’échec.",
-    beneficiaryPicker: "Choisir le fichier Dossiers FSE+",
-    beneficiaryFormats: "XLSX · 10 Mo maximum",
+    beneficiaryPicker: "Sélectionner le fichier bénéficiaires FSE+",
+    beneficiaryFormats: "XLSX ou XLSM · maximum 10 Mo",
     fascicolo: "Dossier (facultatif)",
     registry: "Registre des lots fabricant",
     preregister: "Préenregistrer un lot",
@@ -440,6 +468,11 @@ export const blocco07 = {
     associated: "Association technique",
   },
   de: {
+    noProductSuggestions:
+      "Kein ausreichend ähnlicher Treffer: vorhandenes Produkt wählen oder ein neues anlegen.",
+    fileFormat: { ELENCO: "Einfache Liste (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "Massivo muss Configuratore file csv enthalten; die einfache Liste ein einziges Blatt Table1.",
     productSuggestions:
       "Mögliche vorhandene Produkte: Name und Einheit prüfen, dann Zuordnung bestätigen.",
     associateSuggested: "{{name}} zuordnen",
@@ -451,13 +484,15 @@ export const blocco07 = {
     compareData: "Daten vergleichen",
     alreadyLinked:
       "Bereits einer anderen FSE+-Akte zugeordnet: neuen Begünstigten anlegen oder Zeile überspringen.",
-    linkAndUpdate: "Verknüpfen und FSE+ aktualisieren",
-    updateExisting: "FSE+ aktualisieren",
+    linkAndUpdate: "Verknüpfen und Stammdaten aktualisieren",
+    updateExisting: "Stammdaten aktualisieren",
     skipRow: "Diese Zeile überspringen",
     skippedRows: "Übersprungene Zeilen: {{count}}",
     mergeHelp:
-      "Die Verknüpfung bewahrt interne Namen und Geburtsdaten; die Datei enthält kein Geburtsdatum. Sie aktualisiert die FSE+-Akte, ergänzt ein fehlendes Aufnahmedatum und bewahrt geprüfte Haushalts- und Lieferdaten.",
+      "Die Bestätigung aktualisiert die gezeigten lokalen Werte. Fehlende Angaben bleiben erhalten. Haushaltssummen nach Alter werden aktualisiert; einzelne Mitglieder bleiben unverändert.",
     comparisonFields: {
+      codiceFiscale: "Steuer-ID",
+      sesso: "Geschlecht",
       nome: "Vorname",
       cognome: "Nachname",
       dataNascita: "Geburtsdatum",
@@ -479,11 +514,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "Interner Wert bleibt erhalten",
-      aggiorna: "Interner Wert aus Datei aktualisiert",
-      solo_fse: "In FSE+-Akte aktualisiert",
+      aggiorna: "In den Stammdaten zu aktualisieren",
+      solo_fse: "In der lokalen Haushaltsübersicht zu aktualisieren",
     },
     beneficiaryHelp:
-      "Verwenden Sie für Begünstigte die FSE+-Datei ElencoFascicoliSociali. Register und Bestände werden beim Wareneingang importiert.",
+      "Eine Datei wählen: Elenco_Fascicoli_Sociali_Massivo (XLSM), vollständiger mit Steuer-ID, Geburt und Geschlecht, oder ElencoFascicoliSociali (XLSX). Beide importieren Haushaltszahlen nach Alter. Register und Bestand gehören zum Wareneingang.",
     dossier: "Akte",
     reloadSources: "Register neu laden",
     modeHelp:
@@ -495,8 +530,8 @@ export const blocco07 = {
       "Das FSE+-Register wird beim ersten Import eingerichtet und wiederverwendet, um Duplikate zu vermeiden. Wählen Sie das richtige Register, falls es mehrere gibt.",
     sourceLoading:
       "Warten Sie auf die FSE+-Register oder versuchen Sie es bei einem Ladefehler erneut.",
-    beneficiaryPicker: "FSE+-Akten-Datei auswählen",
-    beneficiaryFormats: "XLSX · maximal 10 MB",
+    beneficiaryPicker: "FSE+-Begünstigtendatei auswählen",
+    beneficiaryFormats: "XLSX oder XLSM · maximal 10 MB",
     fascicolo: "Akte (optional)",
     registry: "Herstellerchargenregister",
     preregister: "Charge vorregistrieren",
@@ -550,6 +585,11 @@ export const blocco07 = {
     associated: "Technische Zuordnung",
   },
   ar: {
+    noProductSuggestions:
+      "لا يوجد تطابق مشابه بما يكفي: اختر منتجاً موجوداً أو أنشئ منتجاً جديداً.",
+    fileFormat: { ELENCO: "قائمة بسيطة (XLSX)", MASSIVO: "Massivo (XLSM)" },
+    beneficiaryWorkbook:
+      "يجب أن يحتوي Massivo على Configuratore file csv والقائمة البسيطة على ورقة Table1 فقط.",
     productSuggestions:
       "منتجات موجودة محتملة: تحقق من الاسم والوحدة ثم أكد الربط.",
     associateSuggested: "ربط مع {{name}}",
@@ -561,13 +601,15 @@ export const blocco07 = {
     compareData: "مقارنة البيانات",
     alreadyLinked:
       "مرتبط بملف FSE+ آخر: أنشئ مستفيداً جديداً أو تخط هذه السطر.",
-    linkAndUpdate: "ربط وتحديث FSE+",
-    updateExisting: "تحديث FSE+",
+    linkAndUpdate: "ربط وتحديث البيانات الشخصية",
+    updateExisting: "تحديث البيانات الشخصية",
     skipRow: "تخطي هذا السطر",
     skippedRows: "الأسطر المتخطاة: {{count}}",
     mergeHelp:
-      "يحافظ الربط على الأسماء وتاريخ الميلاد الداخلي؛ الملف لا يحتوي تاريخ الميلاد. يتم تحديث ملف FSE+ وإكمال تاريخ التسجيل المفقود والحفاظ على بيانات الأسرة والتسليم المتحققة.",
+      "أكد تحديث القيم المحلية المعروضة. تُحفظ القيم غير الموجودة في الملف. يتم تحديث إجماليات الأسرة حسب العمر مع إبقاء الأفراد المسجلين دون تغيير.",
     comparisonFields: {
+      codiceFiscale: "الرقم الضريبي",
+      sesso: "الجنس",
       nome: "الاسم",
       cognome: "اللقب",
       dataNascita: "تاريخ الميلاد",
@@ -589,11 +631,11 @@ export const blocco07 = {
     },
     comparisonEffect: {
       conserva: "الحفاظ على القيمة الداخلية",
-      aggiorna: "تحديث القيمة الداخلية من الملف",
-      solo_fse: "تحديث في ملف FSE+",
+      aggiorna: "سيتم تحديثه في البيانات الشخصية",
+      solo_fse: "سيتم تحديثه في ملخص الأسرة المحلي",
     },
     beneficiaryHelp:
-      "للمستفيدين استخدم ملف ElencoFascicoliSociali من FSE+. يتم استيراد السجل والمخزون من استلام البضائع.",
+      "اختر ملفاً واحداً: Elenco_Fascicoli_Sociali_Massivo (XLSM) الأكثر اكتمالاً بالرقم الضريبي والميلاد والجنس، أو ElencoFascicoliSociali (XLSX). يستورد كلاهما أعداد الأسرة حسب العمر. ملفات السجل والمخزون تخص إدخال البضائع.",
     dossier: "الملف",
     reloadSources: "إعادة تحميل السجلات",
     modeHelp:
@@ -604,8 +646,8 @@ export const blocco07 = {
     automaticSource:
       "يتم إعداد سجل FSE+ عند أول استيراد وإعادة استخدامه لمنع التكرار. اختر السجل الصحيح إذا كانت هناك سجلات متعددة في المنطقة.",
     sourceLoading: "انتظر تحميل سجلات FSE+ أو أعد المحاولة عند فشل التحميل.",
-    beneficiaryPicker: "اختر ملف ملفات FSE+",
-    beneficiaryFormats: "XLSX · الحد الأقصى 10 ميغابايت",
+    beneficiaryPicker: "اختيار ملف مستفيدي FSE+",
+    beneficiaryFormats: "XLSX أو XLSM · بحد أقصى 10 ميغابايت",
     fascicolo: "الملف (اختياري)",
     registry: "سجل دفعات المصنّع",
     preregister: "تسجيل الدفعة مسبقاً",

@@ -8876,7 +8876,9 @@ export const PreviewBeneficiariFseBody = zod.object({
     ),
   file: zod
     .custom<Uint8Array>((value) => value instanceof Uint8Array)
-    .describe("Workbook XLSX reale; non viene conservato dal server."),
+    .describe(
+      "Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server.",
+    ),
 });
 
 export const PreviewBeneficiariFseResponse = zod.object({
@@ -8900,6 +8902,8 @@ export const PreviewBeneficiariFseResponse = zod.object({
       errori: zod.array(zod.string()),
       warning: zod.array(zod.string()),
       beneficiarioId: zod.number().optional(),
+      versioneBeneficiario: zod.number().min(1).optional(),
+      versioneFascicolo: zod.number().min(1).optional(),
       confronto: zod
         .array(
           zod.object({
@@ -8907,6 +8911,7 @@ export const PreviewBeneficiariFseResponse = zod.object({
             attuale: zod.string().nullable(),
             importato: zod.string().nullable(),
             esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+            differente: zod.boolean().optional(),
           }),
         )
         .optional(),
@@ -8919,6 +8924,7 @@ export const PreviewBeneficiariFseResponse = zod.object({
             cognome: zod.string().optional(),
             dataNascita: zod.coerce.date().nullish(),
             collegabile: zod.boolean().optional(),
+            versione: zod.number().min(1).optional(),
             confronto: zod
               .array(
                 zod.object({
@@ -8926,6 +8932,7 @@ export const PreviewBeneficiariFseResponse = zod.object({
                   attuale: zod.string().nullable(),
                   importato: zod.string().nullable(),
                   esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+                  differente: zod.boolean().optional(),
                 }),
               )
               .optional(),
@@ -8937,6 +8944,7 @@ export const PreviewBeneficiariFseResponse = zod.object({
   ),
   conteggi: zod.record(zod.string(), zod.number()),
   numeroRighe: zod.number(),
+  formatoFile: zod.enum(["ELENCO", "MASSIVO"]).optional(),
   dataRiferimento: zod.coerce.date(),
 });
 
@@ -8959,7 +8967,7 @@ export const ImportBeneficiariFseBody = zod.object({
     .describe("Data confermata nella preview e rivalidata dal server."),
   file: zod
     .custom<Uint8Array>((value) => value instanceof Uint8Array)
-    .describe("Lo stesso workbook XLSX reale viene rivalidato dal server."),
+    .describe("Lo stesso workbook XLSX o XLSM viene rivalidato dal server."),
   risoluzioni: zod
     .string()
     .optional()

@@ -17,6 +17,7 @@ import {
   utentiTable,
   zoneUdsTable,
 } from "@workspace/db";
+import { massivoFixture } from "./helpers/fse-massivo-workbook";
 import beneficiariRouter from "../src/routes/beneficiari";
 import beneficiariFseRouter from "../src/routes/beneficiari-fse";
 import {
@@ -193,6 +194,40 @@ it.runIf(Boolean(process.env.FSE_BENEFICIARI_REAL_PATH))("importa il workbook FS
   expect({ creati: replay.body.creati, invariati: replay.body.invariati, errori: replay.body.errori }).toEqual({ creati: 0, invariati: 117, errori: 0 });
 });
 
+it.runIf(Boolean(process.env.FSE_MASSIVO_REAL_PATH))("importa il Massivo XLSM reale anche dopo l’Elenco e ripete senza cambiare le anagrafiche", async () => {
+  const buffer = readFileSync(process.env.FSE_MASSIVO_REAL_PATH!);
+  const parsed = parseFseBeneficiariWorkbook(buffer);
+  const codes = parsed.rows.map((item) => item.codiceFascicolo!.trim().toLowerCase());
+  const owners = await db.select({ areaId: beneficiariTable.areaOperativaId, centreId: beneficiariTable.centroAscoltoId }).from(fseFascicoliSocialiTable)
+    .innerJoin(beneficiariTable, eq(fseFascicoliSocialiTable.beneficiarioId, beneficiariTable.id))
+    .where(inArray(fseFascicoliSocialiTable.codiceFascicoloNormalizzato, codes));
+  let areaId: number, centreId: number;
+  if (owners.length) {
+    expect(owners).toHaveLength(117); expect(new Set(owners.map((o) => `${o.areaId}:${o.centreId}`)).size).toBe(1);
+    areaId = owners[0].areaId!; centreId = owners[0].centreId!;
+  } else {
+    const [area] = await db.insert(areeOperativeTable).values({ nome: `Massivo reale ${suffix}` }).returning(); areaIds.push(area.id); areaId = area.id;
+    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Massivo reale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id); centreId = centre.id;
+  }
+  const api = app({ areaOperativaId: areaId });
+  const options = { buffer, filename: "Elenco_Fascicoli_Sociali_Massivo.xlsm", dataRiferimento: "2026-10-20" };
+  const initialPreview = await upload(api, "/beneficiari/fse/preview", centreId, [], options);
+  expect(initialPreview.status).toBe(200);
+  const decisions = initialPreview.body.righe.filter((row: { classificazione: string }) => row.classificazione !== "nuovo").map((row: { numeroRiga: number; beneficiarioId: number; versioneBeneficiario: number; versioneFascicolo: number }) => ({ numeroRiga: row.numeroRiga, azione: "aggiorna", beneficiarioId: row.beneficiarioId, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo }));
+  const response = await upload(api, "/beneficiari/fse/import", centreId, [], { ...options, risoluzioni: decisions });
+  expect(response.status).toBe(200); expect(response.body).toMatchObject({ creati: owners.length ? 0 : 117, aggiornati: owners.length ? 117 : 0, errori: 0, conflitti: 0 });
+  const rows = await db.select().from(beneficiariTable).where(eq(beneficiariTable.centroAscoltoId, centreId)).orderBy(beneficiariTable.id);
+  expect(rows.filter((r) => r.dataNascita)).toHaveLength(117); expect(rows.filter((r) => r.codiceFiscale)).toHaveLength(115);
+  expect(rows.reduce((n, row) => n + row.numComponenti, 0)).toBe(289);
+  expect(rows.reduce((n, row) => n + row.numMinori, 0)).toBe(74); expect(rows.reduce((n, row) => n + row.numAnziani, 0)).toBe(21);
+  const preview = await upload(api, "/beneficiari/fse/preview", centreId, [], options);
+  expect(preview.body.conteggi.invariato).toBe(117);
+  const risoluzioni = preview.body.righe.map((row: { numeroRiga: number; beneficiarioId: number; versioneBeneficiario: number; versioneFascicolo: number }) => ({ numeroRiga: row.numeroRiga, azione: "aggiorna", beneficiarioId: row.beneficiarioId, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo }));
+  const replay = await upload(api, "/beneficiari/fse/import", centreId, [], { ...options, risoluzioni });
+  expect(replay.body).toMatchObject({ creati: 0, invariati: 117, aggiornati: 0, errori: 0 });
+  expect(await db.select().from(beneficiariTable).where(eq(beneficiariTable.centroAscoltoId, centreId)).orderBy(beneficiariTable.id)).toEqual(rows);
+});
+
 it("conserva Fascicolo facoltativo nella stessa identità FSE per creazione, modifica e lettura", async () => {
   const [area] = await db.insert(areeOperativeTable).values({ nome: `Fascicolo manuale ${suffix}` }).returning(); areaIds.push(area.id);
   const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Fascicolo manuale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id);
@@ -356,7 +391,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
     expect(response.body.righe[0].classificazione).toBe("nuovo");
     expect(response.body).not.toHaveProperty("rawRows");
-    expect(response.body.righe[0].confronto).toContainEqual({ campo: "nome", attuale: null, importato: `Referente-${suffix}-PREVIEW-1`, esito: "conserva" });
+    expect(response.body.righe[0].confronto).toContainEqual({ campo: "nome", attuale: null, importato: `Referente-${suffix}-PREVIEW-1`, esito: "aggiorna", differente: true });
   });
 
   it("rifiuta lato server un workbook con foglio diverso da Table1", async () => {
@@ -693,9 +728,9 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     const candidate = preview.body.righe[0].duplicati.find((item: { id: number }) => item.id === target.id);
     expect(candidate).toMatchObject({ nome: target.nome, cognome: target.cognome, dataNascita: "1990-01-01", collegabile: true });
     expect(candidate.confronto).toEqual(expect.arrayContaining([
-      { campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva" },
-      { campo: "numeroComponenti", attuale: "1", importato: "5", esito: "aggiorna" },
-      { campo: "tipologiaAttivita", attuale: "Pacchi", importato: "Domiciliare", esito: "conserva" },
+      { campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva", differente: false },
+      { campo: "numeroComponenti", attuale: "1", importato: "5", esito: "aggiorna", differente: true },
+      { campo: "tipologiaAttivita", attuale: "Pacchi", importato: "Domiciliare", esito: "aggiorna", differente: true },
     ]));
 
     const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [
@@ -773,10 +808,47 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     const changedSource = { ...source, Disabili: 1 };
     const existingPreview = await upload(app(), "/beneficiari/fse/preview", centerA, [changedSource]);
     expect(existingPreview.body.righe[0]).toMatchObject({ classificazione: "da_aggiornare", beneficiarioId: target.id });
-    expect(existingPreview.body.righe[0].confronto).toContainEqual({ campo: "disabili", attuale: "0", importato: "1", esito: "aggiorna" });
+    expect(existingPreview.body.righe[0].confronto).toContainEqual({ campo: "disabili", attuale: "0", importato: "1", esito: "aggiorna", differente: true });
     const secondSkip = await upload(app(), "/beneficiari/fse/import", centerA, [changedSource], { risoluzioni: [{ numeroRiga: 2, azione: "salta" }] });
     expect(secondSkip.body).toMatchObject({ saltati: 1, aggiornati: 0, errori: 0 });
     expect((await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)))[0]).toEqual(before);
+  });
+
+  it("aggiorna esplicitamente nascita, codice fiscale e riepilogo per età dal Massivo; conserva i componenti e nasconde il replay invariato", async () => {
+    const target = await insertBeneficiary({ nome: "Persona", cognome: "Massiva", numComponenti: 1 });
+    const buffer = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}` });
+    const options = { buffer, filename: "Elenco_Fascicoli_Sociali_Massivo.xlsm", dataRiferimento: "2026-10-20" };
+    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [], options);
+    expect(preview.status).toBe(200); expect(preview.body.formatoFile).toBe("MASSIVO");
+    const candidate = preview.body.righe[0].duplicati.find((candidate: { id: number }) => candidate.id === target.id);
+    expect(candidate).toBeTruthy();
+    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...options, risoluzioni: [{ numeroRiga: 9, azione: "collega", beneficiarioId: target.id, aggiornaAnagrafica: true, versioneBeneficiario: candidate.versione }] });
+    expect(linked.body).toMatchObject({ collegati: 1, errori: 0 });
+    const [after] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    expect(after).toMatchObject({ codiceFiscale: "RSSMRA90A01H501U", dataNascita: "1990-01-01", sesso: "F", numComponenti: 3, numMinori: 1, numAnziani: 1, numDisabili: 1, versione: target.versione + 1 });
+    // A complete, real local member is retained even when aggregate totals change.
+    const [member] = await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Reale", dataNascita: "2015-01-01", sesso: "M" }).returning();
+    await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Anziano", dataNascita: "1950-01-01", sesso: "F" });
+    const changed = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}`, NomeReferenteNucleoFamiliare: "Persona corretta", DataDiNascitaReferenteNucleoFamiliare: "02/01/1990", TotaleDonne: 3, "Totale18-29": 1 });
+    const changedOptions = { ...options, buffer: changed };
+    const review = await upload(app(), "/beneficiari/fse/preview", centerA, [], changedOptions);
+    const row = review.body.righe[0]; expect(row.classificazione).toBe("da_aggiornare");
+    const decision = { numeroRiga: 9, azione: "aggiorna", beneficiarioId: target.id, versioneBeneficiario: row.versioneBeneficiario, versioneFascicolo: row.versioneFascicolo };
+    const updated = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [decision] });
+    expect(updated.body).toMatchObject({ aggiornati: 1, errori: 0 });
+    const [local] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    expect(local).toMatchObject({ nome: "Persona corretta", dataNascita: "1990-01-02", numComponenti: 4 });
+    expect((await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.id, member.id)))[0]).toEqual(member);
+    const [profile] = await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
+    expect(profile).toMatchObject({ numeroComponentiImportato: 4, eta017Importata: 1, eta1829Importata: 1, eta3064Importata: 1, eta65PlusImportata: 1 });
+    const same = await upload(app(), "/beneficiari/fse/preview", centerA, [], changedOptions);
+    expect(same.body.righe[0].classificazione).toBe("invariato");
+    expect(same.body.righe[0].confronto.every((field: { differente: boolean }) => !field.differente)).toBe(true);
+    const noChange = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [{ ...decision, versioneBeneficiario: local.versione, versioneFascicolo: profile.versione }] });
+    expect(noChange.body).toMatchObject({ invariati: 1, aggiornati: 0 });
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id)))[0]).toEqual(local);
+    const stale = await upload(app(), "/beneficiari/fse/import", centerA, [], { ...changedOptions, risoluzioni: [decision] });
+    expect(stale.body.dettagli[0].errori).toContain("ANAGRAFICA_MODIFICATA");
   });
 
   it("non sovrascrive i conteggi di un nucleo interno anagraficamente completo", async () => {

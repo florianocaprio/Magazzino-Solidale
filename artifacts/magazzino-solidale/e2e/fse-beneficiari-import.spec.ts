@@ -1,3 +1,4 @@
+import { massivoFixture } from "../../api-server/tests/helpers/fse-massivo-workbook";
 import { expect, test } from "@playwright/test";
 import * as XLSX from "xlsx";
 import { login, selectOption } from "./helpers";
@@ -106,7 +107,10 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
     .click();
   const fileChooser = page.waitForEvent("filechooser");
   await dialog
-    .getByRole("button", { name: "Seleziona file Fascicoli FSE+", exact: true })
+    .getByRole("button", {
+      name: "Seleziona file Beneficiari FSE+",
+      exact: true,
+    })
     .click();
   await (
     await fileChooser
@@ -334,16 +338,19 @@ test("confronta il beneficiario registrato con il file e distingue collega, salt
   ).toBeVisible();
   await expect(
     first.getByText("Non presente nel file", { exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Conferma importazione" }),
   ).toBeDisabled();
   expect(
     await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: testInfo.outputPath("confronto-fse.png"), fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath("confronto-fse.png"),
+    fullPage: true,
+  });
   await first
-    .getByRole("button", { name: "Collega e aggiorna FSE+", exact: true })
+    .getByRole("button", { name: "Collega e aggiorna anagrafica", exact: true })
     .click();
   await dialog
     .locator('[data-fse-review-row="3"]')
@@ -384,4 +391,137 @@ test("confronta il beneficiario registrato con il file e distingue collega, salt
     )
   ).json();
   expect(list).toHaveLength(2);
+});
+
+test("Massivo XLSM: propone solo differenze, aggiorna l’anagrafica e non ripropone righe identiche", async ({
+  page,
+}, testInfo) => {
+  await login(page);
+  const suffix = `massivo-${Date.now()}-${testInfo.project.name}`;
+  const area = await (
+    await page.request.post("/api/aree-operative", {
+      data: { nome: `Massivo ${suffix}` },
+    })
+  ).json();
+  const centre = await (
+    await page.request.post("/api/centri-ascolto", {
+      data: {
+        nome: `Centro ${suffix}`,
+        areaOperativaId: area.id,
+        attivo: true,
+      },
+    })
+  ).json();
+  const existingResponse = await page.request.post("/api/beneficiari", {
+    data: {
+      nome: "Persona",
+      cognome: "Massiva",
+      dataNascita: "1991-01-01",
+      sesso: "F",
+      areaProvenienza: "IT",
+      numComponenti: 1,
+      areaOperativaId: area.id,
+      centroAscoltoId: centre.id,
+      fascicolo: `MASSIVO-${suffix}`,
+    },
+  });
+  expect(existingResponse.status()).toBe(201);
+  const existing = await existingResponse.json();
+  const buffer = massivoFixture({ CodiceFascicolo: `MASSIVO-${suffix}` });
+  const attach = {
+    name: "Elenco_Fascicoli_Sociali_Massivo.xlsm",
+    mimeType: "application/vnd.ms-excel.sheet.macroEnabled.12",
+    buffer,
+  };
+  await page.goto("/beneficiari");
+  const open = async () => {
+    await page
+      .getByRole("button", { name: "Importa FSE+", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Importa FSE+" });
+    await selectOption(
+      page,
+      dialog.getByRole("combobox", { name: "Area Operativa FSE+" }),
+      area.nome,
+    );
+    await selectOption(
+      page,
+      dialog.getByRole("combobox", { name: "Centro di Ascolto FSE+" }),
+      centre.nome,
+    );
+    await dialog.getByLabel("File FSE+", { exact: true }).setInputFiles(attach);
+    await dialog.getByRole("button", { name: "Carica e analizza" }).click();
+    await expect(
+      dialog.getByText("Massivo (XLSM)", { exact: true }),
+    ).toBeVisible();
+    return dialog;
+  };
+  let dialog = await open();
+  const review = dialog.locator('[data-fse-review-row="9"]');
+  await expect(review).toBeVisible();
+  await expect(
+    review.getByRole("rowheader", { name: "Data di nascita", exact: true }),
+  ).toBeVisible();
+  // Equal identity values are context in the title, never repeated as comparison rows.
+  await expect(
+    review.getByRole("rowheader", { name: "Nome", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    review.getByRole("button", { name: "Aggiorna anagrafica", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Conferma importazione" }),
+  ).toBeDisabled();
+  await review
+    .getByRole("button", { name: "Aggiorna anagrafica", exact: true })
+    .click();
+  await review
+    .getByRole("columnheader", { name: "Dati registrati" })
+    .scrollIntoViewIfNeeded();
+  expect(
+    await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: testInfo.outputPath("massivo-differenze.png"),
+    fullPage: true,
+  });
+  const imported = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/beneficiari/fse/import") &&
+      r.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  expect(await (await imported).json()).toMatchObject({
+    aggiornati: 1,
+    creati: 0,
+    errori: 0,
+  });
+  const after = await (
+    await page.request.get(`/api/beneficiari/${existing.id}`)
+  ).json();
+  expect(after).toMatchObject({
+    dataNascita: "1990-01-01",
+    codiceFiscale: "RSSMRA90A01H501U",
+    numComponenti: 3,
+    numMinori: 1,
+    numAnziani: 1,
+  });
+  await dialog.getByRole("button", { name: "Chiudi", exact: true }).click();
+  dialog = await open();
+  await expect(dialog.locator("[data-fse-review-row]")).toHaveCount(0);
+  const replay = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/beneficiari/fse/import") &&
+      r.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  expect(await (await replay).json()).toMatchObject({
+    invariati: 1,
+    aggiornati: 0,
+    errori: 0,
+  });
+  expect(
+    (await (await page.request.get(`/api/beneficiari/${existing.id}`)).json())
+      .versione,
+  ).toBe(after.versione);
 });

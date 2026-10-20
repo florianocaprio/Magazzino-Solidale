@@ -17,6 +17,10 @@ export interface BeneficiariFsePreviewRow {
   errori: string[];
   warning: string[];
   beneficiarioId?: number;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
   confronto?: BeneficiariFseComparisonField[];
   duplicati?: BeneficiariFseDuplicateCandidate[];
 }

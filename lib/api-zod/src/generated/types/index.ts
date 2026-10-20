@@ -95,6 +95,7 @@ export * from "./beneficiariFseImportResultStato";
 export * from "./beneficiariFseNotFoundResponse";
 export * from "./beneficiariFsePreviewResult";
 export * from "./beneficiariFsePreviewResultConteggi";
+export * from "./beneficiariFsePreviewResultFormatoFile";
 export * from "./beneficiariFsePreviewRow";
 export * from "./beneficiariFsePreviewRowClassificazione";
 export * from "./beneficiariFseRowInput";

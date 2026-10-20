@@ -11822,15 +11822,18 @@ components:
         file:
           type: string
           format: binary
-          description: Workbook XLSX reale; non viene conservato dal server.
+          description: Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server.
       required: [centroAscoltoId, dataRiferimento, file]
     BeneficiariFseImportResolution:
       type: object
       additionalProperties: false
       properties:
         numeroRiga: { type: integer, minimum: 2 }
-        azione: { type: string, enum: [crea, collega, salta] }
+        azione: { type: string, enum: [crea, collega, salta, aggiorna] }
         beneficiarioId: { type: integer, minimum: 1 }
+        aggiornaAnagrafica: { type: boolean }
+        versioneBeneficiario: { type: integer, minimum: 1 }
+        versioneFascicolo: { type: integer, minimum: 1 }
       required: [numeroRiga, azione]
     BeneficiariFseWorkbookImportUpload:
       type: object
@@ -11848,7 +11851,7 @@ components:
         file:
           type: string
           format: binary
-          description: Lo stesso workbook XLSX reale viene rivalidato dal server.
+          description: Lo stesso workbook XLSX o XLSM viene rivalidato dal server.
         risoluzioni:
           type: string
           description: Array JSON di BeneficiariFseImportResolution.
@@ -11860,6 +11863,7 @@ components:
         attuale: { type: [string, "null"] }
         importato: { type: [string, "null"] }
         esito: { type: string, enum: [conserva, aggiorna, solo_fse] }
+        differente: { type: boolean }
       required: [campo, attuale, importato, esito]
     BeneficiariFseDuplicateCandidate:
       type: object
@@ -11870,6 +11874,7 @@ components:
         cognome: { type: string }
         dataNascita: { type: [string, "null"], format: date }
         collegabile: { type: boolean }
+        versione: { type: integer, minimum: 1 }
         confronto:
           type: array
           items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
@@ -11895,6 +11900,8 @@ components:
         errori: { type: array, items: { type: string } }
         warning: { type: array, items: { type: string } }
         beneficiarioId: { type: integer }
+        versioneBeneficiario: { type: integer, minimum: 1 }
+        versioneFascicolo: { type: integer, minimum: 1 }
         confronto:
           type: array
           items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
@@ -11917,6 +11924,7 @@ components:
           }
         conteggi: { type: object, additionalProperties: { type: integer } }
         numeroRighe: { type: integer }
+        formatoFile: { type: string, enum: [ELENCO, MASSIVO] }
         dataRiferimento: { type: string, format: date }
       required:
         [

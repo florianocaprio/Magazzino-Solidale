@@ -8,6 +8,7 @@ import {
   getGetFseImportSessionQueryKey,
   getListFseImportSourcesQueryKey,
   getListFseImportSessionsQueryKey,
+  getListProdottiQueryKey,
   useAddFseImportToPractice,
   resolveAutomaticFseImportSource,
   useCreateProdotto,
@@ -127,6 +128,12 @@ export function FseImportPracticeWizard({
   const { toast } = useToast();
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (open)
+      void queryClient.invalidateQueries({
+        queryKey: getListProdottiQueryKey(),
+      });
+  }, [open, queryClient]);
   const canManageProducts = hasPermission("magazzino.products.manage");
   const canManageMappings = hasPermission("magazzino.agea.mapping.manage");
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
@@ -178,6 +185,8 @@ export function FseImportPracticeWizard({
   const detailQuery = useGetFseImportSession(sessionId ?? 0, {
     query: {
       enabled: open && sessionId != null,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
       queryKey: getGetFseImportSessionQueryKey(sessionId ?? 0),
     },
   });
@@ -875,34 +884,37 @@ export function FseImportPracticeWizard({
                       </Button>
                     )}
                   </div>
-                  {canManageMappings &&
-                    suggestFseProducts(description, products).length > 0 && (
-                      <div className="space-y-2 rounded-md bg-muted/40 p-3 md:col-span-3">
-                        <p className="text-sm text-muted-foreground">
-                          {t("blocco07.productSuggestions")}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {suggestFseProducts(description, products).map(
-                            (product) => (
-                              <Button
-                                key={product.id}
-                                variant="outline"
-                                disabled={pending}
-                                className="h-auto max-w-full whitespace-normal text-left"
-                                onClick={() =>
-                                  void confirmMapping(description, product.id)
-                                }
-                              >
-                                {t("blocco07.associateSuggested", {
-                                  name: product.nome,
-                                })}{" "}
-                                · {product.codice} · {product.unitaMisura}
-                              </Button>
-                            ),
-                          )}
-                        </div>
+                  {canManageMappings && (
+                    <div className="space-y-2 rounded-md bg-muted/40 p-3 md:col-span-3">
+                      <p className="text-sm text-muted-foreground">
+                        {t(
+                          suggestFseProducts(description, products).length
+                            ? "blocco07.productSuggestions"
+                            : "blocco07.noProductSuggestions",
+                        )}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {suggestFseProducts(description, products).map(
+                          (product) => (
+                            <Button
+                              key={product.id}
+                              variant="outline"
+                              disabled={pending}
+                              className="h-auto max-w-full whitespace-normal text-left"
+                              onClick={() =>
+                                void confirmMapping(description, product.id)
+                              }
+                            >
+                              {t("blocco07.associateSuggested", {
+                                name: product.nome,
+                              })}{" "}
+                              · {product.codice} · {product.unitaMisura}
+                            </Button>
+                          ),
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
                   {createdProducts.current[`${detail?.id}:${description}`] && (
                     <p role="status" className="md:col-span-3">
                       {t("caricoPratiche.fseSelectProduct")}: #

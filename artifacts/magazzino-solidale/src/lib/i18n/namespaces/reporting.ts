@@ -3981,6 +3981,8 @@ function make(
         "المرشحون: {{candidates}} · القابلون للتصدير: {{exportable}} · المحظورون: {{blocked}} · التحذيرات: {{warnings}}",
       ][index],
       classification: {
+        da_aggiornare: ["Da aggiornare", "Por actualizar", "To update", "À actualiser", "Zu aktualisieren", "للتحديث"][index],
+        invariato: ["Invariati", "Sin cambios", "Unchanged", "Inchangés", "Unverändert", "دون تغيير"][index],
         nuovo: ["Nuovi", "Nuevos", "New", "Nouveaux", "Neu", "جديد"][index],
         errore: ["Errori", "Errores", "Errors", "Erreurs", "Fehler", "أخطاء"][
           index

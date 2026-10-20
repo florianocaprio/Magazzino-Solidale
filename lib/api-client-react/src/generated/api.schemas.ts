@@ -478,7 +478,7 @@ export interface BeneficiariFseWorkbookUpload {
   centroAscoltoId: number;
   /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
   dataRiferimento: string;
-  /** Workbook XLSX reale; non viene conservato dal server. */
+  /** Elenco XLSX o Massivo XLSM reale; letto senza eseguire macro e non conservato dal server. */
   file: Blob;
 }
 
@@ -489,6 +489,7 @@ export const BeneficiariFseImportResolutionAzione = {
   crea: "crea",
   collega: "collega",
   salta: "salta",
+  aggiorna: "aggiorna",
 } as const;
 
 export interface BeneficiariFseImportResolution {
@@ -497,6 +498,11 @@ export interface BeneficiariFseImportResolution {
   azione: BeneficiariFseImportResolutionAzione;
   /** @minimum 1 */
   beneficiarioId?: number;
+  aggiornaAnagrafica?: boolean;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
 }
 
 export interface BeneficiariFseWorkbookImportUpload {
@@ -509,7 +515,7 @@ export interface BeneficiariFseWorkbookImportUpload {
   centroAscoltoId: number;
   /** Data confermata nella preview e rivalidata dal server. */
   dataRiferimento: string;
-  /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
+  /** Lo stesso workbook XLSX o XLSM viene rivalidato dal server. */
   file: Blob;
   /** Array JSON di BeneficiariFseImportResolution. */
   risoluzioni?: string;
@@ -531,6 +537,7 @@ export interface BeneficiariFseComparisonField {
   /** @nullable */
   importato: string | null;
   esito: BeneficiariFseComparisonFieldEsito;
+  differente?: boolean;
 }
 
 export interface BeneficiariFseDuplicateCandidate {
@@ -541,6 +548,8 @@ export interface BeneficiariFseDuplicateCandidate {
   /** @nullable */
   dataNascita?: string | null;
   collegabile?: boolean;
+  /** @minimum 1 */
+  versione?: number;
   confronto?: BeneficiariFseComparisonField[];
   /** @nullable */
   centroAscoltoId: number | null;
@@ -567,11 +576,23 @@ export interface BeneficiariFsePreviewRow {
   errori: string[];
   warning: string[];
   beneficiarioId?: number;
+  /** @minimum 1 */
+  versioneBeneficiario?: number;
+  /** @minimum 1 */
+  versioneFascicolo?: number;
   confronto?: BeneficiariFseComparisonField[];
   duplicati?: BeneficiariFseDuplicateCandidate[];
 }
 
 export type BeneficiariFsePreviewResultConteggi = { [key: string]: number };
+
+export type BeneficiariFsePreviewResultFormatoFile =
+  (typeof BeneficiariFsePreviewResultFormatoFile)[keyof typeof BeneficiariFsePreviewResultFormatoFile];
+
+export const BeneficiariFsePreviewResultFormatoFile = {
+  ELENCO: "ELENCO",
+  MASSIVO: "MASSIVO",
+} as const;
 
 export interface BeneficiariFsePreviewResult {
   centroAscoltoId: number;
@@ -581,6 +602,7 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  formatoFile?: BeneficiariFsePreviewResultFormatoFile;
   dataRiferimento: string;
 }
 

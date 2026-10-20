@@ -19,6 +19,14 @@ export function FseBeneficiariComparison({
     }
     return text;
   };
+  const visible = registered
+    ? fields.filter(
+        (field) =>
+          field.differente ??
+          (field.importato != null && field.attuale !== field.importato),
+      )
+    : fields.filter((field) => field.importato != null);
+  if (!visible.length) return null;
   return (
     <table className="w-full table-fixed text-xs sm:text-sm">
       <thead>
@@ -37,7 +45,7 @@ export function FseBeneficiariComparison({
         </tr>
       </thead>
       <tbody>
-        {fields.map((field) => (
+        {visible.map((field) => (
           <tr key={field.campo} className="border-b last:border-0">
             <th scope="row" className="break-words p-2 text-left font-medium">
               {t(`blocco07.comparisonFields.${field.campo}`)}

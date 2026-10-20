@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { calcolaEta, fasciaEtaDaEta } from "@workspace/api-zod";
 import * as XLSX from "xlsx";
+import { FSE_MASSIVO_SHEET, readFseMassivo } from "./fseBeneficiariMassivo";
 
 export const FSE_BENEFICIARI_HEADERS = [
   "Nome Referente fascicolo",
@@ -48,6 +49,7 @@ export type FseBeneficiariRow = {
   disabili: number;
   cittadiniPaesiTerzi: number;
   senzaTettoEsclusioneAbitativa: number;
+  anagrafica?: { codiceFiscale: string | null; dataNascita: string | null; sesso: string | null };
   hash: string;
 };
 
@@ -174,6 +176,13 @@ export function validateFseRows(rawRows: Array<Record<string, unknown>>): FseRow
     const errori: string[] = [];
     const warning: string[] = [];
     const text = (header: FseBeneficiariHeader) => String(raw[header] ?? "").trim();
+    const numeroRiga = Number.isSafeInteger(raw.__fseNumeroRiga) ? Number(raw.__fseNumeroRiga) : index + 2;
+    const anagrafica = raw.__fseAnagrafica as FseBeneficiariRow["anagrafica"];
+    if (anagrafica) {
+      if (anagrafica.codiceFiscale && anagrafica.codiceFiscale.length > 16) errori.push("Codice fiscale: massimo 16 caratteri.");
+      if (anagrafica.dataNascita && calcolaEta(anagrafica.dataNascita) == null) errori.push("Data di nascita non valida o futura.");
+      if (anagrafica.sesso != null && !["M", "F"].includes(anagrafica.sesso)) errori.push("Sesso referente non valido.");
+    }
     const nome = text(FSE_BENEFICIARI_HEADERS[0]);
     const cognome = text(FSE_BENEFICIARI_HEADERS[1]);
     const codiceFascicolo = text(FSE_BENEFICIARI_HEADERS[2]);
@@ -214,7 +223,7 @@ export function validateFseRows(rawRows: Array<Record<string, unknown>>): FseRow
     }
 
     if (errori.length) {
-      return { numeroRiga: index + 2, codiceFascicolo: codiceFascicolo || null, row: null, errori, warning };
+      return { numeroRiga, codiceFascicolo: codiceFascicolo || null, row: null, errori, warning };
     }
     const payload = {
       nome,
@@ -234,9 +243,10 @@ export function validateFseRows(rawRows: Array<Record<string, unknown>>): FseRow
       disabili,
       cittadiniPaesiTerzi: paesiTerzi,
       senzaTettoEsclusioneAbitativa: esclusione,
+      ...(anagrafica ? { anagrafica } : {}),
     };
     return {
-      numeroRiga: index + 2,
+      numeroRiga,
       codiceFascicolo,
       row: { ...payload, hash: createHash("sha256").update(JSON.stringify(payload)).digest("hex") },
       errori,
@@ -247,10 +257,16 @@ export function validateFseRows(rawRows: Array<Record<string, unknown>>): FseRow
 
 export function parseFseBeneficiariWorkbook(input: Buffer | Uint8Array) {
   const workbook = XLSX.read(input, { type: "buffer", cellDates: false });
+  if (workbook.SheetNames.includes(FSE_MASSIVO_SHEET)) {
+    const massivo = readFseMassivo(workbook.Sheets[FSE_MASSIVO_SHEET], (value) => parseFseDate(value, workbook.Workbook?.WBProps?.date1904 === true));
+    return { formatoFile: "MASSIVO" as const, sheetNames: workbook.SheetNames,
+      headers: [...FSE_BENEFICIARI_HEADERS], rawRows: massivo.rawRows,
+      header: { errori: massivo.errori, warning: [] as string[] }, rows: validateFseRows(massivo.rawRows) };
+  }
   const sheetName = workbook.SheetNames[0] ?? null;
   const sheet = sheetName ? workbook.Sheets[sheetName] : null;
   if (!sheet) {
-    return { sheetNames: workbook.SheetNames, headers: [], rawRows: [], header: { errori: ["Workbook privo di fogli."], warning: [] }, rows: [] };
+    return { formatoFile: "ELENCO" as const, sheetNames: workbook.SheetNames, headers: [], rawRows: [], header: { errori: ["Workbook privo di fogli."], warning: [] }, rows: [] };
   }
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
   const headers = (matrix[0] ?? []).map((value) => String(value ?? ""));
@@ -267,6 +283,8 @@ export function parseFseBeneficiariWorkbook(input: Buffer | Uint8Array) {
   // Excel civil dates are serial numbers, not instants in the server timezone.
   const date1904 = workbook.Workbook?.WBProps?.date1904 === true;
   for (const row of rawRows) {
+    delete row.__fseNumeroRiga;
+    delete row.__fseAnagrafica;
     const value = row[FSE_BENEFICIARI_HEADERS[3]];
     if (typeof value === "number") row[FSE_BENEFICIARI_HEADERS[3]] = parseFseDate(value, date1904) ?? value;
   }
@@ -274,6 +292,7 @@ export function parseFseBeneficiariWorkbook(input: Buffer | Uint8Array) {
     ? []
     : [`Il workbook deve contenere un solo foglio denominato ${FSE_BENEFICIARI_SHEET}.`];
   return {
+    formatoFile: "ELENCO" as const,
     sheetNames: workbook.SheetNames,
     headers,
     rawRows,

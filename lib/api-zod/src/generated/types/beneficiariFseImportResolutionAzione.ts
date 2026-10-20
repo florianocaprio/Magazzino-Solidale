@@ -13,4 +13,5 @@ export const BeneficiariFseImportResolutionAzione = {
   crea: "crea",
   collega: "collega",
   salta: "salta",
+  aggiorna: "aggiorna",
 } as const;

@@ -592,7 +592,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
           errori: [],
           warning: ["Possibile duplicato"],
           confronto: [{ campo: "nome", attuale: null, importato: "Test", esito: "conserva" }],
-          duplicati: [{ id: 9, codice: "BEN-9", nome: "Test", cognome: "Import", dataNascita: "1990-01-01",
+          duplicati: [{ id: 9, codice: "BEN-9", versione: 1, nome: "Test", cognome: "Import", dataNascita: "1990-01-01",
             confronto: [{ campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva" },
               { campo: "numeroComponenti", attuale: "2", importato: "3", esito: "aggiorna" }] }],
         },
@@ -645,10 +645,10 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(document.body.textContent).toContain("01/01/1990");
     expect(document.body.textContent).toContain("Dati registrati");
     expect(document.body.textContent).toContain("Dati nel file FSE+");
-    expect(document.body.textContent).toContain("Non presente nel file");
+    expect(document.body.textContent).not.toContain("Non presente nel file");
     await act(async () => button("Salta questa riga")?.click());
     expect((button("Conferma importazione") as HTMLButtonElement).disabled).toBe(false);
-    await act(async () => button("Collega e aggiorna FSE+")?.click());
+    await act(async () => button("Collega e aggiorna anagrafica")?.click());
     expect(
       (button("Conferma importazione") as HTMLButtonElement).disabled,
     ).toBe(false);

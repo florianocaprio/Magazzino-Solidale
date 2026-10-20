@@ -46,6 +46,7 @@ vi.mock("@workspace/api-client-react", () => ({
   analyzeFsePracticeImport: api.analyze,
   getGetFseImportSessionQueryKey: (id: number) => [id],
   getListFseImportSourcesQueryKey: () => ["sources"],
+  getListProdottiQueryKey: () => ["/api/prodotti"],
   getListFseImportSessionsQueryKey: () => ["sessions"],
   useListFseImportSources: () => ({ data: api.sources }),
   useListFseImportSessions: () => ({ data: api.sessions }),

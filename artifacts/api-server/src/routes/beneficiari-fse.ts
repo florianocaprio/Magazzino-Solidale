@@ -1,3 +1,4 @@
+import { anagraficaImportValues, fseImportComparison } from "../lib/fseBeneficiariImportPlan";
 import { canonicalFseSnapshot, type SnapshotOrigin } from "../lib/beneficiarioFascicolo";
 import { allocateBeneficiaryCode } from "../lib/beneficiariCodice";
 import { createHash } from "node:crypto";
@@ -58,6 +59,7 @@ type RawBody = {
   risoluzioni?: unknown;
   dataRiferimento?: unknown;
   soloAttivi?: unknown;
+  formatoFile?: "ELENCO" | "MASSIVO";
 };
 
 type MultipartWorkbook = {
@@ -68,7 +70,10 @@ type MultipartWorkbook = {
 
 type ImportResolution = {
   numeroRiga: number;
-  azione: "crea" | "collega" | "salta";
+  azione: "crea" | "collega" | "salta" | "aggiorna";
+  aggiornaAnagrafica?: boolean;
+  versioneBeneficiario?: number;
+  versioneFascicolo?: number;
   beneficiarioId?: number;
 };
 
@@ -142,11 +147,11 @@ function parseMultipartWorkbook(req: Request):
       error: "Payload multipart FSE+ non valido.",
     };
   }
-  if (!file || !nomeFile.toLowerCase().endsWith(".xlsx")) {
+  if (!file || !/\.xls[xm]$/i.test(nomeFile)) {
     return {
       ok: false,
       status: 400,
-      error: "È richiesto un unico file .xlsx nel campo file.",
+      error: "È richiesto un unico file .xlsx o .xlsm nel campo file.",
     };
   }
   return { ok: true, upload: { file, nomeFile, fields } };
@@ -195,6 +200,7 @@ function authoritativeWorkbookBody(
       sha256File: createHash("sha256").update(upload.file).digest("hex"),
       headers: parsed.headers,
       righe: parsed.rawRows,
+      formatoFile: parsed.formatoFile,
       risoluzioni,
       dataRiferimento: upload.fields.dataRiferimento,
     },
@@ -297,13 +303,20 @@ function parseResolutions(value: unknown): {
     if (
       !Number.isSafeInteger(numeroRiga) ||
       numeroRiga < 2 ||
-      (azione !== "crea" && azione !== "collega" && azione !== "salta") ||
-      (azione === "collega" && (!Number.isSafeInteger(beneficiarioId) || beneficiarioId! <= 0)) ||
+      !["crea", "collega", "salta", "aggiorna"].includes(String(azione)) ||
+      (["collega", "aggiorna"].includes(String(azione)) && (!Number.isSafeInteger(beneficiarioId) || beneficiarioId! <= 0)) ||
+      (raw.aggiornaAnagrafica != null && typeof raw.aggiornaAnagrafica !== "boolean") ||
+      [raw.versioneBeneficiario, raw.versioneFascicolo].some((value) => value != null && (!Number.isSafeInteger(value) || Number(value) < 1)) ||
+      (azione === "aggiorna" && (raw.versioneBeneficiario == null || raw.versioneFascicolo == null)) ||
+      (raw.aggiornaAnagrafica === true && raw.versioneBeneficiario == null) ||
       map.has(numeroRiga)
     ) {
       return { map: new Map(), error: "Risoluzione import non valida o duplicata." };
     }
-    map.set(numeroRiga, { numeroRiga, azione, beneficiarioId });
+    map.set(numeroRiga, { numeroRiga, azione: azione as ImportResolution["azione"], beneficiarioId,
+      aggiornaAnagrafica: raw.aggiornaAnagrafica as boolean | undefined,
+      versioneBeneficiario: raw.versioneBeneficiario as number | undefined,
+      versioneFascicolo: raw.versioneFascicolo as number | undefined });
   }
   return { map };
 }
@@ -364,6 +377,7 @@ function snapshotFromImportRow(input: {
     statoAttuale: input.row.statoAttuale,
     attendibilitaDato: "fonte_fse_dichiarata",
     riferimentoSorgente: `fse-import-batch:${input.batchId}`,
+    metadatiQualita: input.row.anagrafica ? { formato: "MASSIVO", anagraficaImportata: input.row.anagrafica } : {},
   });
 }
 
@@ -439,45 +453,12 @@ async function importComparison(row: FseBeneficiariRow, target?: typeof benefici
     .where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)) : [];
   const family = target ? await db.select().from(nucleoFamiliareTable)
     .where(eq(nucleoFamiliareTable.beneficiarioId, target.id)) : [];
-  const demographic = target ? calcolaDemografiaNucleo(target, family, new Date(), snapshotFromProfile(profile)) : null;
-  const changes = target ? conservativeImportChanges(target, row, family) : {};
-  const registered: Record<string, string | number | null> = {
-    nome: target?.nome ?? null, cognome: target?.cognome ?? null,
-    dataNascita: target?.dataNascita ?? null, codiceFascicolo: profile?.codiceFascicolo ?? null,
-    dataPresaInCarico: target?.dataPresaInCarico ?? null,
-    numeroComponenti: target?.numComponenti ?? null,
-    tipologiaAttivita: target ? mapDeliveryToFseActivity(target.consegnaDomicilio) : null,
-    statoAttuale: target ? (target.attivo ? "Attivo" : "Disattivato") : null,
-    donne: demographic?.dettaglioCompleto ? demographic.donne : profile?.donneImportate ?? null,
-    uomini: demographic?.dettaglioCompleto ? demographic.uomini : profile?.uominiImportati ?? null,
-    eta017: target?.numMinori ?? null,
-    eta1829: demographic?.dettaglioCompleto ? demographic.eta1829 : profile?.eta1829Importata ?? null,
-    eta3064: demographic?.dettaglioCompleto ? demographic.eta3064 : profile?.eta3064Importata ?? null,
-    eta65Plus: target?.numAnziani ?? null,
-    origineStranieraMinoranze: profile?.origineStranieraMinoranze ?? null,
-    disabili: target?.numDisabili ?? null,
-    cittadiniPaesiTerzi: profile?.cittadiniPaesiTerzi ?? null,
-    senzaTettoEsclusioneAbitativa: profile?.senzaTettoEsclusioneAbitativa ?? null,
-  };
-  const columns: Record<string, string> = {
-    dataPresaInCarico: "dataPresaInCarico", numeroComponenti: "numComponenti",
-    eta017: "numMinori", eta65Plus: "numAnziani", disabili: "numDisabili",
-    tipologiaAttivita: "consegnaDomicilio",
-  };
-  const incoming: Record<string, string | number | null> = { nome: row.nome, cognome: row.cognome, dataNascita: null,
-    codiceFascicolo: row.codiceFascicolo, dataPresaInCarico: row.dataPresaInCarico,
-    numeroComponenti: row.numeroComponenti, tipologiaAttivita: row.tipologiaAttivita, statoAttuale: row.statoAttuale,
-    donne: row.donne, uomini: row.uomini, eta017: row.eta017, eta1829: row.eta1829, eta3064: row.eta3064,
-    eta65Plus: row.eta65Plus, origineStranieraMinoranze: row.origineStranieraMinoranze,
-    disabili: row.disabili, cittadiniPaesiTerzi: row.cittadiniPaesiTerzi,
-    senzaTettoEsclusioneAbitativa: row.senzaTettoEsclusioneAbitativa };
-  return Object.entries(incoming).map(([campo, value]) => ({ campo,
-    attuale: registered[campo] == null ? null : String(registered[campo]),
-    importato: value == null ? null : String(value),
-    esito: ["nome", "cognome", "dataNascita", "statoAttuale"].includes(campo) ||
-      (columns[campo] && !(columns[campo] in changes)) ? "conserva" :
-      campo === "codiceFascicolo" || columns[campo] ? "aggiorna" : "solo_fse",
-  }));
+  return fseImportComparison(row, target, profile, family);
+}
+
+function importCandidates(row: FseBeneficiariRow, areaOperativaId: number) {
+  return searchBeneficiariDuplicates({ areaOperativaId, nome: row.nome, cognome: row.cognome,
+    search: row.anagrafica?.codiceFiscale ?? undefined, dataNascita: row.anagrafica?.dataNascita ?? undefined });
 }
 
 function previewItem(item: ReturnType<typeof validateFseRows>[number]) {
@@ -558,41 +539,24 @@ router.post(
           fascicolo.beneficiario.centroAscoltoId === scoped.centro.id &&
           fascicolo.beneficiario.areaOperativaId ===
             scoped.centro.areaOperativaId;
+        const accessible = territorial && await canAccessFseBeneficiario(fascicolo.beneficiario, req);
+        const confronto = await importComparison(item.row, accessible ? fascicolo.beneficiario : undefined);
         const warning = [...item.warning];
-        if (!samePersonName(fascicolo.beneficiario, item.row)) {
-          warning.push("Nome/cognome differiscono dall'anagrafica collegata.");
-        }
-        if (
-          fascicolo.beneficiario.dataPresaInCarico &&
-          fascicolo.beneficiario.dataPresaInCarico !==
-            item.row.dataPresaInCarico
-        ) {
-          warning.push(
-            "La data di presa in carico interna è differente e non verrà sovrascritta.",
-          );
-        }
-        const classificazione =
-          !territorial || !samePersonName(fascicolo.beneficiario, item.row)
-            ? "conflitto"
-            : fascicolo.profilo.hashUltimaRigaImportata === item.row.hash &&
-                fascicolo.profilo.dataRiferimento === dateRaw
-              ? "invariato"
-              : "da_aggiornare";
+        if (accessible && confronto.some((field) => ["nome", "cognome"].includes(field.campo) && field.differente)) warning.push("Nome/cognome differiscono: controlla il confronto prima di aggiornare l’anagrafica.");
+        const classificazione = !accessible ? "conflitto" : confronto.some((field) => field.differente) ? "da_aggiornare" : "invariato";
         result.push({
           ...previewItem(item),
           warning,
           classificazione,
-          beneficiarioId: territorial ? fascicolo.beneficiario.id : undefined,
-          confronto: await importComparison(item.row, territorial && await canAccessFseBeneficiario(fascicolo.beneficiario, req) ? fascicolo.beneficiario : undefined),
+          beneficiarioId: accessible ? fascicolo.beneficiario.id : undefined,
+          versioneBeneficiario: accessible ? fascicolo.beneficiario.versione : undefined,
+          versioneFascicolo: accessible ? fascicolo.profilo.versione : undefined,
+          confronto,
         });
         continue;
       }
 
-      const suggestions = await searchBeneficiariDuplicates({
-        areaOperativaId: scoped.centro.areaOperativaId,
-        nome: item.row.nome,
-        cognome: item.row.cognome,
-      });
+      const suggestions = await importCandidates(item.row, scoped.centro.areaOperativaId);
       const accessible = suggestions.filter((candidate) => candidate.centroAscoltoId === scoped.centro.id);
       const hasRemoteSimilarity = suggestions.length > accessible.length;
       result.push({
@@ -606,7 +570,7 @@ router.post(
             .where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
           return { id: candidate.id, codice: candidate.codice, nome: candidate.nome,
             cognome: candidate.cognome, dataNascita: candidate.dataNascita,
-            centroAscoltoId: candidate.centroAscoltoId, collegabile: !profile,
+            centroAscoltoId: candidate.centroAscoltoId, collegabile: !profile, versione: target.versione,
             confronto: await importComparison(item.row!, target) };
         })).then((candidates) => candidates.filter((candidate) => candidate != null)),
         warning: hasRemoteSimilarity
@@ -642,6 +606,7 @@ router.post(
       areaOperativaId: scoped.centro.areaOperativaId,
       areaOperativaDerivata: true,
       warningHeader: headerResult.warning,
+      formatoFile: body.formatoFile,
       righe: result,
       conteggi,
       numeroRighe: righe.length,
@@ -758,10 +723,7 @@ router.post(
     // before creating any beneficiaries; existing local candidates still require a choice.
     const candidatesBeforeImport = new Map<number, Awaited<ReturnType<typeof searchBeneficiariDuplicates>>>();
     for (const item of validations) {
-      if (item.row && parsedResolutions.map.get(item.numeroRiga)?.azione !== "salta") candidatesBeforeImport.set(item.numeroRiga, await searchBeneficiariDuplicates({
-        areaOperativaId: scoped.centro.areaOperativaId,
-        nome: item.row.nome, cognome: item.row.cognome,
-      }));
+      if (item.row && parsedResolutions.map.get(item.numeroRiga)?.azione !== "salta") candidatesBeforeImport.set(item.numeroRiga, await importCandidates(item.row, scoped.centro.areaOperativaId));
     }
 
     for (const item of validations) {
@@ -781,6 +743,8 @@ router.post(
         continue;
       }
       const row = item.row;
+      const resolution = parsedResolutions.map.get(item.numeroRiga);
+      const fullUpdate = resolution?.azione === "aggiorna" || resolution?.aggiornaAnagrafica === true;
       try {
         const esito = await db.transaction(async (tx) => {
           const mergeConservativo = async (
@@ -788,7 +752,10 @@ router.post(
           ) => {
             const nucleo = await tx.select().from(nucleoFamiliareTable)
               .where(eq(nucleoFamiliareTable.beneficiarioId, target.id));
-            const changes = conservativeImportChanges(target, row, nucleo);
+            if (fullUpdate && resolution?.versioneBeneficiario !== target.versione) throw new RowImportError("ANAGRAFICA_MODIFICATA", "Rianalizza il file: l’anagrafica è cambiata.");
+            const changes = fullUpdate
+              ? { ...anagraficaImportValues(row), versione: target.versione + 1, dataAggiornamento: new Date() }
+              : conservativeImportChanges(target, row, nucleo);
             await tx
               .update(beneficiariTable)
               .set(changes)
@@ -826,10 +793,14 @@ router.post(
               existing.beneficiario.centroAscoltoId !== scoped.centro.id ||
               existing.beneficiario.areaOperativaId !==
                 scoped.centro.areaOperativaId ||
-              !samePersonName(existing.beneficiario, row)
+              (!samePersonName(existing.beneficiario, row) && !fullUpdate)
             )
               return "conflitto" as const;
-            if (
+            if (fullUpdate && (resolution?.beneficiarioId !== existing.beneficiario.id || resolution?.versioneBeneficiario !== existing.beneficiario.versione || resolution?.versioneFascicolo !== existing.profilo.versione)) throw new RowImportError("ANAGRAFICA_MODIFICATA", "Rianalizza il file prima di aggiornare.");
+            const family = await tx.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, existing.beneficiario.id));
+            const differences = fseImportComparison(row, existing.beneficiario, existing.profilo, family).some((field) => field.differente);
+            if (fullUpdate && !differences) return "invariato" as const;
+            if (!fullUpdate &&
               existing.profilo.hashUltimaRigaImportata === row.hash &&
               existing.profilo.dataRiferimento === dateRaw
             )
@@ -882,7 +853,7 @@ router.post(
           const accessibleSuggestions = suggestions.filter(
             (candidate) => candidate.centroAscoltoId === scoped.centro.id,
           );
-          const resolution = parsedResolutions.map.get(item.numeroRiga);
+          if (resolution?.azione === "aggiorna") throw new RowImportError("TARGET_NON_CANDIDATO", "Il Fascicolo non è più collegato: rianalizza il file.");
           if (suggestions.length && !resolution) {
             throw new RowImportError("DUPLICATO_NON_RISOLTO", "Possibile duplicato non risolto.");
           }
@@ -897,7 +868,7 @@ router.post(
               );
             }
             const [target] = await tx.select().from(beneficiariTable)
-              .where(eq(beneficiariTable.id, Number(resolution.beneficiarioId)));
+              .where(eq(beneficiariTable.id, Number(resolution.beneficiarioId))).for("update");
             if (
               !target ||
               target.centroAscoltoId !== scoped.centro.id ||
@@ -934,20 +905,12 @@ router.post(
             const mono = row.numeroComponenti === 1;
             const [created] = await tx.insert(beneficiariTable).values({
               codice: await allocateBeneficiaryCode(tx, scoped.centro.areaOperativaId),
-              nome: row.nome,
-              cognome: row.cognome,
               statoAnagrafica: "provvisoria",
-              dataPresaInCarico: row.dataPresaInCarico,
-              numComponenti: row.numeroComponenti,
-              numMinori: row.eta017,
-              numAnziani: row.eta65Plus,
-              numDisabili: row.disabili,
-              consegnaDomicilio: mapFseActivityToDelivery(row.tipologiaAttivita)!,
-              attivo: true,
               centroAscoltoId: scoped.centro.id,
               areaOperativaId: scoped.centro.areaOperativaId,
-              sesso: mono ? (row.donne === 1 ? "F" : "M") : null,
-              fasciaEtaPresunta: mono
+              ...anagraficaImportValues(row),
+              sesso: row.anagrafica?.sesso ?? (mono ? (row.donne === 1 ? "F" : "M") : null),
+              fasciaEtaPresunta: row.anagrafica?.dataNascita ? null : mono
                 ? row.eta017 === 1
                   ? "0_17"
                   : row.eta1829 === 1

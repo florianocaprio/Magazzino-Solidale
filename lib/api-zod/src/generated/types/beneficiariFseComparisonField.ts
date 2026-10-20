@@ -14,4 +14,5 @@ export interface BeneficiariFseComparisonField {
   /** @nullable */
   importato: string | null;
   esito: BeneficiariFseComparisonFieldEsito;
+  differente?: boolean;
 }
