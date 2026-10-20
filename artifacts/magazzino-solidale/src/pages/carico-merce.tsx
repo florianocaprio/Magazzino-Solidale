@@ -2202,6 +2202,7 @@ function CarichiContent() {
                     </span>
                   )}
                 {canEditManual &&
+                  practice.soloAggiunte === false &&
                   hasPermission("magazzino.stock.adjust") &&
                   remainingCaricoQuantity(row) !== "0.000000" && (
                     <div className="flex flex-wrap gap-2">

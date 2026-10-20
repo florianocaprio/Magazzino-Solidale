@@ -2349,3 +2349,66 @@ Questa ricevuta è solo documentale e non cambia il codice installato. Branch
 `codex/bugfix-uat-ottobre-2026`, main e produzione esclusi. Workflow nuovamente
 verificato: nessun deploy sul push del branch; zero hook e zero ambienti GitHub.
 La consegna 05 resta in attesa dell'OK UAT di Floriano prima del prompt 06.
+
+## Precisazione finale UAT 05 — riapertura con sole aggiunte
+
+Floriano conferma che il resto delle funzionalità è perfetto e richiede un solo
+vincolo aggiuntivo: una pratica chiusa, quando viene riaperta, permette di
+aggiungere prodotti, senza modificare quantità o rimuovere righe già caricate.
+Alla domanda sul seguito chiarisce: **«Completa questa correzione; ti invierò
+il prossimo prompt»**. Il prompt 06 resta quindi in attesa del suo invio.
+
+Intervento minimo: l'API ricava `soloAggiunte` dallo stato Chiusa o dagli eventi
+storici `CARICO_PRATICA_CHIUDI` / `CARICO_PRATICA_RIAPRI`, già conservati nel DB.
+Il vincolo non dipende dalla sessione o dalla memoria del browser. Dopo una
+chiusura il comando rettifica rifiuta nuove rimozioni o copie sostitutive, anche
+con chiamata diretta all'endpoint e permessi amministrativi. Il controllo è
+eseguito nel lock/transazione della pratica; il replay di un comando già concluso
+rimane una lettura idempotente e non crea altri movimenti.
+
+L'interfaccia nasconde Modifica/Rimuovi sulle righe contabilizzate quando il
+flag non è esplicitamente false. Aggiunta di nuove righe, compilazione/salvataggio
+e rimozione delle nuove bozze non confermate, conferma di una nuova integrazione,
+Sospendi e Chiudi mantengono il comportamento verificato. Le rettifiche prima
+della prima chiusura restano disponibili. Nessun cambiamento a stati o schema DB;
+solo il campo opzionale additivo `soloAggiunte` nel dettaglio OpenAPI, con tipi
+rigenerati dal comando ufficiale e verifica di riproducibilità.
+
+Copertura aggiunta: API chiude/riapre, rifiuta entrambi i tipi di rettifica,
+verifica versione, righe e integrazioni invariate, poi aggiunge e conferma una
+nuova riga mantenendo l'originale identica. Browser verifica il blocco anche dopo
+reload, aggiunge 15 alle precedenti righe 80 e 20 e verifica 115 senza cambiare
+le due quantità originali.
+
+File modificati:
+
+- `artifacts/api-server/src/routes/carico-pratiche.ts`
+- `artifacts/api-server/tests/carico-pratiche-m3a.test.ts`
+- `artifacts/magazzino-solidale/src/pages/carico-merce.tsx`
+- `artifacts/magazzino-solidale/e2e/carico-pratiche-m3a.spec.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaDettaglio.ts`
+- questo registro.
+
+Verifiche sul correttivo:
+
+- `CI=true pnpm install --frozen-lockfile`: PASS, lockfile invariato.
+- `pnpm run typecheck`: PASS.
+- UI `pnpm --filter @workspace/magazzino-solidale run test --maxWorkers=2`:
+  **782 PASS, 121 file**.
+- Runner API canonico, gruppo general: **1.530 PASS + 4 SKIP esterni, 140 file**,
+  incluse le **13 prove** della pratica di carico. Evidenza privata
+  `/private/tmp/blocco05onlyadd-api`.
+- Runner browser canonico, `carico-pratiche-m3a.spec.ts`: **2 PASS + 8 SKIP** dei
+  viewport già esclusi dalla matrice mutativa. Il controllo del flusso inventariale
+  gira su desktop come prima; nessuno skip, timeout o retry modificato.
+  Evidenza privata `/private/tmp/blocco05onlyadd-browser`. Le altre spec di
+  presentazione non sono state rieseguite: nessuna modifica al loro codice.
+- Build produzione e budget: **386,6/400 KiB gzip**, entry `index-D77xZueP.js`.
+- Codegen ufficiale eseguito due volte, file generati identici byte per byte.
+- `git diff --check`: PASS. Quattro documenti preesistenti conservati e fuori Git.
+
+Installazione 8082 da completare con immagini immutabili del checkpoint,
+backup e ricevuta separata. Nessun test funzionale ha usato il DB personale.

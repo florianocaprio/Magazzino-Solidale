@@ -10,6 +10,8 @@ import type { CaricoPratica } from "./caricoPratica";
 import type { CaricoPraticaRiga } from "./caricoPraticaRiga";
 
 export type CaricoPraticaDettaglio = CaricoPratica & {
+  /** La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate. */
+  soloAggiunte?: boolean;
   areaOperativaNome: string;
   lottoLogicoCodice: string;
   /** @nullable */

@@ -797,6 +797,97 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
     expect(Number(final.body.righe[1].quantitaRettificata)).toBe(8);
   });
 
+  it("mantiene le pratiche chiuse e riaperte in sola aggiunta, anche chiamando direttamente le API", async () => {
+    const app = appFor(operatorAId);
+    const created = await createPractice(app, [row("10")]);
+    const id = created.body.id;
+    const rowId = created.body.righe[0].id;
+    expect(created.body.soloAggiunte).toBe(false);
+    const registered = await request(app)
+      .post(`/carico-pratiche/${id}/registra`)
+      .send({
+        versione: created.body.versione,
+        rigaIds: [rowId],
+        idempotencyKey: `onlyadd-load-${suffix}`,
+      });
+    expect(registered.status).toBe(201);
+    const closed = await request(app)
+      .post(`/carico-pratiche/${id}/chiudi`)
+      .send({ versione: registered.body.versione });
+    expect(closed.status).toBe(200);
+    expect(closed.body.soloAggiunte).toBe(true);
+    const originalRow = closed.body.righe[0];
+    const originalIntegrations = closed.body.integrazioni;
+    const url = `/carico-pratiche/${id}/righe/${rowId}/rettifica`;
+    expect(
+      (
+        await request(app)
+          .post(url)
+          .send({
+            versione: closed.body.versione,
+            quantita: "10",
+            motivo: "Non consentito dopo chiusura",
+            idempotencyKey: `onlyadd-closed-${suffix}`,
+          })
+      ).status,
+    ).toBe(409);
+    const reopened = await request(app)
+      .post(`/carico-pratiche/${id}/riapri`)
+      .send({ versione: closed.body.versione, motivo: "Aggiunta merce" });
+    expect(reopened.status).toBe(200);
+    expect(reopened.body).toMatchObject({
+      stato: "aperta",
+      soloAggiunte: true,
+    });
+    for (const ripristinaBozza of [false, true]) {
+      const denied = await request(app)
+        .post(url)
+        .send({
+          versione: reopened.body.versione,
+          quantita: "10",
+          motivo: "Non consentito dopo riapertura",
+          idempotencyKey: `onlyadd-denied-${ripristinaBozza}-${suffix}`,
+          ripristinaBozza,
+        });
+      expect(denied.status).toBe(409);
+      expect(denied.body.error).toContain("solo nuove aggiunte");
+    }
+    const unchanged = await request(app).get(`/carico-pratiche/${id}`);
+    expect(unchanged.body.soloAggiunte).toBe(true);
+    expect(unchanged.body.versione).toBe(reopened.body.versione);
+    expect(unchanged.body.righe).toEqual([originalRow]);
+    expect(unchanged.body.integrazioni).toEqual(originalIntegrations);
+    const added = await request(app)
+      .post(`/carico-pratiche/${id}/righe`)
+      .send({ versione: reopened.body.versione, ...row(null) });
+    expect(added.status).toBe(201);
+    const newId = added.body.rigaId;
+    const edited = await request(app)
+      .patch(`/carico-pratiche/${id}/righe/${newId}`)
+      .send({ versione: added.body.versione, ...row("5") });
+    expect(edited.status).toBe(200);
+    const integration = await request(app)
+      .post(`/carico-pratiche/${id}/registra`)
+      .send({
+        versione: edited.body.versione,
+        rigaIds: [newId],
+        idempotencyKey: `onlyadd-new-${suffix}`,
+      });
+    expect(integration.status).toBe(201);
+    const final = await request(app).get(`/carico-pratiche/${id}`);
+    expect(final.body.righe[0]).toEqual(originalRow);
+    expect(final.body.righe[1]).toMatchObject({ id: newId, registrata: true });
+    expect(Number(final.body.righe[1].quantita)).toBe(5);
+    expect(final.body.soloAggiunte).toBe(true);
+    expect(
+      (
+        await request(app)
+          .post(`/carico-pratiche/${id}/chiudi`)
+          .send({ versione: final.body.versione })
+      ).status,
+    ).toBe(200);
+  });
+
   it("gestisce chiusura, replay dopo chiusura e annullamento motivato di una bozza", async () => {
     const app = appFor(operatorAId);
     const created = await createPractice(app, [row("2")], {

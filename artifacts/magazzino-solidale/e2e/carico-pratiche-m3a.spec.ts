@@ -377,27 +377,54 @@ test.describe("M3A — pratica di carico persistente", () => {
     expect(await readStock(resumedPage)).toBe(before + 100);
     await openPracticeFromList(resumedPage, area, description);
     resumedPage.once("dialog", (dialog) =>
-      dialog.accept("Correzione di una riga caricata"),
+      dialog.accept("Aggiunta di altri prodotti"),
     );
     await resumedPage.getByRole("button", { name: /^riapri$/i }).click();
-    const loadedRow = resumedPage
-      .getByText(`20,00 ${product.unitaMisura}`, { exact: true })
-      .locator("..");
-    await loadedRow
-      .getByRole("button", { name: "Modifica prodotto", exact: true })
+    await expect(
+      resumedPage.getByText(`20,00 ${product.unitaMisura}`, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Modifica prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Rimuovi Prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    expect(await readStock(resumedPage)).toBe(before + 100);
+    await resumedPage.reload();
+    await openPracticeFromList(resumedPage, area, description);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Modifica prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Rimuovi Prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await resumedPage
+      .getByRole("button", { name: "Inserimento prodotti", exact: true })
       .click();
-    const correctionDialog = resumedPage.getByRole("alertdialog");
-    await correctionDialog
-      .getByRole("textbox")
-      .fill("Quantità corretta da 20 a 15");
-    await correctionDialog
-      .getByRole("button", { name: "Conferma rettifica" })
+    await resumedPage
+      .getByLabel(/cerca per nome, codice o barcode/i)
+      .fill(product.codice);
+    await resumedPage
+      .getByRole("button", { name: new RegExp(product.codice, "i") })
       .click();
-    await expect(correctionDialog).toHaveCount(0);
-    expect(await readStock(resumedPage)).toBe(before + 80);
-    const replacementQuantity = resumedPage.getByLabel(/quantità/i);
-    await expect(replacementQuantity).toBeFocused();
-    await replacementQuantity.fill("15");
+    await resumedPage
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
+      .click();
+    const newQuantity = resumedPage.getByLabel(/quantità/i);
+    await expect(newQuantity).toBeFocused();
+    await newQuantity.fill("15");
     await resumedPage
       .getByRole("button", { name: "Inserisci Prodotto", exact: true })
       .click();
@@ -419,8 +446,36 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("alertdialog")
       .getByRole("button", { name: /conferma/i })
       .click();
-    await expect(replacementQuantity).toHaveCount(0);
-    expect(await readStock(resumedPage)).toBe(before + 95);
+    await expect(newQuantity).toHaveCount(0);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Modifica prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Rimuovi Prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    expect(await readStock(resumedPage)).toBe(before + 115);
+    const afterAddition = await (
+      await resumedPage.request.get(`/api/carico-pratiche/${practice.id}`)
+    ).json();
+    expect(afterAddition.soloAggiunte).toBe(true);
+    expect(
+      afterAddition.righe.map(
+        (row: { quantita: string; registrata: boolean }) => [
+          Number(row.quantita),
+          row.registrata,
+        ],
+      ),
+    ).toEqual([
+      [80, true],
+      [20, true],
+      [15, true],
+    ]);
     await concurrentContext.close();
     await resumedContext.close();
   });
@@ -531,9 +586,7 @@ test.describe("M3A — pratica di carico persistente", () => {
       ),
     ).toBeVisible();
 
-    await page
-      .getByRole("button", { name: "Magazzino", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Magazzino", exact: true }).click();
     await page.getByRole("link", { name: "Giacenze", exact: true }).click();
     const unsavedDialog = page.getByRole("alertdialog", {
       name: /modifiche non salvate/i,

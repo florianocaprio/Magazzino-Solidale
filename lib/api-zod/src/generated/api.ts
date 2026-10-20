@@ -1787,6 +1787,12 @@ export const GetCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -1946,6 +1952,12 @@ export const UpdateCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -2197,6 +2209,12 @@ export const UpdateCaricoPraticaRigaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -2333,6 +2351,12 @@ export const DeleteCaricoPraticaRigaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -2550,6 +2574,12 @@ export const CloseCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -2686,6 +2716,12 @@ export const ReopenCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),
@@ -2822,6 +2858,12 @@ export const CancelCaricoPraticaResponse = zod
   })
   .and(
     zod.object({
+      soloAggiunte: zod
+        .boolean()
+        .optional()
+        .describe(
+          "La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.",
+        ),
       areaOperativaNome: zod.string(),
       lottoLogicoCodice: zod.string(),
       fornitoreNome: zod.string().nullish(),

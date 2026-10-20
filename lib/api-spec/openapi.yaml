@@ -14203,6 +14203,9 @@ components:
         - $ref: "#/components/schemas/CaricoPratica"
         - type: object
           properties:
+            soloAggiunte:
+              type: boolean
+              description: La pratica è stata chiusa almeno una volta; dopo la riapertura consente nuove aggiunte senza rettificare le righe contabilizzate.
             areaOperativaNome: { type: string }
             lottoLogicoCodice: { type: string }
             fornitoreNome: { type: [string, "null"] }

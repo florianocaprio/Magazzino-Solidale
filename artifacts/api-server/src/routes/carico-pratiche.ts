@@ -5,6 +5,7 @@ import {
   FONDI_ORIGINE,
   ORIGINI_CARICO_MANUALI,
   areeOperativeTable,
+  auditEventiTable,
   caricoIntegrazioneRigheTable,
   caricoIntegrazioniTable,
   caricoPraticaRettificheTable,
@@ -447,6 +448,27 @@ function requireManualPracticeEdit(practice: CaricoPratica) {
     );
 }
 
+async function hasClosedPractice(
+  reader: Pick<InventoryTransaction, "select">,
+  id: number,
+) {
+  const [event] = await reader
+    .select({ id: auditEventiTable.id })
+    .from(auditEventiTable)
+    .where(
+      and(
+        eq(auditEventiTable.entitaTipo, "carico_pratica"),
+        eq(auditEventiTable.entitaId, id),
+        inArray(auditEventiTable.azione, [
+          "CARICO_PRATICA_CHIUDI",
+          "CARICO_PRATICA_RIAPRI",
+        ]),
+      ),
+    )
+    .limit(1);
+  return event != null;
+}
+
 async function detail(id: number) {
   const [header] = await db
     .select({
@@ -516,6 +538,8 @@ async function detail(id: number) {
     .orderBy(caricoIntegrazioniTable.id);
   return {
     ...header.pratica,
+    soloAggiunte:
+      header.pratica.stato === "chiusa" || (await hasClosedPractice(db, id)),
     areaOperativaNome: header.areaOperativaNome,
     magazzinoNome: header.magazzinoNome,
     lottoLogicoDescrizione: header.lottoLogicoDescrizione,
@@ -1497,6 +1521,11 @@ router.post(
         }
 
         requireVersion(practice, requestedVersion);
+        if (practice.stato === "chiusa" || (await hasClosedPractice(tx, id)))
+          throw new CaricoPraticaError(
+            409,
+            "Dopo la chiusura la pratica consente solo nuove aggiunte: le righe contabilizzate non sono più modificabili o rimovibili",
+          );
         if (ripristinaBozza) {
           requireWorkingState(practice);
           requireManualPracticeEdit(practice);
