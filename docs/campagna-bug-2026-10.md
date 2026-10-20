@@ -2990,4 +2990,44 @@ Seconda general `13776c0e-5498-4765-918e-4dfcb42c7b36`: **1557 PASS / 7 SKIP / 1
 Browser iniziale interrotto al solo Playwright identificato: fixture con `getByLabel(..., exact:true)` non includeva l’asterisco del campo obbligatorio. Corretto soltanto il selettore con regex; non cambiati accessibilità o prodotto per adattarli al test. Cleanup e lock gestiti dal runner; un tentativo anticipato di avvio è stato correttamente respinto dal lock senza operazioni DB/browser. La ripetizione finale avviene con PATH Node 24, a sorgenti applicativi fermi. Il checkpoint `00371ff88419491ff532100811c8f57ac22e59f5` contiene il prodotto; segue checkpoint della fixture corretta e build della SHA finale.
 
 
-Browser finale **PASS**: `m67-p4-mensa-context.spec.ts` **20 PASS** su cinque viewport, incluso il nuovo percorso completo C2C senza skip; `mensa-workflows.spec.ts` **8 PASS / 12 SKIP**, skip preesistenti dei tre scenari mutativi eseguiti soltanto desktop, mentre le cinque viewport sono verificate. Totale **28 PASS / 12 SKIP**, nessun failure/flaky finale. Evidenze `test-results/quality-gates/browser/097c74be-d13d-4077-bddb-83e3fa7ac49e`. Coperti anche pasti temporanei, replay, consumi con risposta persa e trasferimento di lotti reali. Database/reti rimossi dal runner. Le verifiche UDS sono effettuate con lo stesso amministratore del CdA, su persona provvisoria, senza completarene automaticamente l’anagrafica. Verifica UI mirata successiva: **19 PASS** (card, postazione e contesto).
+Browser finale **PASS**: `m67-p4-mensa-context.spec.ts` **20 PASS** su cinque viewport, incluso il nuovo percorso completo C2C senza skip; `mensa-workflows.spec.ts` **8 PASS / 12 SKIP**, skip preesistenti dei tre scenari mutativi eseguiti soltanto desktop, mentre le cinque viewport sono verificate. Totale **28 PASS / 12 SKIP**, nessun failure/flaky finale. Evidenze `test-results/quality-gates/browser/097c74be-d13d-4077-bddb-83e3fa7ac49e`. Coperti anche pasti temporanei, replay, consumi con risposta persa e trasferimento di lotti reali. Database/reti rimossi dal runner. Le verifiche UDS sono effettuate con lo stesso amministratore del CdA, su persona provvisoria, senza completarne automaticamente l’anagrafica. Verifica UI mirata successiva: **19 PASS** (card, postazione e contesto).
+
+
+### C2C / BUG26 — ricevuta finale e 8082 pronta per Floriano
+
+General finale con stop impedito soltanto durante il runner: **1558 PASS / 7 SKIP**, zero failure, **191 s**; evidenze `test-results/quality-gates/api/b086772d-309c-4d28-896b-980d3ad4786d`. I 7 skip sono gli originali esterni opzionali non disponibili, senza aggiunte. I due precedenti timeout FSE/lotti e quello UDS sono tutti passati senza alcuna modifica a quei test o ai timeout. Riusate le evidenze ancora valide sullo stesso codice API core (79 PASS) e Mensa (118 PASS): totale **1755 API PASS / 7 SKIP**. Nessun insieme parziale dichiarato campagna cumulativa completa.
+
+UI **841 PASS / 129 file**, ulteriore verifica mirata **19 PASS** sui tre componenti coinvolti, typecheck workspace/frontend PASS. Browser **28 PASS / 12 skip preesistenti**, inclusi **20 PASS senza skip** di contesto e flusso C2C sulle cinque viewport. Install frozen, codegen riproducibile per 1003 file, build API/WEB e budget immagine **390,7/400 KiB gzip** PASS. Le evidenze del prodotto corrispondono al checkpoint `00371ff`; `5343464` cambia soltanto fixture browser e registro.
+
+Revisione esatta compilata e installata: **`5343464fae00391a31b1f1b815467db0ae3d1014`**.
+
+- API `magazzino-bugfix-uat-api:sha-5343464fae00`, ID `sha256:5bc1ed1653876fe0d2b50dfb3f123570a9b5ca9a58a38ab6e187a056994d2f3f`.
+- WEB `magazzino-bugfix-uat-web:sha-5343464fae00`, ID `sha256:f2c03b45e0361bc727f5da3ceff9847411311f3bc27246406cff4b7459e49d8b`.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2C-5343464fae00-2026-10-20T23-37-26-813Z`: dump PostgreSQL e uploads con SHA256 e indici verificati, restore effettivo su PostgreSQL effimero senza porte host, replay canonico **63→63**. Estesa la verifica in sola lettura alle tabelle Mensa: il primo preflight ha rilevato il limite PostgreSQL di 100 argomenti a json_build_object; corretta soltanto la query privata con jsonb_object_agg, nessuna modifica applicativa o dei dati. Il preflight finale e il confronto prima/dopo sono identici su **57 tabelle**, compresi accessi, pasti, eccezioni, temporanei, consumi, configurazioni, saldi e ricevute. Ricreati soltanto API/WEB sulla catena Compose effettiva; PostgreSQL mantiene ID/avvio/volume e uploads mantengono il volume. Nessuna suite mutativa, importazione, simulazione di date o ricarica di prova sulla 8082.
+
+Ledger initialized **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Verificate revision label, hash degli asset realmente serviti e presenza dei nuovi controlli API/UI C2C, conservando verifiche C2A/C2B e primo ciclo. Entry `/assets/index-CeN76en1.js`; ricevuta privata `/private/tmp/c2c-final-release-result.json`. Nessun cambiamento main/Hetzner, push o merge.
+
+Elenco dei file applicativi/di verifica modificati nel blocco:
+
+- `artifacts/api-server/src/lib/mensaEligibilitySummary.ts`
+- `artifacts/api-server/src/routes/beneficiari.ts`
+- `artifacts/api-server/src/routes/mensa.ts`
+- `artifacts/api-server/tests/mensa.test.ts`
+- `artifacts/magazzino-solidale/src/components/beneficiario-mensa-card.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-mensa-card.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/pages/mensa.tsx`
+- `artifacts/magazzino-solidale/src/lib/i18n/index.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/ciclo2Mensa.ts`
+- `artifacts/magazzino-solidale/e2e/m67-p4-mensa-context.spec.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/mensaAbilitazione.ts`
+- `lib/api-zod/src/generated/types/mensaAbilitazioneInput.ts`
+- `lib/api-zod/src/generated/types/mensaStatoInput.ts`
+- `docs/campagna-bug-2026-10.md`
+
+**C2C / BUG26: PRONTO PER LA UAT DI FLORIANO SULLA 8082**, in base al suo mandato diretto di ricompilazione. Ricaricare la pagina. Prova proposta: dal CdA aprire Modifica anagrafica e abilitare Mensa con motivo, anche su provvisoria; leggere Area e riferimento; servire nella seconda Mensa autorizzata della stessa Area con un solo pasto ordinario per giorno/tipo; verificare sospensione/revoca e diniego altra Area; nel contesto UDS controllare soli stati anche riaprendo la modifica. Usare una seconda persona o un diverso servizio/giorno per distinguere mobilità e divieto di duplicati. **C2C resta aperta fino all’OK umano**. I prompt 04 di certificazione cumulativa e 05 di rilascio finale restano separati e non attivati; questo blocco non li sostituisce né autorizza il merge.
