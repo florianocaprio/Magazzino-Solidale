@@ -885,7 +885,13 @@ export function FseImportPracticeWizard({
                     )}
                   </div>
                   {canManageMappings && (
-                    <div className="space-y-2 rounded-md bg-muted/40 p-3 md:col-span-3">
+                    <div
+                      className={
+                        suggestFseProducts(description, products).length
+                          ? "space-y-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 md:col-span-3 dark:border-emerald-900 dark:bg-emerald-950"
+                          : "space-y-2 rounded-md bg-muted/40 p-3 md:col-span-3"
+                      }
+                    >
                       <p className="text-sm text-muted-foreground">
                         {t(
                           suggestFseProducts(description, products).length
@@ -900,7 +906,7 @@ export function FseImportPracticeWizard({
                               key={product.id}
                               variant="outline"
                               disabled={pending}
-                              className="h-auto max-w-full whitespace-normal text-left"
+                              className="h-auto max-w-full whitespace-normal border-emerald-300 bg-emerald-100 text-left text-emerald-900 hover:bg-emerald-200 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800"
                               onClick={() =>
                                 void confirmMapping(description, product.id)
                               }
