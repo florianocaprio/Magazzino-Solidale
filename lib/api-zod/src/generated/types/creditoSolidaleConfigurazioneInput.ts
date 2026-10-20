@@ -9,6 +9,11 @@ import type { CreditoSolidaleConfigurazioneInputCreditoSolidaleStato } from "./c
 
 export interface CreditoSolidaleConfigurazioneInput {
   /**
+   * Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.
+   * @minimum 1
+   */
+  versioneBeneficiario?: number;
+  /**
    * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
    * @minimum 1
    * @nullable

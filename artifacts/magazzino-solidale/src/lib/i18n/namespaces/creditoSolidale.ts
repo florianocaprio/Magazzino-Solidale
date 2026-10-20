@@ -98,7 +98,7 @@ const it = {
   allCenters: "Tutti i centri",
   simulationTitle: "Credito mensile suggerito",
   simulationSubtitle:
-    "Questo totale è una simulazione della quota mensile suggerita. La ricarica effettiva sarà gestita in una fase successiva.",
+    "Quota mensile suggerita sulla base del nucleo e della politica corrente. La prima quota dovuta richiede la conferma Emporio/credito; le mensilità successive vengono elaborate automaticamente.",
   politicaApplicata: "Politica applicata",
   totaleSuggerito: "Totale suggerito",
   totalePrimaDeiLimiti: "Totale prima dei limiti",

@@ -903,6 +903,7 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
     })
     .fill("Decisione sociale esplicita E2E");
   await enable.click();
+  await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   expect(
     (
@@ -944,6 +945,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await card
     .getByRole("button", { name: "Abilita all'Emporio", exact: true })
     .click();
+  await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(planning).toBeVisible();
   await page.goBack();
@@ -986,6 +988,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
         exact: true,
       })
       .click();
+    if(state==="attivo")await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
     await expect(
       card.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();

@@ -66,6 +66,8 @@ async function beneficiary(saldo = 210, quota = 12) {
       creditoSolidaleStato: "attivo",
       creditoSolidaleSaldo: String(saldo),
       creditoSolidaleMensileAssegnato: String(quota),
+      creditoSolidaleMensileManuale: true,
+      creditoSolidaleMotivoModifica: "Deroga totale fixture F1",
     })
     .returning();
   created.push(b.id);

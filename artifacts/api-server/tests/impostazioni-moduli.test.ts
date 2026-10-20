@@ -241,6 +241,7 @@ describe("Impostazioni moduli", () => {
       .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
       .send({
         creditoSolidaleAbilitato: true,
+        versioneBeneficiario: created.body.versione,
         creditoSolidaleMensileAssegnato: 70,
         creditoSolidaleMensileSuggerito: 60,
         creditoSolidaleMotivoModifica: "Esigenza temporanea",

@@ -66,6 +66,7 @@ export const UpdateBeneficiarioInput = BeneficiarioBaseInput.partial().extend({
 }).strict();
 
 export const UpdateBeneficiarioCreditoInput = z.object({
+  versioneBeneficiario: z.number().int().positive().optional(),
   politicaCreditoSolidaleId: nullableId,
   creditoSolidaleAbilitato: booleanValue.optional(),
   creditoSolidaleStato: z.enum(["non_abilitato", "attivo", "sospeso", "revocato"]).optional(),

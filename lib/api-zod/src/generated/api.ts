@@ -13327,6 +13327,102 @@ export const GetEmporioAbilitazioniRiepilogoBeneficiariResponse = zod.array(
   GetEmporioAbilitazioniRiepilogoBeneficiariResponseItem,
 );
 
+/**
+ * @summary Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
+ */
+export const GetEmporioCreditoAnteprimaParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const GetEmporioCreditoAnteprimaResponse = zod.object({
+  beneficiarioId: zod.number(),
+  versioneBeneficiario: zod.number(),
+  calcoloToken: zod.string(),
+  areaNome: zod.string(),
+  politicaNome: zod.string(),
+  totaleSuggerito: zod.number(),
+  quotaMensileAssegnata: zod.number(),
+  motivoModificaQuota: zod.string().nullish(),
+  primaQuotaAmmessa: zod.boolean(),
+});
+
+/**
+ * @summary Attivazione atomica Emporio, credito e prima quota; stessa chiave e contenuto restituiscono la ricevuta, mismatch 409.
+ */
+export const AttivaEmporioCreditoParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const attivaEmporioCreditoBodyIdempotencyKeyMax = 120;
+
+export const attivaEmporioCreditoBodyCalcoloTokenMin = 64;
+export const attivaEmporioCreditoBodyCalcoloTokenMax = 64;
+
+export const attivaEmporioCreditoBodyMotivoMax = 1000;
+
+export const attivaEmporioCreditoBodyQuotaMensileAssegnataMin = 0;
+export const attivaEmporioCreditoBodyQuotaMensileAssegnataMax = 99999999;
+
+export const attivaEmporioCreditoBodyMotivoModificaQuotaMax = 10000;
+
+export const AttivaEmporioCreditoBody = zod.object({
+  idempotencyKey: zod
+    .string()
+    .min(1)
+    .max(attivaEmporioCreditoBodyIdempotencyKeyMax),
+  versioneBeneficiario: zod.number().min(1),
+  calcoloToken: zod
+    .string()
+    .min(attivaEmporioCreditoBodyCalcoloTokenMin)
+    .max(attivaEmporioCreditoBodyCalcoloTokenMax),
+  motivo: zod.string().min(1).max(attivaEmporioCreditoBodyMotivoMax),
+  quotaMensileAssegnata: zod
+    .number()
+    .min(attivaEmporioCreditoBodyQuotaMensileAssegnataMin)
+    .max(attivaEmporioCreditoBodyQuotaMensileAssegnataMax)
+    .nullish(),
+  motivoModificaQuota: zod
+    .string()
+    .max(attivaEmporioCreditoBodyMotivoModificaQuotaMax)
+    .nullish(),
+});
+
+export const AttivaEmporioCreditoResponse = zod.object({
+  beneficiarioId: zod.number(),
+  quotaMensile: zod.number(),
+  quotaAccreditata: zod.number(),
+  primaQuotaValutata: zod.boolean(),
+  periodo: zod.string(),
+  movimentoId: zod.number().nullable(),
+  stato: zod.string(),
+});
+
+/**
+ * @summary Recupera l'esito con rivalidazione di entrambi i permessi, moduli, attore e territorio.
+ */
+export const GetEmporioCreditoAttivazioneEsitoParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const getEmporioCreditoAttivazioneEsitoQueryIdempotencyKeyMax = 120;
+
+export const GetEmporioCreditoAttivazioneEsitoQueryParams = zod.object({
+  idempotencyKey: zod.coerce
+    .string()
+    .min(1)
+    .max(getEmporioCreditoAttivazioneEsitoQueryIdempotencyKeyMax),
+});
+
+export const GetEmporioCreditoAttivazioneEsitoResponse = zod.object({
+  beneficiarioId: zod.number(),
+  quotaMensile: zod.number(),
+  quotaAccreditata: zod.number(),
+  primaQuotaValutata: zod.boolean(),
+  periodo: zod.string(),
+  movimentoId: zod.number().nullable(),
+  stato: zod.string(),
+});
+
 export const GetEmporioAbilitazioneParams = zod.object({
   beneficiarioId: zod.coerce.number(),
 });
@@ -19287,6 +19383,13 @@ export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleM
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax = 99999999;
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
+  versioneBeneficiario: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.",
+    ),
   politicaCreditoSolidaleId: zod
     .number()
     .min(1)
@@ -19322,6 +19425,7 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneResponse =
   zod.object({
+    versioneBeneficiario: zod.number().optional(),
     politicaCreditoSolidaleId: zod
       .number()
       .min(1)

@@ -13,7 +13,7 @@ const it = {
   revoca: "Revoca abilitazione",
   motivo: "Motivo dell'abilitazione o della variazione",
   indipendente:
-    "Valida negli Empori della stessa Area. La prima abilitazione attiva anche il Credito Solidale; saldo e storico restano conservati. Nessun accredito immediato.",
+    "Valida negli Empori della stessa Area. Conferma attivazione, quota mensile e prima ricarica dovuta nel passaggio successivo. Saldo e storico restano conservati.",
   creditoBloccato:
     "Abilita prima il servizio Emporio. Saldo e storico esistenti restano conservati.",
   nessunEmporio:

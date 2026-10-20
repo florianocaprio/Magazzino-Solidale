@@ -5377,6 +5377,11 @@ export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
 
 export interface CreditoSolidaleConfigurazioneInput {
   /**
+   * Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.
+   * @minimum 1
+   */
+  versioneBeneficiario?: number;
+  /**
    * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
    * @minimum 1
    * @nullable
@@ -5413,6 +5418,7 @@ export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazione {
+  versioneBeneficiario?: number;
   /**
    * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
    * @minimum 1
@@ -7181,6 +7187,55 @@ export interface EmporioAbilitazione {
   statoEffettivo?: EmporioStatoEffettivo;
   /** @nullable */
   motivo?: string | null;
+}
+
+export interface EmporioCreditoAnteprima {
+  beneficiarioId: number;
+  versioneBeneficiario: number;
+  calcoloToken: string;
+  areaNome: string;
+  politicaNome: string;
+  totaleSuggerito: number;
+  quotaMensileAssegnata: number;
+  motivoModificaQuota?: string | null;
+  primaQuotaAmmessa: boolean;
+}
+
+export interface EmporioCreditoAttivazioneInput {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versioneBeneficiario: number;
+  /**
+   * @minLength 64
+   * @maxLength 64
+   */
+  calcoloToken: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  motivo: string;
+  /**
+   * @minimum 0
+   * @maximum 99999999
+   */
+  quotaMensileAssegnata?: number | null;
+  /** @maxLength 10000 */
+  motivoModificaQuota?: string | null;
+}
+
+export interface EmporioCreditoAttivazioneResult {
+  beneficiarioId: number;
+  quotaMensile: number;
+  quotaAccreditata: number;
+  primaQuotaValutata: boolean;
+  periodo: string;
+  movimentoId: number | null;
+  stato: string;
 }
 
 export type EmporioAbilitazioneInputStato =
@@ -12217,6 +12272,14 @@ export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
    * Identificativi della pagina corrente, separati da virgola (massimo 100).
    */
   beneficiarioIds: string;
+};
+
+export type GetEmporioCreditoAttivazioneEsitoParams = {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  idempotencyKey: string;
 };
 
 export type SearchBeneficiariAccessiEmporioParams = {

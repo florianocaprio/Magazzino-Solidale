@@ -1,3 +1,4 @@
+import { findPolicyByBeneficiario, calculate, configuraQuotaTx, calcolaQuotaTx } from "../lib/creditoCalcolo";
 import { Router, type IRouter, type Request } from "express";
 import { creditoPolicyApplicable } from "../lib/creditoPolicyScope";
 import {
@@ -9,6 +10,7 @@ import { DocumentCommandError } from "../lib/documentCommand";
 import { auditContextFromRequest } from "../lib/auditEvent";
 import { calendarioCredito } from "../lib/creditoMensile";
 import {
+  comandiOperativiTable,
   creditoRicaricheMensiliTable,
   creditoRicaricheDestinatariTable,
 } from "@workspace/db";
@@ -93,24 +95,6 @@ const TIPI_MOVIMENTO = [
 type TipoMovimento = (typeof TIPI_MOVIMENTO)[number];
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-const DEFAULT_POLICY = {
-  id: null as number | null,
-  nome: "Politica predefinita",
-  creditoBaseNucleo: "50.00",
-  creditoPerComponente: "10.00",
-  bonusMinore: "5.00",
-  bonusAnziano: "5.00",
-  bonusDisabile: "10.00",
-  creditoMinimoMensile: "0.00",
-  creditoMassimoMensile: null as string | null,
-  giornoRicaricaMensile: 1,
-  ricaricaAutomaticaAbilitata: false,
-  arrotondamento: "nessuno",
-};
-
-type PoliticaCalcolo = typeof DEFAULT_POLICY;
-type PoliticaOrigine = "centro" | "areaOperativa" | "globale" | "default";
-
 const toNumber = (v: string | number | null | undefined): number => {
   if (v == null || v === "") return 0;
   const n = Number(v);
@@ -152,21 +136,6 @@ function parseOptionalId(value: unknown): { value?: number; error?: string } {
     : { error: "Filtro non valido." };
 }
 
-function applyRounding(value: number, mode: string): number {
-  // Validate BEFORE the historical policy: no mode may legalize a fraction.
-  creditoIntero(value);
-  switch (mode) {
-    case "intero_superiore":
-      return Math.ceil(value);
-    case "intero_inferiore":
-      return Math.floor(value);
-    case "intero_piu_vicino":
-      return Math.round(value);
-    default:
-      return value;
-  }
-}
-
 function canAccessBeneficiario(
   beneficiario: typeof beneficiariTable.$inferSelect,
   req: Request,
@@ -198,128 +167,6 @@ async function requireAccessibleBeneficiario(
   if (!canAccessBeneficiario(beneficiario, req))
     return { error: ACCESS_DENIED_MSG, status: 403 } as const;
   return { beneficiario } as const;
-}
-
-async function findPolicyByBeneficiario(
-  beneficiario: typeof beneficiariTable.$inferSelect,
-  executor: Pick<typeof db, "select"> = db,
-): Promise<{ politica: PoliticaCalcolo; origine: PoliticaOrigine }> {
-  if (beneficiario.politicaCreditoSolidaleId != null) {
-    const [selected] = await executor.select().from(politicheCreditoSolidaleTable)
-      .where(eq(politicheCreditoSolidaleTable.id, beneficiario.politicaCreditoSolidaleId));
-    if (!selected || !creditoPolicyApplicable(selected, beneficiario))
-      throw new EmporioScopeError(409, "La politica scelta non è attiva o non è applicabile al territorio del beneficiario.");
-    return { politica: selected, origine: selected.centroAscoltoId != null ? "centro" : selected.areaOperativaId != null ? "areaOperativa" : "globale" };
-  }
-  if (beneficiario.centroAscoltoId != null) {
-    const [row] = await executor
-      .select()
-      .from(politicheCreditoSolidaleTable)
-      .where(
-        and(
-          eq(politicheCreditoSolidaleTable.attiva, true),
-          eq(
-            politicheCreditoSolidaleTable.centroAscoltoId,
-            beneficiario.centroAscoltoId,
-          ),
-        ),
-      )
-      .orderBy(desc(politicheCreditoSolidaleTable.id))
-      .limit(1);
-    if (row) return { politica: row, origine: "centro" };
-  }
-
-  if (beneficiario.areaOperativaId != null) {
-    const [row] = await executor
-      .select()
-      .from(politicheCreditoSolidaleTable)
-      .where(
-        and(
-          eq(politicheCreditoSolidaleTable.attiva, true),
-          isNull(politicheCreditoSolidaleTable.centroAscoltoId),
-          eq(
-            politicheCreditoSolidaleTable.areaOperativaId,
-            beneficiario.areaOperativaId,
-          ),
-        ),
-      )
-      .orderBy(desc(politicheCreditoSolidaleTable.id))
-      .limit(1);
-    if (row) return { politica: row, origine: "areaOperativa" };
-  }
-
-  const [globalPolicy] = await executor
-    .select()
-    .from(politicheCreditoSolidaleTable)
-    .where(
-      and(
-        eq(politicheCreditoSolidaleTable.attiva, true),
-        isNull(politicheCreditoSolidaleTable.centroAscoltoId),
-        isNull(politicheCreditoSolidaleTable.areaOperativaId),
-      ),
-    )
-    .orderBy(desc(politicheCreditoSolidaleTable.id))
-    .limit(1);
-
-  if (globalPolicy) return { politica: globalPolicy, origine: "globale" };
-  return { politica: DEFAULT_POLICY, origine: "default" };
-}
-
-function calculate(
-  beneficiario: typeof beneficiariTable.$inferSelect,
-  politica: PoliticaCalcolo,
-) {
-  const creditoBaseNucleo = toNumber(politica.creditoBaseNucleo);
-  const quotaComponenti =
-    (beneficiario.numComponenti ?? 0) * toNumber(politica.creditoPerComponente);
-  const quotaMinori =
-    (beneficiario.numMinori ?? 0) * toNumber(politica.bonusMinore);
-  const quotaAnziani =
-    (beneficiario.numAnziani ?? 0) * toNumber(politica.bonusAnziano);
-  const quotaDisabili =
-    (beneficiario.numDisabili ?? 0) * toNumber(politica.bonusDisabile);
-  const totalePrimaDeiLimiti =
-    creditoBaseNucleo +
-    quotaComponenti +
-    quotaMinori +
-    quotaAnziani +
-    quotaDisabili;
-
-  const minimo = toNumber(politica.creditoMinimoMensile);
-  const massimo =
-    politica.creditoMassimoMensile == null
-      ? null
-      : toNumber(politica.creditoMassimoMensile);
-  let totaleLimitato = totalePrimaDeiLimiti;
-  let creditoMinimoApplicato: number | null = null;
-  let creditoMassimoApplicato: number | null = null;
-
-  if (totaleLimitato < minimo) {
-    totaleLimitato = minimo;
-    creditoMinimoApplicato = minimo;
-  }
-  if (massimo != null && totaleLimitato > massimo) {
-    totaleLimitato = massimo;
-    creditoMassimoApplicato = massimo;
-  }
-
-  const totaleSuggerito = round2(
-    applyRounding(totaleLimitato, politica.arrotondamento),
-  );
-  return {
-    creditoBaseNucleo: round2(creditoBaseNucleo),
-    quotaComponenti: round2(quotaComponenti),
-    quotaMinori: round2(quotaMinori),
-    quotaAnziani: round2(quotaAnziani),
-    quotaDisabili: round2(quotaDisabili),
-    totalePrimaDeiLimiti: round2(totalePrimaDeiLimiti),
-    creditoMinimoApplicato:
-      creditoMinimoApplicato == null ? null : round2(creditoMinimoApplicato),
-    creditoMassimoApplicato:
-      creditoMassimoApplicato == null ? null : round2(creditoMassimoApplicato),
-    arrotondamentoApplicato: politica.arrotondamento,
-    totaleSuggerito,
-  };
 }
 
 function fmtMovimento(row: {
@@ -631,12 +478,15 @@ async function buildMonthlyPreview(
     giaRicaricatiRows.map((row) => row.beneficiarioId),
   );
 
-  const righe = rows.map((row) => {
+  const zeroOrInitial = ids.length ? await db.select({id:comandiOperativiTable.aggregatoId}).from(comandiOperativiTable).where(and(
+    eq(comandiOperativiTable.tipoComando,"credito.quota.periodo"),inArray(comandiOperativiTable.aggregatoId,ids),
+    sql`${comandiOperativiTable.resultSnapshot}->>'periodo' = ${periodoRiferimento}`,
+  )) : [];
+  for (const receipt of zeroOrInitial) giaRicaricati.add(receipt.id);
+  const righe = await Promise.all(rows.map(async (row) => {
     const b = row.beneficiario;
-    const quota =
-      b.creditoSolidaleMensileAssegnato == null
-        ? null
-        : Number(b.creditoSolidaleMensileAssegnato);
+    const quota = b.creditoSolidaleMensileManuale ? (b.creditoSolidaleMensileAssegnato == null ? null : creditoIntero(b.creditoSolidaleMensileAssegnato))
+      : (await calcolaQuotaTx(db,b)).dettaglio.totaleSuggerito;
     const saldoAttuale = Number(b.creditoSolidaleSaldo ?? "0");
     const giaRicaricato = giaRicaricati.has(b.id);
     const quotaValida = quota != null && quota > 0;
@@ -661,7 +511,7 @@ async function buildMonthlyPreview(
         ? round2(saldoAttuale + quota)
         : null,
     };
-  });
+  }));
 
   const totaleRicaricabili = righe.filter((r) => r.ricaricabile).length;
   const totaleGiaRicaricati = righe.filter((r) => r.giaRicaricato).length;
@@ -999,9 +849,13 @@ router.patch(
         { beneficiarioId },
         false,
       );
+      const changesQuota = input.creditoSolidaleMensileAssegnato !== undefined || input.creditoSolidaleMotivoModifica !== undefined;
+      if ((changesQuota && input.versioneBeneficiario == null) ||
+          (input.versioneBeneficiario != null && input.versioneBeneficiario !== existing.versione))
+        throw new EmporioScopeError(409,"Anagrafica o nucleo modificati: ricarica la scheda prima di assegnare la quota.");
       const enabled =
         input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
-      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined || input.politicaCreditoSolidaleId !== undefined) {
+      if (enabled || changesQuota || input.politicaCreditoSolidaleId !== undefined) {
         await requireEmporioEligibilityTx(tx, existing);
         if (!existing.attivo)
           throw new EmporioScopeError(400, "Beneficiario non attivo.");
@@ -1015,7 +869,7 @@ router.patch(
           "Associa un Centro di Ascolto prima di abilitare il Credito Solidale.",
         );
       }
-      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined || input.politicaCreditoSolidaleId !== undefined) {
+      if (enabled || changesQuota || input.politicaCreditoSolidaleId !== undefined) {
         const [area] = await tx
           .select()
           .from(areeOperativeTable)
@@ -1040,6 +894,7 @@ router.patch(
         creditoSolidaleAbilitato: enabled,
         creditoSolidaleStato: stato,
         dataAggiornamento: new Date(),
+        versione: existing.versione + 1,
       };
       if (input.creditoSolidaleNote !== undefined)
         updates.creditoSolidaleNote = input.creditoSolidaleNote;
@@ -1058,19 +913,11 @@ router.patch(
           updates.creditoSolidaleDataUltimaModificaQuota = new Date();
         }
       }
-      if (input.creditoSolidaleMensileAssegnato !== undefined) {
-        const assegnato = input.creditoSolidaleMensileAssegnato;
-        updates.creditoSolidaleMensileAssegnato =
-          assegnato == null ? null : decimalString(assegnato);
-        updates.creditoSolidaleMensileManuale =
-          assegnato != null &&
-          input.creditoSolidaleMensileSuggerito != null &&
-          round2(assegnato) !== round2(input.creditoSolidaleMensileSuggerito);
-        updates.creditoSolidaleDataUltimaModificaQuota = new Date();
-      }
-      if (input.creditoSolidaleMotivoModifica !== undefined) {
-        updates.creditoSolidaleMotivoModifica =
-          input.creditoSolidaleMotivoModifica;
+      if (changesQuota) {
+        const quota = await configuraQuotaTx(tx, { ...existing, ...updates } as typeof existing, {
+          assegnato:input.creditoSolidaleMensileAssegnato, motivo:input.creditoSolidaleMotivoModifica,
+        });
+        Object.assign(updates, quota.updates);
       }
       if (enabled && !existing.creditoSolidaleAbilitato)
         updates.creditoSolidaleDataAbilitazione = new Date();
@@ -1109,6 +956,7 @@ router.patch(
     });
     res.json({
       beneficiarioId: row.id,
+      versioneBeneficiario: row.versione,
       politicaCreditoSolidaleId: row.politicaCreditoSolidaleId ?? null,
       creditoSolidaleAbilitato: row.creditoSolidaleAbilitato,
       creditoSolidaleStato: row.creditoSolidaleStato,

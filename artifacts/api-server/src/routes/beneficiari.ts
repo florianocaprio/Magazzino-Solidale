@@ -1,3 +1,4 @@
+import { riallineaQuotaNucleoTx } from "../lib/creditoCalcolo";
 import { readBeneficiarioFascicolo, saveBeneficiarioFascicolo, BeneficiarioFascicoloError } from "../lib/beneficiarioFascicolo";
 import { isModuloAttivo } from "../lib/featureFlags";
 import { requireCurrentCommandActor, CurrentCommandActorError } from "../lib/currentCommandActor";
@@ -1351,7 +1352,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
         utenteId: req.user?.id ?? null,
         ip: req.ip ?? req.socket.remoteAddress ?? null,
       });
-      return updated;
+      return await riallineaQuotaNucleoTx(tx, existing, updated, req.user?.id ?? null);
     });
     if (!row) { res.status(409).json({ error: "Il Beneficiario è stato modificato da un altro utente. Ricarica la scheda e riprova." }); return; }
     res.json({ ...await readBeneficiarioFascicolo(row.id), ...fmtBenefForRequest(
@@ -1473,12 +1474,14 @@ router.post("/beneficiari/:id/nucleo", requirePermission("beneficiari.manage"), 
   const parsed = NucleoFamiliareInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
   const row = await db.transaction(async (tx) => {
+    const [parent] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id,id)).for("update");
     const [created] = await tx.insert(nucleoFamiliareTable).values({ ...parsed.data, beneficiarioId: id }).returning();
     await tx.insert(auditConfigurazioniTable).values({
       area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "aggiunta-membro-nucleo",
       valoreNuovo: { membroId: created.id, campiCompilati: Object.keys(parsed.data) },
       utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
     });
+    await riallineaQuotaNucleoTx(tx,parent,parent,req.user?.id ?? null,true);
     return created;
   });
   res.status(201).json(row);
@@ -1505,6 +1508,9 @@ router.patch("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiari
     }
   }
   const row = await db.transaction(async (tx) => {
+    const [parent] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id,id)).for("update");
+    const [currentMember] = await tx.select().from(nucleoFamiliareTable).where(and(eq(nucleoFamiliareTable.id,membroId),eq(nucleoFamiliareTable.beneficiarioId,id))).for("update");
+    if (!currentMember) return null;
     const [updated] = await tx.update(nucleoFamiliareTable).set(parsed.data).where(and(
       eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id),
     )).returning();
@@ -1514,6 +1520,8 @@ router.patch("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiari
       valoreNuovo: { membroId, campiModificati: Object.keys(parsed.data) },
       utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
     });
+    const relevant = ["nome","cognome","relazione","dataNascita","sesso"] as const;
+    if (relevant.some(k => currentMember[k] !== updated[k])) await riallineaQuotaNucleoTx(tx,parent,parent,req.user?.id ?? null,true);
     return updated;
   });
   if (!row) { res.status(404).json({ error: "Membro del nucleo non trovato." }); return; }
@@ -1526,12 +1534,14 @@ router.delete("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiar
   const access = Number.isSafeInteger(id) && id > 0 ? await scopedBeneficiario(id, req) : { status: 400, error: "Beneficiario non valido." } as const;
   if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
   const deleted = await db.transaction(async (tx) => {
+    const [parent] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id,id)).for("update");
     const [deleted] = await tx.delete(nucleoFamiliareTable)
       .where(and(eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id))).returning({ id: nucleoFamiliareTable.id });
     if (deleted) await tx.insert(auditConfigurazioniTable).values({
       area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "rimozione-membro-nucleo",
       valorePrecedente: { membroId }, utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
     });
+    if (deleted) await riallineaQuotaNucleoTx(tx,parent,parent,req.user?.id ?? null,true);
     return deleted ?? null;
   });
   if (!deleted) { res.status(404).json({ error: "Membro del nucleo non trovato." }); return; }

@@ -309,3 +309,26 @@ test("M10/Cassa: nessuna ricarica da UI, avviso sotto carrello vicino alla chius
   );
   expect(await balance(f.beneficiary)).toBe(210);
 });
+
+test("C2B: conferma integrata con deroga totale 80, prima quota unica e riapertura",async({page})=>{
+  const f=await fixture(page,true);
+  await db.query(`insert into politiche_credito_solidale(nome,centro_ascolto_id,credito_base_nucleo,credito_per_componente) select 'C2B 60',centro_ascolto_id,50,10 from beneficiari where id=$1`,[f.beneficiary]);
+  await page.goto(`/beneficiari/${f.beneficiary}`);
+  await page.getByRole("button",{name:"Modifica anagrafica",exact:true}).click();
+  const card=page.getByRole("region",{name:"Emporio Solidale",exact:true});
+  await card.getByRole("textbox",{name:"Motivo dell'abilitazione o della variazione"}).fill("Conferma C2B");
+  await card.getByRole("button",{name:"Completa o aggiorna Emporio e credito",exact:true}).click();
+  const d=page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true});
+  await expect(d).toBeVisible();await expect(d).toContainText("Suggerito dal calcolo: 60");
+  expect(await balance(f.beneficiary)).toBe(210);
+  await d.getByLabel("Quota mensile assegnata",{exact:true}).fill("80");
+  await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
+  await expect(d.locator('[aria-invalid="true"]')).toHaveCount(1);
+  await d.getByLabel(/Motivo modifica quota/).fill("Deroga totale C2B");
+  await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();await expect(d).not.toBeVisible();
+  expect(await balance(f.beneficiary)).toBe(290);
+  await card.getByRole("textbox",{name:"Motivo dell'abilitazione o della variazione"}).fill("Verifica riapertura C2B");
+  await card.getByRole("button",{name:"Completa o aggiorna Emporio e credito",exact:true}).click();await expect(d).toContainText("Nessuna nuova prima ricarica");
+  await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();await expect(d).not.toBeVisible();expect(await balance(f.beneficiary)).toBe(290);
+  expect((await db.query("select count(*)::int n from credito_solidale_movimenti where beneficiario_id=$1 and origine='attivazione_emporio'",[f.beneficiary])).rows[0].n).toBe(1);
+});

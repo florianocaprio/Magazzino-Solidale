@@ -1,3 +1,4 @@
+import { EmporioCreditoActivationDialog } from "./emporio-credito-activation-dialog";
 import { operationalCentroId } from "@/lib/service-scope";
 import { RequiredField } from "./ui/required-field";
 import { useState } from "react";
@@ -69,6 +70,7 @@ export function BeneficiarioEmporioSection({
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [activationOpen,setActivationOpen]=useState(false);
   if (!emporioAbilitato) return null;
   const canManage =
     !readOnly &&
@@ -81,6 +83,7 @@ export function BeneficiarioEmporioSection({
     setError("");
     setSubmitted(true);
     if (!motivo.trim()) return;
+    if (stato === "attivo") { if(!hasPermission("credito.quota.manage")){setError(t("ciclo2Credito.unavailable"));return;}setActivationOpen(true);return; }
     try {
       await update.mutateAsync({
         beneficiarioId: beneficiario.id,
@@ -107,6 +110,8 @@ export function BeneficiarioEmporioSection({
         <CardTitle>{t("emporioServizio.titolo")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {activationOpen && <EmporioCreditoActivationDialog key={beneficiario.id} beneficiarioId={beneficiario.id} motivo={motivo}
+          onClose={()=>setActivationOpen(false)} onComplete={()=>{setActivationOpen(false);setMotivo("");setSubmitted(false);}}/>}
         <p className="text-sm text-muted-foreground">
           {t("emporioServizio.indipendente")}
         </p>
@@ -145,6 +150,7 @@ export function BeneficiarioEmporioSection({
                     )}
                   </Button>
                 )}
+                {record.stato === "attivo" && hasPermission("credito.quota.manage") && <Button type="button" variant="outline" onClick={()=>void change("attivo")}>{t("ciclo2Credito.configure")}</Button>}
                 {record.stato === "attivo" && (
                   <Button
                     type="button"

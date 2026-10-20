@@ -123,6 +123,7 @@ async function createBeneficiario(
     creditoSolidaleAbilitato?: boolean;
     creditoSolidaleStato?: "non_abilitato" | "attivo" | "sospeso" | "revocato";
     creditoSolidaleMensileAssegnato?: number | null;
+    creditoSolidaleMensileManuale?: boolean;
     creditoSolidaleSaldo?: number;
     attivo?: boolean;
   } = {},
@@ -152,6 +153,8 @@ async function createBeneficiario(
       numDisabili: opts.numDisabili ?? 0,
       creditoSolidaleAbilitato: opts.creditoSolidaleAbilitato ?? false,
       creditoSolidaleStato: opts.creditoSolidaleStato ?? "non_abilitato",
+      creditoSolidaleMensileManuale: opts.creditoSolidaleMensileManuale ?? false,
+      creditoSolidaleMotivoModifica: opts.creditoSolidaleMensileManuale ? "Deroga totale fixture" : null,
       creditoSolidaleMensileAssegnato:
         opts.creditoSolidaleMensileAssegnato == null
           ? null
@@ -615,6 +618,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
       creditoSolidaleMensileAssegnato: 15,
+      creditoSolidaleMensileManuale: true,
     });
     await createBeneficiario({
       areaOperativaId,
@@ -630,8 +634,8 @@ describe("Movimenti Credito Solidale", () => {
       .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
 
     expect(preview.status).toBe(200);
-    expect(preview.body.totaleRicaricabili).toBe(1);
-    expect(preview.body.totaleCreditoDaRicaricare).toBe(15);
+    expect(preview.body.totaleRicaricabili).toBe(2);
+    expect(preview.body.totaleCreditoDaRicaricare).toBe(75);
     expect(
       preview.body.righe.find(
         (r: { beneficiarioId: number }) => r.beneficiarioId === ricaricabileId,

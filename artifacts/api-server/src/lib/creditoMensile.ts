@@ -1,3 +1,5 @@
+import { calcolaQuotaTx } from "./creditoCalcolo";
+import { riconosciQuotaPeriodoTx } from "./creditoQuotaPeriodo";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   db,
@@ -5,13 +7,11 @@ import {
   centriAscoltoTable,
   areeOperativeTable,
   emporioAbilitazioniTable,
-  creditoSolidaleMovimentiTable,
   creditoRicaricheMensiliTable as runs,
   creditoRicaricheDestinatariTable as items,
 } from "@workspace/db";
 import { creditoIntero, CreditoInteroError } from "./creditoIntero";
 import {
-  appendCreditTx,
   requireCreditModulesTx,
   CreditoSaldoError,
 } from "./creditoSaldo";
@@ -112,28 +112,6 @@ export async function eseguiRicaricaMensile(now = new Date()) {
             .from(beneficiariTable)
             .where(eq(beneficiariTable.id, item.beneficiarioId))
             .for("update");
-          // Anche una mensilità storica annullata/stornata resta già eseguita.
-          const [previous] = await tx
-            .select({ id: creditoSolidaleMovimentiTable.id })
-            .from(creditoSolidaleMovimentiTable)
-            .where(
-              and(
-                eq(creditoSolidaleMovimentiTable.beneficiarioId, b.id),
-                eq(
-                  creditoSolidaleMovimentiTable.tipoMovimento,
-                  "ricarica_mensile",
-                ),
-                eq(
-                  creditoSolidaleMovimentiTable.periodoRiferimento,
-                  job.periodo,
-                ),
-              ),
-            )
-            .limit(1);
-          if (previous) {
-            await done("gia_elaborato", "mensilita_gia_eseguita", previous.id);
-            return;
-          }
           await requireCreditModulesTx(tx);
           if (
             !b.attivo ||
@@ -184,30 +162,51 @@ export async function eseguiRicaricaMensile(now = new Date()) {
             return;
           }
           let quota: number;
+          let politicaId: number | null;
           try {
-            quota = creditoIntero(b.creditoSolidaleMensileAssegnato);
+            const calculation = await calcolaQuotaTx(tx, b);
+            politicaId = calculation.politica.id;
+            quota = b.creditoSolidaleMensileManuale
+              ? creditoIntero(b.creditoSolidaleMensileAssegnato)
+              : calculation.dettaglio.totaleSuggerito;
+            if (
+              !b.creditoSolidaleMensileManuale &&
+              Number(b.creditoSolidaleMensileAssegnato) !== quota
+            ) {
+              await tx
+                .update(beneficiariTable)
+                .set({
+                  creditoSolidaleMensileAssegnato: String(quota),
+                  creditoSolidaleDataUltimaModificaQuota: now,
+                  versione: b.versione + 1,
+                  dataAggiornamento: now,
+                })
+                .where(eq(beneficiariTable.id, b.id));
+            }
             creditoIntero(b.creditoSolidaleSaldo);
           } catch (error) {
             if (!(error instanceof CreditoInteroError)) throw error;
             await done("escluso", "quota_o_saldo_non_conforme");
             return;
           }
-          if (quota <= 0) {
-            await done("escluso", "quota_non_assegnata");
-            return;
-          }
-          const movement = await appendCreditTx(tx, {
-            beneficiary: b,
-            variazione: quota,
-            tipo: "ricarica_mensile",
+          const receipt = await riconosciQuotaPeriodoTx(tx, b, {
+            quota,
             periodo: job.periodo,
+            origine: "scheduler_mensile",
+            politicaId,
             motivo: "Ricarica mensile automatica",
             command: systemAuditContext({
               actorCode: "credito-mensile",
               operationKey: `credito.mensile:${b.id}:${job.periodo}`,
             }),
           });
-          await done("elaborato", null, movement.id);
+          if (receipt.movimentoId == null) await done("escluso", "quota_zero");
+          else
+            await done(
+              receipt.nuova ? "elaborato" : "gia_elaborato",
+              receipt.nuova ? null : "mensilita_gia_eseguita",
+              receipt.movimentoId,
+            );
         });
       } catch {
         // La TX economica è già annullata. Non sovrascrivere il successo di un altro worker.
