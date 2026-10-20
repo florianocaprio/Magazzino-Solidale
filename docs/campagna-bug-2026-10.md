@@ -2825,3 +2825,16 @@ Prova proposta a Floriano sulla 8082:
 5. Aprire il report con un profilo autorizzato: incontri distinti, sezioni separate, piano futuro e indicazione di stato corrente. Confrontare il PDF, anche per testi lunghi e più pagine.
 
 La richiesta diretta di Floriano autorizza la ricompilazione personale in questa consegna, superando il rinvio alla fase separata indicato nel pacchetto. Non attiva C2B, merge o un nuovo rilascio Hetzner.
+
+### Ricevuta 8082 — C2A pronta per le prove
+
+Checkpoint applicativo installato: **`4fbab67582f2adb93a220d6b8bf51174bcee9eeb`**. Build da `git archive` della SHA esatta, API/WEB con revision label corrispondenti:
+
+- API `magazzino-bugfix-uat-api:sha-4fbab67582f2`, image ID `sha256:f07051f56eacd98fdb9b2da5336e9510ac4ca8e6b5574f9336cd53805f7dd00d`.
+- WEB `magazzino-bugfix-uat-web:sha-4fbab67582f2`, image ID `sha256:2511b415ac68f61b41a65013f341593b988c78dc84295bf26e16c14f60ca8295`.
+
+Backup privato DB/uploads `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2A-4fbab67582f2-2026-10-20T19-52-41-345Z`, archivi e SHA256 verificati, dump realmente ripristinato in PostgreSQL effimero isolato, replay canonico **63→63** e integrità invariata. Ricreati solo API/WEB con override della catena Compose reale, senza ricreare PostgreSQL né cambiare mount/volumi. Confrontate **45 tabelle**, impronte prima/dopo identiche. Nessuna importazione o suite mutativa sulla 8082.
+
+Ledger initialized, **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo 401. Asset JS/CSS effettivamente serviti confrontati per SHA256 con l'immagine, inclusi registro e report UDS; sorgenti API distribuiti contengono i nuovi filtri/proiezione. Entry `index-DR5qs2t6.js`, budget **389,3/400 KiB gzip**. Ricevuta privata `/private/tmp/c2a-final-release-result.json`. Il PDF sintetico finale di 11 pagine è stato renderizzato e controllato, inclusi footer e passaggio pagina.
+
+**C2A / BUG22 / BUG23: PRONTO PER UAT sulla 8082.** In attesa dell'esito personale di Floriano; nessuna chiusura UAT anticipata. Questo checkpoint documentale non modifica la versione applicativa distribuita. C2B/C2C, merge e produzione non avviati.
