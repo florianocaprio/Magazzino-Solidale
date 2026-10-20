@@ -1081,12 +1081,15 @@ const makeEditSchema = (t: (k: string) => string, imported = false) =>
 type EditValues = z.infer<ReturnType<typeof makeEditSchema>>;
 
 function CreditoSolidaleCalcoloPanel({
-  beneficiarioId,
+  b,
   enabled,
+  disabled,
 }: {
-  beneficiarioId: number;
+  b: BeneficiarioDettaglioType;
   enabled: boolean;
+  disabled: boolean;
 }) {
+  const beneficiarioId = b.id;
   const { t } = useTranslation();
   const { data, isLoading, isError } = useCalcolaCreditoSolidaleBeneficiario(
     beneficiarioId,
@@ -1110,6 +1113,7 @@ function CreditoSolidaleCalcoloPanel({
           {t("creditoSolidale.simulationSubtitle")}
         </p>
       </div>
+      <BeneficiarioCreditoPolicy b={b} disabled={disabled} />
       {isLoading ? (
         <div className="space-y-2">
           <Skeleton className="h-4 w-48" />
@@ -1122,15 +1126,6 @@ function CreditoSolidaleCalcoloPanel({
         </p>
       ) : data ? (
         <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">
-              {t("creditoSolidale.politicaApplicata")}
-            </span>
-            <span className="min-w-0 break-words text-right font-medium">
-              {data.politicaNome} ·{" "}
-              {t(`creditoSolidale.origin.${data.politicaOrigine}`)}
-            </span>
-          </div>
           {[
             [
               "creditoSolidale.creditoBaseNucleo",
@@ -2313,10 +2308,10 @@ export function EditBeneficiarioSheet({
                       toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
                     } catch (cause) { toast({ title: t("beneficiarioDettaglio.error"), description: apiErrorMessage(cause, t("creditoSolidale.calculateError")), variant: "destructive" }); }
                   }}>{t("creditoSolidale.saveConfiguration")}</Button>
-                  <BeneficiarioCreditoPolicy b={b} disabled={territoryUnsaved || !creditoSolidaleAbilitato || !emporioAbilitato} />
                   <CreditoSolidaleCalcoloPanel
-                    beneficiarioId={b.id}
+                    b={b}
                     enabled={creditoSolidaleAbilitato && emporioAbilitato}
+                    disabled={territoryUnsaved || !creditoSolidaleAbilitato || !emporioAbilitato}
                   />
                   <CreditoSolidaleQuotaPanel
                     b={b}

@@ -280,6 +280,10 @@ test("FSE+ accettato: Area e Centro in modifica, Emporio attiva il Credito e pol
   await expect(emporio.getByText("ATTIVO", { exact: true })).toBeVisible();
   expect(await detail()).toMatchObject({ creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo", creditoSolidaleSaldo: 0 });
   const policySelect = edit.getByRole("combobox", { name: "Politica per questo beneficiario", exact: true });
+  const calculationPanel = edit.getByRole("heading", { name: "Credito mensile suggerito", exact: true }).locator("..").locator("..");
+  await expect(calculationPanel.getByRole("combobox", { name: "Politica per questo beneficiario", exact: true })).toBeVisible();
+  await expect(policySelect).toContainText("Seleziona la politica da applicare");
+  await expect(edit.getByRole("button", { name: "Applica politica", exact: true })).toBeDisabled();
   await policySelect.click();
   await expect(page.getByRole("option", { name: new RegExp(policies[1].nome) })).toBeVisible();
   await expect(page.getByRole("option", { name: new RegExp(policies[2].nome) })).toHaveCount(0);
@@ -296,6 +300,15 @@ test("FSE+ accettato: Area e Centro in modifica, Emporio attiva il Credito e pol
   await expect(edit).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Stati dei servizi" }).getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Abilita all'Emporio", exact: true })).toHaveCount(0);
+  const newer = await page.request.post("/api/politiche-credito-solidale", { data: {
+    nome: `Politica successiva ${suffix}`, creditoBaseNucleo: 77, creditoPerComponente: 0,
+    bonusMinore: 0, bonusAnziano: 0, bonusDisabile: 0, creditoMinimoMensile: 0,
+  } });
+  expect(newer.status()).toBe(201);
+  await page.reload();
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  await expect(policySelect).toContainText(policies[0].nome);
+  expect(await (await page.request.get(`/api/credito-solidale/calcola-beneficiario/${id}`)).json()).toMatchObject({ politicaId: policies[0].id, totaleSuggerito: 21 });
 });
 
 test("Fascicolo facoltativo inserito manualmente e modificato nell’anagrafica", async ({
