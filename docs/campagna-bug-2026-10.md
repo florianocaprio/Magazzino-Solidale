@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Ultima UAT 05 confermata sul correttivo `ad1b190`. Prompt 06 e 07 autorizzati insieme: BUG18 in lavorazione; consegna completa sulla 8082 dopo modello, interfaccia e verifiche.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati e verificati: codice `0519ecc` installato sulla 8082, ledger 62/62. UAT BUG18 da validare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -2482,7 +2482,7 @@ La risoluzione comune precede gli effetti sulle partite. Il lock transazionale
 di ingresso viene acquisito prima delle business key fisiche ed è riutilizzabile
 nei comandi composti; serializza conservativamente gli ingressi per evitare
 inversioni fra carichi concorrenti, preregistrazione, trasferimenti e import.
-Tradeoff: ingressi concorrenti su Aree diverse condividono questo breve lock.
+Tradeoff: ingressi concorrenti su Aree diverse condividono questo lock fino al termine del comando; import grandi possono attendere.
 
 ### Percorsi integrati e perimetro
 
@@ -2642,3 +2642,57 @@ Nessun test funzionale sul DB personale; nessun merge/main/produzione.
 - `lib/db/src/schema/lotti.ts`
 - `lib/db/src/schema/lottiProduttore.ts`
 - `lib/db/updates/20261020_lotti_produttore.sql`
+
+
+### Ricevuta 8082 — consegna completa 06–07
+
+Checkpoint tecnico 06: `410419d3d440e100d1377d420d6b6652be58cd62`.
+Codice 07 installato: `0519ecc068702c6c4323828ccd98baa8ebae5aad`.
+API e WEB compilati da `git archive` di questo SHA, con revisioni OCI coerenti:
+
+- magazzino-api `magazzino-bugfix-uat-api:sha-0519ecc06870`,
+  ID `sha256:3be5fa18d39bd56cc33daffabe789005c7e312d73934ebe0b2b703099ddf887e`.
+- magazzino-web `magazzino-bugfix-uat-web:sha-0519ecc06870`,
+  ID `sha256:3b1f53d33ccb10fd47e2d77a35de551e3c23c338c38ce9197ae12c30a41a45fe`.
+
+Backup DB/uploads privato, archivi verificati con indici e SHA-256, directory
+0700 e file 0600:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/BLOCCO06-07-LOTTI-0519ecc06870-2026-10-20T05-50-53-304Z`.
+Ripristino realmente provato su PostgreSQL effimero senza porte pubblicate né
+volumi personali. Aggiornamento **61→62** e replay PASS, dati controllati
+invariati, nuova tabella vuota e link storici lasciati NULL. Ripristino uploads
+verificato. Override di rollback immagini conservato insieme al backup.
+
+Ricreati soltanto API e WEB con la catena Compose reale, `--no-deps --no-build`.
+PostgreSQL mantiene ID, istante di avvio e volume; uploads mantiene il volume.
+Ledger **62/62**, senza pending, checksum difformi, file mancanti o fuori ordine.
+Le impronte dei campi preesistenti delle **24 tabelle** controllate coincidono
+prima/dopo: escluse soltanto le nuove colonne nullable `lotto_produttore_id`.
+La migrazione non ha creato anagrafiche né partite fittizie.
+
+HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**; endpoint Utenti
+anonimo **401**. Entry `/assets/index-CkRARl5n.js`, **386,7/400 KiB gzip**.
+JS/CSS serviti confrontati per SHA-256 con le immagini, inclusi pannello lotti,
+Carico Merce, testi del wizard e comandi del correttivo 05. Ricevuta privata:
+`/private/tmp/blocco0607-release-result.json`.
+
+Il commit della ricevuta è documentale; la versione eseguibile resta lo SHA
+07 sopra indicato. Pubblicazione limitata al branch della campagna, senza
+main/merge/produzione. Hook GitHub e ambienti di deploy verificati: 0/0.
+
+### Prova UAT suggerita a Floriano
+
+1. In Carico Merce → Lotti fisici scegliere l'Area e **Pre-registra lotto**.
+   Creare un lotto per un prodotto: compare con **Creato manualmente** senza
+   aumentare lo stock. Provare i filtri Tutti/Manuale/Automatico/Importato.
+2. Aprire una pratica e scegliere il lotto dal lookup della riga. Salvare,
+   sospendere e riaprire: scelta conservata. Confermare il carico: stock
+   aggiornato, origine iniziale invariata e scheda collegata alla partita.
+3. Nel catalogo verificare badge FSE+ viola e obbligo lotto blu indipendenti.
+4. Import FSE: scegliere Registro e, per Saldo, anche Giacenze, data e copertura.
+   Percorrere i quattro passaggi: l'esito aggiunge righe alla pratica; lo stock
+   cambia soltanto alla successiva conferma del carico.
+
+Storico privo di origine attestata conservato come sconosciuto; dati discordanti
+bloccati con conflitto esplicito. Nessun passaggio manuale tecnico richiesto,
+resta la validazione funzionale di Floriano prima di 08.
