@@ -82,6 +82,7 @@ async function fixture(count: number, eligible = true, owner = false) {
           "beneficiari.view",
           "beneficiari.manage",
           "credito.view",
+          "credito.quota.manage",
           "emporio.eligibility.manage",
         ]
       : []),
@@ -865,7 +866,7 @@ test("T04/T06/T11/T12/T13/T20: cross-Center name, card, context reset and explic
   ).toBe(f.centers[1]);
   expect(errors).toEqual([]);
 });
-test("T08/T15: beneficiary service panel enables explicitly without credit increment", async ({
+test("T08/T15 C2B: conferma integrata autorizzata riconosce la prima quota", async ({
   page,
 }) => {
   const f = await fixture(1, false, true);
@@ -912,7 +913,7 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
         [f.beneficiary],
       )
     ).rows[0].credito_solidale_saldo,
-  ).toBe("100.00");
+  ).toBe("160.00");
 });
 
 test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-link eligibility without logout", async ({
