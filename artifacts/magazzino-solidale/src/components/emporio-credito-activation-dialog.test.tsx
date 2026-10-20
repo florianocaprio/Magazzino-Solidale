@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
     versioneBeneficiario: 3,
     areaNome: "Roma",
     politicaNome: "Politica",
+    politicaCreditoSolidaleId:null,
+    politicheDisponibili:[{id:11,nome:"Politica",ambito:"globale"}],
     totaleSuggerito: 60,
     quotaMensileAssegnata: 60,
     motivoModificaQuota: null,

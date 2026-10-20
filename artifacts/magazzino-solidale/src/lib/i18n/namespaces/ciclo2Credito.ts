@@ -1,4 +1,6 @@
 const it = {
+  automaticPolicy:"Automatica (Centro → Area → globale)",
+  scope:{centro:"Centro",area:"Area",globale:"Globale"},
   title: "Conferma Emporio e Credito Solidale",
   explanation:
     "L'abilitazione vale negli Empori della stessa Area. Conferma la quota mensile totale: la prima quota dovuta viene accreditata una sola volta, senza sostituire il saldo residuo.",
@@ -17,6 +19,8 @@ const it = {
     "Persona salvata; attivazione non confermata. Riprendi dallo stesso ID.",
 };
 const en: typeof it = {
+  automaticPolicy:"Automatic (Centre → Area → global)",
+  scope:{centro:"Centre",area:"Area",globale:"Global"},
   title: "Confirm Emporio and Solidarity Credit",
   explanation:
     "Eligibility applies throughout the Area. Confirm the total monthly quota: the first quota due is credited once and added to the remaining balance.",

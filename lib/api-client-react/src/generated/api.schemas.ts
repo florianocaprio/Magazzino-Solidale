@@ -7189,12 +7189,29 @@ export interface EmporioAbilitazione {
   motivo?: string | null;
 }
 
+export type EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito =
+  (typeof EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito)[keyof typeof EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito];
+
+export const EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito = {
+  centro: "centro",
+  area: "area",
+  globale: "globale",
+} as const;
+
+export type EmporioCreditoAnteprimaPoliticheDisponibiliItem = {
+  id: number;
+  nome: string;
+  ambito: EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito;
+};
+
 export interface EmporioCreditoAnteprima {
   beneficiarioId: number;
   versioneBeneficiario: number;
   calcoloToken: string;
   areaNome: string;
   politicaNome: string;
+  politicaCreditoSolidaleId: number | null;
+  politicheDisponibili: EmporioCreditoAnteprimaPoliticheDisponibiliItem[];
   totaleSuggerito: number;
   quotaMensileAssegnata: number;
   motivoModificaQuota?: string | null;
@@ -7224,12 +7241,19 @@ export interface EmporioCreditoAttivazioneInput {
    * @maximum 99999999
    */
   quotaMensileAssegnata?: number | null;
+  /**
+   * Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.
+   * @minimum 1
+   */
+  politicaCreditoSolidaleId?: number | null;
   /** @maxLength 10000 */
   motivoModificaQuota?: string | null;
 }
 
 export interface EmporioCreditoAttivazioneResult {
   beneficiarioId: number;
+  politicaCreditoSolidaleId?: number | null;
+  politicaNome?: string;
   quotaMensile: number;
   quotaAccreditata: number;
   primaQuotaValutata: boolean;
@@ -12272,6 +12296,14 @@ export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
    * Identificativi della pagina corrente, separati da virgola (massimo 100).
    */
   beneficiarioIds: string;
+};
+
+export type GetEmporioCreditoAnteprimaParams = {
+  /**
+   * Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.
+   * @pattern ^(auto|[1-9][0-9]*)$
+   */
+  politicaCreditoSolidaleId?: string;
 };
 
 export type GetEmporioCreditoAttivazioneEsitoParams = {

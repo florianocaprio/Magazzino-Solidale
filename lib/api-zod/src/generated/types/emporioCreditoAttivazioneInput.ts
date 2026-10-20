@@ -29,6 +29,11 @@ export interface EmporioCreditoAttivazioneInput {
    * @maximum 99999999
    */
   quotaMensileAssegnata?: number | null;
+  /**
+   * Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.
+   * @minimum 1
+   */
+  politicaCreditoSolidaleId?: number | null;
   /** @maxLength 10000 */
   motivoModificaQuota?: string | null;
 }

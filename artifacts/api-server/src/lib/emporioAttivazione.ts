@@ -1,5 +1,5 @@
 import { z } from "@workspace/api-zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import {
   db,
   beneficiariTable,
@@ -9,6 +9,7 @@ import {
   creditoSolidaleMovimentiTable,
   comandiOperativiTable,
   auditConfigurazioniTable,
+  politicheCreditoSolidaleTable,
 } from "@workspace/db";
 import type { InventoryTransaction as Tx } from "./scaricoInventory";
 import type { AuditCommandContext } from "./auditEvent";
@@ -20,6 +21,7 @@ import {
 } from "./emporioScope";
 import { operationalCentroId } from "./serviceScope";
 import { requireCreditModulesTx } from "./creditoSaldo";
+import { creditoPolicyApplicable } from "./creditoPolicyScope";
 import { calcolaQuotaTx, configuraQuotaTx } from "./creditoCalcolo";
 import { calendarioCredito } from "./creditoMensile";
 import { riconosciQuotaPeriodoTx } from "./creditoQuotaPeriodo";
@@ -48,6 +50,12 @@ const Input = z
       .nullable()
       .optional(),
     motivoModificaQuota: z.string().trim().max(10000).nullable().optional(),
+    politicaCreditoSolidaleId: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -132,6 +140,40 @@ async function firstDecision(tx: Tx, b: typeof beneficiariTable.$inferSelect) {
     b.creditoSolidaleMensileAssegnato == null
   );
 }
+/** Scelta preparata in sola lettura; viene confermata soltanto nel comando atomico. */
+export function parseAttivazionePolicy(
+  raw: unknown,
+): number | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === "auto") return null;
+  if (
+    typeof raw !== "string" ||
+    !/^[1-9]\d*$/.test(raw) ||
+    !Number.isSafeInteger(Number(raw))
+  )
+    throw new EmporioScopeError(400, "Politica non valida.");
+  return Number(raw);
+}
+async function withPolicyTx(
+  tx: Tx,
+  b: typeof beneficiariTable.$inferSelect,
+  choice: number | null | undefined,
+) {
+  if (choice === undefined) return b;
+  if (choice !== null) {
+    const [policy] = await tx
+      .select()
+      .from(politicheCreditoSolidaleTable)
+      .where(eq(politicheCreditoSolidaleTable.id, choice))
+      .for("share");
+    if (!policy || !creditoPolicyApplicable(policy, b))
+      throw new EmporioScopeError(
+        400,
+        "Politica non disponibile per l'Area e il Centro selezionati.",
+      );
+  }
+  return { ...b, politicaCreditoSolidaleId: choice };
+}
 function calculationToken(
   b: typeof beneficiariTable.$inferSelect,
   suggested: number,
@@ -143,20 +185,61 @@ function calculationToken(
     versione: b.versione,
     suggested,
     policyId,
+    politicaScelta: b.politicaCreditoSolidaleId,
     first,
   });
 }
-export async function anteprimaAttivazioneEmporio(id: number, userId: number) {
+export async function anteprimaAttivazioneEmporio(
+  id: number,
+  userId: number,
+  choice?: number | null,
+) {
   return db.transaction(async (tx) => {
     const { b } = await authorized(tx, userId, id);
     const area = await territory(tx, b);
-    const { politica, dettaglio } = await calcolaQuotaTx(tx, b);
+    const selected = await withPolicyTx(tx, b, choice);
+    const { politica, dettaglio } = await calcolaQuotaTx(tx, selected);
+    const available = await tx
+      .select({
+        id: politicheCreditoSolidaleTable.id,
+        nome: politicheCreditoSolidaleTable.nome,
+        area: politicheCreditoSolidaleTable.areaOperativaId,
+        centro: politicheCreditoSolidaleTable.centroAscoltoId,
+      })
+      .from(politicheCreditoSolidaleTable)
+      .where(
+        and(
+          eq(politicheCreditoSolidaleTable.attiva, true),
+          or(
+            isNull(politicheCreditoSolidaleTable.areaOperativaId),
+            eq(
+              politicheCreditoSolidaleTable.areaOperativaId,
+              b.areaOperativaId!,
+            ),
+          ),
+          or(
+            isNull(politicheCreditoSolidaleTable.centroAscoltoId),
+            eq(
+              politicheCreditoSolidaleTable.centroAscoltoId,
+              b.centroAscoltoId!,
+            ),
+          ),
+        ),
+      )
+      .orderBy(politicheCreditoSolidaleTable.nome);
     const first = await firstDecision(tx, b);
     return {
       beneficiarioId: id,
       versioneBeneficiario: b.versione,
       areaNome: area.nome,
       politicaNome: politica.nome,
+      politicaCreditoSolidaleId: selected.politicaCreditoSolidaleId,
+      politicheDisponibili: available.map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        ambito:
+          p.centro != null ? "centro" : p.area != null ? "area" : "globale",
+      })),
       totaleSuggerito: dettaglio.totaleSuggerito,
       quotaMensileAssegnata:
         b.creditoSolidaleMensileManuale &&
@@ -166,7 +249,7 @@ export async function anteprimaAttivazioneEmporio(id: number, userId: number) {
       motivoModificaQuota: b.creditoSolidaleMotivoModifica,
       primaQuotaAmmessa: first,
       calcoloToken: calculationToken(
-        b,
+        selected,
         dettaglio.totaleSuggerito,
         politica.id,
         first,
@@ -219,9 +302,10 @@ export async function attivaEmporioCredito(input: {
         "Il credito è sospeso o revocato: usa la configurazione autorizzata prima di proseguire.",
       );
     const first = await firstDecision(tx, b);
+    const selected = await withPolicyTx(tx, b, data.politicaCreditoSolidaleId);
     const quota = await configuraQuotaTx(
       tx,
-      b,
+      selected,
       {
         assegnato: data.quotaMensileAssegnata,
         motivo: data.motivoModificaQuota,
@@ -231,7 +315,7 @@ export async function attivaEmporioCredito(input: {
     if (
       data.calcoloToken !==
       calculationToken(
-        b,
+        selected,
         quota.dettaglio.totaleSuggerito,
         quota.politica.id,
         first,
@@ -278,6 +362,7 @@ export async function attivaEmporioCredito(input: {
       .update(beneficiariTable)
       .set({
         ...quota.updates,
+        politicaCreditoSolidaleId: selected.politicaCreditoSolidaleId,
         creditoSolidaleAbilitato: true,
         creditoSolidaleStato: "attivo",
         creditoSolidaleDataAbilitazione:
@@ -322,11 +407,13 @@ export async function attivaEmporioCredito(input: {
       azione: "attivazione-integrata-emporio-credito",
       utenteId: actor.id,
       valorePrecedente: {
+        politicaId: b.politicaCreditoSolidaleId,
         quota: b.creditoSolidaleMensileAssegnato,
         manuale: b.creditoSolidaleMensileManuale,
         motivo: b.creditoSolidaleMotivoModifica,
       },
       valoreNuovo: {
+        politicaId: configured.politicaCreditoSolidaleId,
         quota: quota.assigned,
         manuale: configured.creditoSolidaleMensileManuale,
         motivo: configured.creditoSolidaleMotivoModifica,
@@ -334,6 +421,8 @@ export async function attivaEmporioCredito(input: {
     });
     const result = {
       beneficiarioId: b.id,
+      politicaCreditoSolidaleId: selected.politicaCreditoSolidaleId,
+      politicaNome: quota.politica.nome,
       quotaMensile: quota.assigned,
       quotaAccreditata: credited?.nuova ? credited.quota : 0,
       primaQuotaValutata: first,

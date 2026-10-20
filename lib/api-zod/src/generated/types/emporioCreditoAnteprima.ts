@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { EmporioCreditoAnteprimaPoliticheDisponibiliItem } from "./emporioCreditoAnteprimaPoliticheDisponibiliItem";
 
 export interface EmporioCreditoAnteprima {
   beneficiarioId: number;
@@ -12,6 +13,8 @@ export interface EmporioCreditoAnteprima {
   calcoloToken: string;
   areaNome: string;
   politicaNome: string;
+  politicaCreditoSolidaleId: number | null;
+  politicheDisponibili: EmporioCreditoAnteprimaPoliticheDisponibiliItem[];
   totaleSuggerito: number;
   quotaMensileAssegnata: number;
   motivoModificaQuota?: string | null;

@@ -313,13 +313,21 @@ test("M10/Cassa: nessuna ricarica da UI, avviso sotto carrello vicino alla chius
 test("C2B: conferma integrata con deroga totale 80, prima quota unica e riapertura",async({page})=>{
   const f=await fixture(page,true);
   await db.query(`insert into politiche_credito_solidale(nome,centro_ascolto_id,credito_base_nucleo,credito_per_componente) select 'C2B 60',centro_ascolto_id,50,10 from beneficiari where id=$1`,[f.beneficiary]);
+  const alternative=(await db.query(`insert into politiche_credito_solidale(nome,area_operativa_id,credito_base_nucleo,credito_per_componente) select 'C2B Alternativa',area_operativa_id,20,5 from beneficiari where id=$1 returning id`,[f.beneficiary])).rows[0].id;
   await page.goto(`/beneficiari/${f.beneficiary}`);
   await page.getByRole("button",{name:"Modifica anagrafica",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Salva configurazione Credito",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Salva quota assegnata",exact:true})).toHaveCount(1);
   const card=page.getByRole("region",{name:"Emporio Solidale",exact:true});
   await card.getByRole("textbox",{name:"Motivo dell'abilitazione o della variazione"}).fill("Conferma C2B");
   await card.getByRole("button",{name:"Completa o aggiorna Emporio e credito",exact:true}).click();
   const d=page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true});
   await expect(d).toBeVisible();await expect(d).toContainText("Suggerito dal calcolo: 60");
+  await d.getByRole("combobox",{name:"Politica per questo beneficiario",exact:true}).click();
+  await page.getByRole("option",{name:"C2B Alternativa · Area",exact:true}).click();
+  await expect(d).toContainText("Suggerito dal calcolo: 25");
+  await expect(d.getByText("Politica applicata:",{exact:true}).locator("..")).toContainText("C2B Alternativa");
+  expect((await db.query("select politica_credito_solidale_id from beneficiari where id=$1",[f.beneficiary])).rows[0].politica_credito_solidale_id).toBeNull();
   expect(await balance(f.beneficiary)).toBe(210);
   await d.getByLabel("Quota mensile assegnata",{exact:true}).fill("80");
   await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
@@ -327,6 +335,8 @@ test("C2B: conferma integrata con deroga totale 80, prima quota unica e riapertu
   await d.getByLabel(/Motivo modifica quota/).fill("Deroga totale C2B");
   await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();await expect(d).not.toBeVisible();
   expect(await balance(f.beneficiary)).toBe(290);
+  expect((await db.query("select politica_credito_solidale_id from beneficiari where id=$1",[f.beneficiary])).rows[0].politica_credito_solidale_id).toBe(alternative);
+  await expect(page.getByText("Politica applicata",{exact:true}).locator("..")).toContainText("C2B Alternativa");
   await card.getByRole("textbox",{name:"Motivo dell'abilitazione o della variazione"}).fill("Verifica riapertura C2B");
   await card.getByRole("button",{name:"Completa o aggiorna Emporio e credito",exact:true}).click();await expect(d).toContainText("Nessuna nuova prima ricarica");
   await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();await expect(d).not.toBeVisible();expect(await balance(f.beneficiary)).toBe(290);

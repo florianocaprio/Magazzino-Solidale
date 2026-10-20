@@ -1,4 +1,4 @@
-import { anteprimaAttivazioneEmporio, attivaEmporioCredito, esitoAttivazioneEmporio } from "../lib/emporioAttivazione";
+import { anteprimaAttivazioneEmporio, attivaEmporioCredito, esitoAttivazioneEmporio, parseAttivazionePolicy } from "../lib/emporioAttivazione";
 import { auditContextFromRequest } from "../lib/auditEvent";
 import { CreditoSaldoError } from "../lib/creditoSaldo";
 import { DocumentCommandError } from "../lib/documentCommand";
@@ -350,7 +350,7 @@ const activationId: RequestHandler = (req,res,next) => {
 };
 router.get("/emporio/beneficiari/:beneficiarioId/attivazione-credito",activationId,
   requirePermission("emporio.eligibility.manage"),requirePermission("credito.quota.manage"),async(req,res)=> {
-    res.json(await anteprimaAttivazioneEmporio(Number(req.params.beneficiarioId),req.user!.id));
+    res.json(await anteprimaAttivazioneEmporio(Number(req.params.beneficiarioId),req.user!.id,parseAttivazionePolicy(req.query.politicaCreditoSolidaleId)));
   });
 router.post("/emporio/beneficiari/:beneficiarioId/attivazione-credito",activationId,
   requirePermission("emporio.eligibility.manage"),requirePermission("credito.quota.manage"),async(req,res)=> {

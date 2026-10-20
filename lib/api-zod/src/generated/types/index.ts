@@ -304,6 +304,8 @@ export * from "./emporioAbilitazioneInputStato";
 export * from "./emporioAbilitazioneRiepilogoBeneficiario";
 export * from "./emporioAbilitazioneStato";
 export * from "./emporioCreditoAnteprima";
+export * from "./emporioCreditoAnteprimaPoliticheDisponibiliItem";
+export * from "./emporioCreditoAnteprimaPoliticheDisponibiliItemAmbito";
 export * from "./emporioCreditoAttivazioneInput";
 export * from "./emporioCreditoAttivazioneResult";
 export * from "./emporioOperativo";

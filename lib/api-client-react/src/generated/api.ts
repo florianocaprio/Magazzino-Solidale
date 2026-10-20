@@ -233,6 +233,7 @@ import type {
   GetCreditoSolidaleRicaricaMensileStato200,
   GetDocumentoOperativoRichiesta200,
   GetEmporioAbilitazioniRiepilogoBeneficiariParams,
+  GetEmporioCreditoAnteprimaParams,
   GetEmporioCreditoAttivazioneEsitoParams,
   GetFseReportingPreviewParams,
   GetInterventiRiepilogoVisteParams,
@@ -19906,8 +19907,23 @@ export function useGetEmporioAbilitazioniRiepilogoBeneficiari<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-export const getGetEmporioCreditoAnteprimaUrl = (beneficiarioId: number) => {
-  return `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`;
+export const getGetEmporioCreditoAnteprimaUrl = (
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito?${stringifiedParams}`
+    : `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`;
 };
 
 /**
@@ -19915,10 +19931,11 @@ export const getGetEmporioCreditoAnteprimaUrl = (beneficiarioId: number) => {
  */
 export const getEmporioCreditoAnteprima = async (
   beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
   options?: RequestInit,
 ): Promise<EmporioCreditoAnteprima> => {
   return customFetch<EmporioCreditoAnteprima>(
-    getGetEmporioCreditoAnteprimaUrl(beneficiarioId),
+    getGetEmporioCreditoAnteprimaUrl(beneficiarioId, params),
     {
       ...options,
       method: "GET",
@@ -19928,9 +19945,11 @@ export const getEmporioCreditoAnteprima = async (
 
 export const getGetEmporioCreditoAnteprimaQueryKey = (
   beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
 ) => {
   return [
     `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`,
+    ...(params ? [params] : []),
   ] as const;
 };
 
@@ -19939,6 +19958,7 @@ export const getGetEmporioCreditoAnteprimaQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
@@ -19952,12 +19972,15 @@ export const getGetEmporioCreditoAnteprimaQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getGetEmporioCreditoAnteprimaQueryKey(beneficiarioId);
+    getGetEmporioCreditoAnteprimaQueryKey(beneficiarioId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>
   > = ({ signal }) =>
-    getEmporioCreditoAnteprima(beneficiarioId, { signal, ...requestOptions });
+    getEmporioCreditoAnteprima(beneficiarioId, params, {
+      signal,
+      ...requestOptions,
+    });
 
   return {
     queryKey,
@@ -19985,6 +20008,7 @@ export function useGetEmporioCreditoAnteprima<
   TError = ErrorType<unknown>,
 >(
   beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
@@ -19996,6 +20020,7 @@ export function useGetEmporioCreditoAnteprima<
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetEmporioCreditoAnteprimaQueryOptions(
     beneficiarioId,
+    params,
     options,
   );
 

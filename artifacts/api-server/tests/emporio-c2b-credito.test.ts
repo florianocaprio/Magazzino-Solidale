@@ -521,3 +521,28 @@ it.each(["senza_quota","altro_territorio","modulo_spento"])("comando composto ne
   await expect(activate(b.id,data)).rejects.toMatchObject({status:403});expect(await movements(b.id)).toHaveLength(0);
   expect(await db.select().from(rights).where(eq(rights.beneficiarioId,b.id))).toHaveLength(0);
 });
+
+it("R1 sceglie la politica alla prima conferma: anteprima senza scritture, calcolo e salvataggio atomici",async()=>{
+  const b=await beneficiary();
+  const [other]=await db.insert(policies).values({nome:"Politica alternativa",areaOperativaId:area,creditoBaseNucleo:"20",creditoPerComponente:"5"}).returning();
+  const p=await anteprimaAttivazioneEmporio(b.id,actor.id,other.id);
+  expect(p).toMatchObject({politicaNome:"Politica alternativa",politicaCreditoSolidaleId:other.id,totaleSuggerito:25});
+  expect(p.politicheDisponibili.map(x=>x.id)).toEqual(expect.arrayContaining([policy,other.id]));
+  expect((await row(b.id)).politicaCreditoSolidaleId).toBeNull();expect(await movements(b.id)).toHaveLength(0);
+  const data={...await body(b.id),politicaCreditoSolidaleId:other.id,calcoloToken:p.calcoloToken};
+  const result=await activate(b.id,data);expect(result).toMatchObject({politicaNome:"Politica alternativa",quotaAccreditata:25});
+  expect((await row(b.id)).politicaCreditoSolidaleId).toBe(other.id);expect(Number((await row(b.id)).creditoSolidaleSaldo)).toBe(25);
+  expect((await movements(b.id))[0].politicaCreditoSolidaleId).toBe(other.id);
+  expect(await activate(b.id,data)).toEqual(result);expect(await movements(b.id)).toHaveLength(1);
+});
+it("R1 policy estranee/disattivate e cambio non anticipato sono rifiutati senza effetti",async()=>{
+  const b=await beneficiary();
+  const [a]=await db.insert(areeOperativeTable).values({nome:"Altra Area "+randomUUID()}).returning();
+  const [foreign]=await db.insert(policies).values({nome:"Esterna",areaOperativaId:a.id}).returning();
+  const data=await body(b.id);
+  await expect(anteprimaAttivazioneEmporio(b.id,actor.id,foreign.id)).rejects.toMatchObject({status:400});
+  expect((await anteprimaAttivazioneEmporio(b.id,actor.id)).politicheDisponibili.some(p=>p.id===foreign.id)).toBe(false);
+  await expect(activate(b.id,{...data,politicaCreditoSolidaleId:foreign.id})).rejects.toMatchObject({status:400});
+  await expect(activate(b.id,{...data,politicaCreditoSolidaleId:policy})).rejects.toMatchObject({status:409});
+  expect(await movements(b.id)).toHaveLength(0);expect((await row(b.id)).creditoSolidaleAbilitato).toBe(false);
+});

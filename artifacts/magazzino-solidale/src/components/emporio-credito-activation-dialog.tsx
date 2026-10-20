@@ -13,6 +13,7 @@ import {
   useEmporioSecurity,
   emporioReadableData,
 } from "@/hooks/use-emporio-security";
+import { CreditoPolicySelect } from "./credito-policy-select";
 import { CreditoQuotaFields } from "./credito-quota-fields";
 import {
   Dialog,
@@ -46,10 +47,20 @@ export function EmporioCreditoActivationDialog({
   const security = useEmporioSecurity();
   const client = useQueryClient();
   const key = `emporio-attivazione:${user?.id}:${beneficiarioId}`;
-  const query = useGetEmporioCreditoAnteprima(beneficiarioId, {
+  const [policyChoice, setPolicyChoice] = useState<number | null | undefined>(
+    undefined,
+  );
+  const params =
+    policyChoice === undefined
+      ? undefined
+      : {
+          politicaCreditoSolidaleId:
+            policyChoice === null ? "auto" : String(policyChoice),
+        };
+  const query = useGetEmporioCreditoAnteprima(beneficiarioId, params, {
     query: {
       ...security.readOptions(
-        getGetEmporioCreditoAnteprimaQueryKey(beneficiarioId),
+        getGetEmporioCreditoAnteprimaQueryKey(beneficiarioId, params),
       ),
       enabled: canAct,
     },
@@ -124,6 +135,7 @@ export function EmporioCreditoActivationDialog({
       versioneBeneficiario: preview.versioneBeneficiario,
       calcoloToken: preview.calcoloToken,
       motivo: motivo.trim(),
+      politicaCreditoSolidaleId: preview.politicaCreditoSolidaleId,
       quotaMensileAssegnata: Number(assigned),
       motivoModificaQuota: reason.trim() || null,
     };
@@ -210,10 +222,30 @@ export function EmporioCreditoActivationDialog({
         )}
         {canAct && preview && !query.isError && (
           <>
-            <p className="text-sm">
-              {preview.areaNome} · {preview.politicaNome}
-            </p>
+            <p className="text-sm">{preview.areaNome}</p>
             <p className="text-sm">{motivo}</p>
+            <CreditoPolicySelect
+              value={String(
+                policyChoice === undefined
+                  ? (preview.politicaCreditoSolidaleId ?? "auto")
+                  : (policyChoice ?? "auto"),
+              )}
+              onValueChange={(v) => {
+                setPolicyChoice(v === "auto" ? null : Number(v));
+                setSubmitted(false);
+              }}
+              disabled={busy || uncertain || query.isFetching}
+              automaticLabel={t("ciclo2Credito.automaticPolicy")}
+              options={preview.politicheDisponibili.map((p) => ({
+                id: p.id,
+                nome: p.nome,
+                scope: t(`ciclo2Credito.scope.${p.ambito}`),
+              }))}
+            />
+            <p className="rounded-md border bg-muted/30 p-3 text-sm">
+              <strong>{t("creditoSolidale.politicaApplicata")}:</strong>{" "}
+              {preview.politicaNome}
+            </p>
             <CreditoQuotaFields
               suggested={preview.totaleSuggerito}
               value={assigned}

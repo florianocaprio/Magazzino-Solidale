@@ -1124,6 +1124,7 @@ function CreditoSolidaleCalcoloPanel({
         </p>
       ) : data ? (
         <div className="space-y-2 text-sm">
+          <div className="flex items-start justify-between gap-3"><span className="text-muted-foreground">{t("creditoSolidale.politicaApplicata")}</span><span className="text-right font-medium">{data.politicaNome}</span></div>
           {[
             [
               "creditoSolidale.creditoBaseNucleo",
@@ -2227,17 +2228,6 @@ export function EditBeneficiarioSheet({
                       </FormItem>
                     )}
                   />
-                  <Button type="button" variant="outline" disabled={updateCredito.isPending || !emporioAbilitato} onClick={async () => {
-                    try {
-                      await updateCredito.mutateAsync({ beneficiarioId: b.id, data: {
-                        creditoSolidaleAbilitato: form.getValues("creditoSolidaleAbilitato"),
-                        creditoSolidaleStato: form.getValues("creditoSolidaleAbilitato") ? form.getValues("creditoSolidaleStato") : "non_abilitato",
-                        creditoSolidaleNote: form.getValues("creditoSolidaleNote") || null,
-                      } });
-                      await queryClient.invalidateQueries({ predicate: (q) => /\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0])) });
-                      toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
-                    } catch (cause) { toast({ title: t("beneficiarioDettaglio.error"), description: apiErrorMessage(cause, t("creditoSolidale.calculateError")), variant: "destructive" }); }
-                  }}>{t("creditoSolidale.saveConfiguration")}</Button>
                   <CreditoSolidaleCalcoloPanel
                     b={b}
                     enabled={creditoSolidaleAbilitato && emporioAbilitato}

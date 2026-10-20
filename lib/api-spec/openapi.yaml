@@ -5544,6 +5544,11 @@ paths:
       summary: Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
       parameters:
         - { name: beneficiarioId, in: path, required: true, schema: { type: integer } }
+        - name: politicaCreditoSolidaleId
+          in: query
+          required: false
+          description: Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.
+          schema: { type: string, pattern: '^(auto|[1-9][0-9]*)$' }
       responses:
         "200":
           description: Calcolo autorevole e versione da confermare.
@@ -19548,11 +19553,21 @@ components:
         calcoloToken: { type: string }
         areaNome: { type: string }
         politicaNome: { type: string }
+        politicaCreditoSolidaleId: { type: integer, nullable: true }
+        politicheDisponibili:
+          type: array
+          items:
+            type: object
+            required: [id, nome, ambito]
+            properties:
+              id: { type: integer }
+              nome: { type: string }
+              ambito: { type: string, enum: [centro, area, globale] }
         totaleSuggerito: { type: integer }
         quotaMensileAssegnata: { type: integer }
         motivoModificaQuota: { type: string, nullable: true }
         primaQuotaAmmessa: { type: boolean }
-      required: [beneficiarioId, versioneBeneficiario, calcoloToken, areaNome, politicaNome, totaleSuggerito, quotaMensileAssegnata, primaQuotaAmmessa]
+      required: [beneficiarioId, versioneBeneficiario, calcoloToken, areaNome, politicaNome, politicaCreditoSolidaleId, politicheDisponibili, totaleSuggerito, quotaMensileAssegnata, primaQuotaAmmessa]
     EmporioCreditoAttivazioneInput:
       type: object
       additionalProperties: false
@@ -19562,12 +19577,19 @@ components:
         calcoloToken: { type: string, minLength: 64, maxLength: 64 }
         motivo: { type: string, minLength: 1, maxLength: 1000 }
         quotaMensileAssegnata: { type: integer, nullable: true, minimum: 0, maximum: 99999999 }
+        politicaCreditoSolidaleId:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.
         motivoModificaQuota: { type: string, nullable: true, maxLength: 10000 }
       required: [idempotencyKey, versioneBeneficiario, calcoloToken, motivo]
     EmporioCreditoAttivazioneResult:
       type: object
       properties:
         beneficiarioId: { type: integer }
+        politicaCreditoSolidaleId: { type: integer, nullable: true }
+        politicaNome: { type: string }
         quotaMensile: { type: integer }
         quotaAccreditata: { type: integer }
         primaQuotaValutata: { type: boolean }

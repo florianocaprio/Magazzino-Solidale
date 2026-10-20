@@ -13334,12 +13334,33 @@ export const GetEmporioCreditoAnteprimaParams = zod.object({
   beneficiarioId: zod.coerce.number(),
 });
 
+export const getEmporioCreditoAnteprimaQueryPoliticaCreditoSolidaleIdRegExp =
+  new RegExp("^(auto|[1-9][0-9]\*)$");
+
+export const GetEmporioCreditoAnteprimaQueryParams = zod.object({
+  politicaCreditoSolidaleId: zod.coerce
+    .string()
+    .regex(getEmporioCreditoAnteprimaQueryPoliticaCreditoSolidaleIdRegExp)
+    .optional()
+    .describe(
+      "Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.",
+    ),
+});
+
 export const GetEmporioCreditoAnteprimaResponse = zod.object({
   beneficiarioId: zod.number(),
   versioneBeneficiario: zod.number(),
   calcoloToken: zod.string(),
   areaNome: zod.string(),
   politicaNome: zod.string(),
+  politicaCreditoSolidaleId: zod.number().nullable(),
+  politicheDisponibili: zod.array(
+    zod.object({
+      id: zod.number(),
+      nome: zod.string(),
+      ambito: zod.enum(["centro", "area", "globale"]),
+    }),
+  ),
   totaleSuggerito: zod.number(),
   quotaMensileAssegnata: zod.number(),
   motivoModificaQuota: zod.string().nullish(),
@@ -13381,6 +13402,13 @@ export const AttivaEmporioCreditoBody = zod.object({
     .min(attivaEmporioCreditoBodyQuotaMensileAssegnataMin)
     .max(attivaEmporioCreditoBodyQuotaMensileAssegnataMax)
     .nullish(),
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.",
+    ),
   motivoModificaQuota: zod
     .string()
     .max(attivaEmporioCreditoBodyMotivoModificaQuotaMax)
@@ -13389,6 +13417,8 @@ export const AttivaEmporioCreditoBody = zod.object({
 
 export const AttivaEmporioCreditoResponse = zod.object({
   beneficiarioId: zod.number(),
+  politicaCreditoSolidaleId: zod.number().nullish(),
+  politicaNome: zod.string().optional(),
   quotaMensile: zod.number(),
   quotaAccreditata: zod.number(),
   primaQuotaValutata: zod.boolean(),
@@ -13415,6 +13445,8 @@ export const GetEmporioCreditoAttivazioneEsitoQueryParams = zod.object({
 
 export const GetEmporioCreditoAttivazioneEsitoResponse = zod.object({
   beneficiarioId: zod.number(),
+  politicaCreditoSolidaleId: zod.number().nullish(),
+  politicaNome: zod.string().optional(),
   quotaMensile: zod.number(),
   quotaAccreditata: zod.number(),
   primaQuotaValutata: zod.boolean(),

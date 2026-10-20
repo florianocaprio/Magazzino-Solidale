@@ -8,6 +8,8 @@
 
 export interface EmporioCreditoAttivazioneResult {
   beneficiarioId: number;
+  politicaCreditoSolidaleId?: number | null;
+  politicaNome?: string;
   quotaMensile: number;
   quotaAccreditata: number;
   primaQuotaValutata: boolean;
