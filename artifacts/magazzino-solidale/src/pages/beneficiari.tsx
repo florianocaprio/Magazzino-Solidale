@@ -53,6 +53,7 @@ const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.ob
   nome: z.string().trim().min(2),
   soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
+  fascicolo: z.string().trim().max(255).optional(),
   dataNascita: z.string().optional().refine(isNotFutureDateOnly, t("logisticaCampaign.birthInvalid")),
   sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
@@ -232,7 +233,7 @@ export default function Beneficiari() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      cognome: "", nome: "", soprannome: "", codiceFiscale: "", dataNascita: "", sesso: "",
+      cognome: "", nome: "", soprannome: "", codiceFiscale: "", fascicolo: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
       abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
@@ -447,7 +448,9 @@ export default function Beneficiari() {
         <div className="flex items-center gap-2">
           <FseBeneficiariActions
             centri={centri ?? []}
+            aree={areaOperativaList ?? []}
             lockedCentroId={lockedCentroId}
+            lockedAreaId={user?.areaOperativaId ?? null}
             canImport={canImportFse}
             canExport={canExportFse}
             onImported={() => queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() })}
@@ -795,6 +798,9 @@ export default function Beneficiari() {
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="fascicolo" render={({ field }) => (
+                    <FormItem><FormLabel>{t("blocco07.fascicolo")}</FormLabel><FormControl><Input {...field} maxLength={255} /></FormControl></FormItem>
+                  )} />
                   <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
                     <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
                   )} />

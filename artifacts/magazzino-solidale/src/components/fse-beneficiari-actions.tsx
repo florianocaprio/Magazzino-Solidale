@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { registerBlocco07 } from "@/lib/i18n/namespaces/blocco07";
+import i18n from "@/lib/i18n";
+registerBlocco07(i18n);
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   useExportBeneficiariFse,
@@ -65,19 +68,23 @@ export const FSE_BENEFICIARI_HEADERS_UI = [
 ] as const;
 
 function apiErrorMessage(error: unknown, fallback: string): string {
-  const data = (error as { data?: { error?: string } })?.data;
-  return data?.error ?? (error instanceof Error ? error.message : fallback);
+  const data = (error as { data?: { error?: string; errori?: string[] } })?.data;
+  return [...new Set([data?.error ?? (error instanceof Error ? error.message : fallback), ...(data?.errori ?? [])])].join(" ");
 }
 
 export function FseBeneficiariActions({
   centri,
+  aree,
   lockedCentroId,
+  lockedAreaId,
   canImport,
   canExport,
   onImported,
 }: {
   centri: Centro[];
+  aree?: { id: number; nome: string; attivo?: boolean }[];
   lockedCentroId: number | null;
+  lockedAreaId?: number | null;
   canImport: boolean;
   canExport: boolean;
   onImported: () => void;
@@ -92,6 +99,32 @@ export function FseBeneficiariActions({
   const [centroId, setCentroId] = useState(
     lockedCentroId ? String(lockedCentroId) : "",
   );
+  const lockedArea =
+    lockedAreaId ??
+    centri.find((centro) => centro.id === lockedCentroId)?.areaOperativaId;
+  const [areaId, setAreaId] = useState(lockedArea ? String(lockedArea) : "");
+  const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (lockedArea != null) setAreaId(String(lockedArea));
+  }, [lockedArea]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [inlineError, setInlineError] = useState("");
+  const [reading, setReading] = useState(false);
+  const generation = useRef(0);
+  const availableAreas: { id: number; nome: string; attivo?: boolean }[] =
+    aree ?? [
+      ...new Map(
+        centri
+          .filter((c) => c.areaOperativaId != null)
+          .map((c) => [
+            c.areaOperativaId!,
+            {
+              id: c.areaOperativaId!,
+              nome: c.areaOperativaNome ?? String(c.areaOperativaId),
+            },
+          ]),
+      ).values(),
+    ];
   const [filePayload, setFilePayload] = useState<FilePayload | null>(null);
   const [preview, setPreview] = useState<BeneficiariFsePreviewResult | null>(
     null,
@@ -104,18 +137,20 @@ export function FseBeneficiariActions({
     Record<number, BeneficiariFseImportResolution>
   >({});
   const [date, setDate] = useState(todayEuropeRome());
-  const selected = useMemo(
-    () => centri.find((centro) => String(centro.id) === centroId),
-    [centri, centroId],
-  );
   const busy =
+    reading ||
     previewMutation.isPending ||
     importMutation.isPending ||
     preflightMutation.isPending ||
     exportMutation.isPending;
 
   const reset = () => {
+    generation.current++;
+    setReading(false);
     setMode(null);
+    setSelectedFile(null);
+    setInlineError("");
+    if (!lockedArea) setAreaId("");
     setPreview(null);
     setImportResult(null);
     setExportPreflight(null);
@@ -125,11 +160,17 @@ export function FseBeneficiariActions({
   };
 
   const readFile = async (file?: File) => {
-    if (!file || !centroId) return;
+    if (!file || !centroId || !areaId) return;
+    setInlineError("");
+    const current = ++generation.current;
+    setReading(true);
     try {
       if (!/\.xlsx$/i.test(file.name))
         throw new Error(t("reporting.fse.selectXlsx"));
+      if (file.size === 0 || file.size > 10 * 1024 * 1024)
+        throw new Error(t("blocco07.beneficiaryFormats"));
       const bytes = await file.arrayBuffer();
+      if (generation.current !== current) return;
       const workbook = XLSX.read(bytes, { type: "array", cellDates: false });
       if (
         workbook.SheetNames.length !== 1 ||
@@ -146,21 +187,27 @@ export function FseBeneficiariActions({
       });
       const payload: FilePayload = {
         centroAscoltoId: Number(centroId),
+        areaOperativaId: Number(areaId),
         dataRiferimento: date,
         file,
       };
       setFilePayload(payload);
       setImportResult(null);
       setResolutions({});
-      setPreview(await previewMutation.mutateAsync({ data: payload }));
+      const result = await previewMutation.mutateAsync({ data: payload });
+      if (generation.current === current) setPreview(result);
     } catch (error) {
+      if (generation.current !== current) return;
       setFilePayload(null);
       setPreview(null);
+      setInlineError(apiErrorMessage(error, t("reporting.fse.invalidFile")));
       toast({
         title: t("reporting.fse.import"),
         description: apiErrorMessage(error, t("reporting.fse.invalidFile")),
         variant: "destructive",
       });
+    } finally {
+      if (generation.current === current) setReading(false);
     }
   };
 
@@ -200,6 +247,7 @@ export function FseBeneficiariActions({
         await preflightMutation.mutateAsync({
           data: {
             centroAscoltoId: Number(centroId),
+            areaOperativaId: Number(areaId),
             dataRiferimento: date,
             soloAttivi: true,
           },
@@ -219,6 +267,7 @@ export function FseBeneficiariActions({
       const blob = await exportMutation.mutateAsync({
         data: {
           centroAscoltoId: Number(centroId),
+          areaOperativaId: Number(areaId),
           dataRiferimento: date,
           soloAttivi: true,
         },
@@ -275,7 +324,7 @@ export function FseBeneficiariActions({
       <Dialog
         open={mode !== null}
         onOpenChange={(open) => {
-          if (!open) reset();
+          if (!open && !busy) reset();
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -291,21 +340,61 @@ export function FseBeneficiariActions({
           </DialogHeader>
           <div className="space-y-4">
             <Select
+              value={areaId}
+              disabled={lockedArea != null || busy}
+              onValueChange={(value) => {
+                setAreaId(value);
+                setCentroId("");
+                setPreview(null);
+                setFilePayload(null);
+                setImportResult(null);
+                setExportPreflight(null);
+                setInlineError("");
+                setResolutions({});
+              }}
+            >
+              <SelectTrigger aria-label={t("reporting.fse.operationalArea")}>
+                <SelectValue
+                  placeholder={t("reporting.filters.areaOperativa")}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableAreas
+                  .filter(
+                    (area) =>
+                      area.attivo !== false &&
+                      (lockedArea == null || area.id === lockedArea),
+                  )
+                  .map((area) => (
+                    <SelectItem key={area.id} value={String(area.id)}>
+                      {area.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={centroId}
               onValueChange={(value) => {
                 setCentroId(value);
+                setFilePayload(null);
+                setInlineError("");
+                setResolutions({});
                 setPreview(null);
                 setExportPreflight(null);
                 setImportResult(null);
               }}
-              disabled={lockedCentroId != null || busy}
+              disabled={!areaId || lockedCentroId != null || busy}
             >
               <SelectTrigger aria-label={t("reporting.fse.centre")}>
                 <SelectValue placeholder={t("reporting.fse.centre")} />
               </SelectTrigger>
               <SelectContent>
                 {centri
-                  .filter((centro) => centro.attivo !== false)
+                  .filter(
+                    (centro) =>
+                      centro.attivo !== false &&
+                      String(centro.areaOperativaId) === areaId,
+                  )
                   .map((centro) => (
                     <SelectItem key={centro.id} value={String(centro.id)}>
                       {centro.nome}
@@ -313,18 +402,6 @@ export function FseBeneficiariActions({
                   ))}
               </SelectContent>
             </Select>
-            <div
-              className="rounded-md bg-muted p-3 text-sm"
-              aria-label={t("reporting.fse.operationalArea")}
-            >
-              {t("reporting.filters.areaOperativa")}:{" "}
-              <strong>
-                {selected?.areaOperativaNome ??
-                  (selected?.areaOperativaId
-                    ? `ID ${selected.areaOperativaId}`
-                    : t("reporting.fse.unavailable"))}
-              </strong>
-            </div>
             {mode === "import" && !importResult && (
               <>
                 <Input
@@ -341,13 +418,50 @@ export function FseBeneficiariActions({
                 <p className="text-sm text-muted-foreground">
                   {t("reporting.fse.referenceDateHistory")}
                 </p>
-                <Input
-                  type="file"
-                  accept=".xlsx"
-                  aria-label={t("reporting.fse.file")}
-                  disabled={!centroId || busy}
-                  onChange={(event) => void readFile(event.target.files?.[0])}
-                />
+                <p className="text-sm text-muted-foreground">{t("blocco07.beneficiaryHelp")}</p>
+                <div className="min-w-0 space-y-2 rounded-md border p-3">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".xlsx"
+                    className="hidden"
+                    aria-label={t("reporting.fse.file")}
+                    disabled={!centroId || !areaId || busy}
+                    onChange={(event) => {
+                      setSelectedFile(event.target.files?.[0] ?? null);
+                      setPreview(null);
+                      setFilePayload(null);
+                      setInlineError("");
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={!centroId || !areaId || busy}
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    {t("blocco07.beneficiaryPicker")}
+                  </Button>
+                  {selectedFile && (
+                    <p className="break-all text-sm">{selectedFile.name}</p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {t("blocco07.beneficiaryFormats")}
+                  </p>
+                  <Button
+                    disabled={!selectedFile || !centroId || !areaId || busy}
+                    onClick={() => void readFile(selectedFile ?? undefined)}
+                  >
+                    {t("blocco07.analyze")}
+                  </Button>
+                </div>
+                {inlineError && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-destructive p-3 text-sm text-destructive"
+                  >
+                    {inlineError}
+                  </p>
+                )}
               </>
             )}
             {mode === "export" && (
@@ -539,7 +653,7 @@ export function FseBeneficiariActions({
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={reset}>
+            <Button variant="outline" disabled={busy} onClick={reset}>
               {importResult
                 ? t("reporting.fse.close")
                 : t("reporting.fse.cancel")}

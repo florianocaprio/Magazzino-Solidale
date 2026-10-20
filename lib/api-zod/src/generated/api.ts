@@ -2984,6 +2984,24 @@ export const CreateFseImportSourceBody = zod.object({
   areaOperativaId: zod.number().min(1),
 });
 
+/**
+ * Riusa il registro FSE+ dell’Area del magazzino o lo configura al primo import. Più registri richiedono una scelta esplicita; i registri disattivati non vengono sostituiti.
+ */
+
+export const ResolveAutomaticFseImportSourceBody = zod.object({
+  magazzinoId: zod.number().min(1),
+});
+
+export const ResolveAutomaticFseImportSourceResponse = zod.object({
+  id: zod.number(),
+  codice: zod.string(),
+  descrizione: zod.string(),
+  areaOperativaId: zod.number(),
+  attiva: zod.union([zod.literal(0), zod.literal(1)]),
+  creatoDa: zod.number(),
+  dataCreazione: zod.coerce.date(),
+});
+
 export const analyzeFsePracticeImportQueryNomeFileMax = 255;
 
 export const analyzeFsePracticeImportQuerySheetNameMax = 100;
@@ -8635,7 +8653,25 @@ export const ListBeneficiariResponseItem = zod
   );
 export const ListBeneficiariResponse = zod.array(ListBeneficiariResponseItem);
 
+export const createBeneficiarioBodyFascicoloMax = 255;
+
+export const createBeneficiarioBodyVersioneFascicoloMin = 0;
+
 export const CreateBeneficiarioBody = zod.object({
+  fascicolo: zod
+    .string()
+    .max(createBeneficiarioBodyFascicoloMax)
+    .nullish()
+    .describe(
+      "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+    ),
+  versioneFascicolo: zod
+    .number()
+    .min(createBeneficiarioBodyVersioneFascicoloMin)
+    .optional()
+    .describe(
+      "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+    ),
   codice: zod.string().optional(),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod.enum(["provvisoria", "completa"]).optional(),
@@ -8736,9 +8772,27 @@ export const CercaBeneficiariSimiliResponse = zod.array(
   CercaBeneficiariSimiliResponseItem,
 );
 
+export const bulkBeneficiariBodyRigheItemFascicoloMax = 255;
+
+export const bulkBeneficiariBodyRigheItemVersioneFascicoloMin = 0;
+
 export const BulkBeneficiariBody = zod.object({
   righe: zod.array(
     zod.object({
+      fascicolo: zod
+        .string()
+        .max(bulkBeneficiariBodyRigheItemFascicoloMax)
+        .nullish()
+        .describe(
+          "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+        ),
+      versioneFascicolo: zod
+        .number()
+        .min(bulkBeneficiariBodyRigheItemVersioneFascicoloMin)
+        .optional()
+        .describe(
+          "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+        ),
       codice: zod.string().optional(),
       codiceFiscale: zod.string().nullish(),
       statoAnagrafica: zod.enum(["provvisoria", "completa"]).optional(),
@@ -8807,6 +8861,13 @@ export const BulkBeneficiariResponse = zod.object({
  */
 
 export const PreviewBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce
     .date()
@@ -8861,6 +8922,13 @@ export const PreviewBeneficiariFseResponse = zod.object({
  */
 
 export const ImportBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce
     .date()
@@ -8909,6 +8977,13 @@ export const ImportBeneficiariFseResponse = zod.object({
 export const preflightBeneficiariFseExportBodySoloAttiviDefault = true;
 
 export const PreflightBeneficiariFseExportBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce.date(),
   soloAttivi: zod
@@ -8949,6 +9024,13 @@ export const PreflightBeneficiariFseExportResponse = zod.object({
 export const exportBeneficiariFseBodySoloAttiviDefault = true;
 
 export const ExportBeneficiariFseBody = zod.object({
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.",
+    ),
   centroAscoltoId: zod.number().min(1),
   dataRiferimento: zod.coerce.date(),
   soloAttivi: zod.boolean().default(exportBeneficiariFseBodySoloAttiviDefault),
@@ -9122,7 +9204,16 @@ export const GetBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getBeneficiarioResponseFascicoloMax = 255;
+
+export const getBeneficiarioResponseVersioneFascicoloMin = 0;
+
 export const GetBeneficiarioResponse = zod.object({
+  fascicolo: zod.string().max(getBeneficiarioResponseFascicoloMax).nullish(),
+  versioneFascicolo: zod
+    .number()
+    .min(getBeneficiarioResponseVersioneFascicoloMin)
+    .optional(),
   id: zod.number(),
   codice: zod.string(),
   codiceFiscale: zod.string().nullish(),
@@ -9356,7 +9447,25 @@ export const UpdateBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateBeneficiarioBodyFascicoloMax = 255;
+
+export const updateBeneficiarioBodyVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioBody = zod.object({
+  fascicolo: zod
+    .string()
+    .max(updateBeneficiarioBodyFascicoloMax)
+    .nullish()
+    .describe(
+      "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+    ),
+  versioneFascicolo: zod
+    .number()
+    .min(updateBeneficiarioBodyVersioneFascicoloMin)
+    .optional()
+    .describe(
+      "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+    ),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod
     .enum(["provvisoria", "completa"])
@@ -9411,8 +9520,26 @@ export const UpdateBeneficiarioBody = zod.object({
   versione: zod.number().min(1),
 });
 
+export const updateBeneficiarioResponseFascicoloMax = 255;
+
+export const updateBeneficiarioResponseVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioResponse = zod
   .object({
+    fascicolo: zod
+      .string()
+      .max(updateBeneficiarioResponseFascicoloMax)
+      .nullish()
+      .describe(
+        "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+      ),
+    versioneFascicolo: zod
+      .number()
+      .min(updateBeneficiarioResponseVersioneFascicoloMin)
+      .optional()
+      .describe(
+        "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+      ),
     id: zod.number(),
     codice: zod.string(),
     codiceFiscale: zod.string().nullish(),
@@ -9499,8 +9626,26 @@ export const UpdateBeneficiarioStatoBody = zod.object({
   versione: zod.number().min(1),
 });
 
+export const updateBeneficiarioStatoResponseFascicoloMax = 255;
+
+export const updateBeneficiarioStatoResponseVersioneFascicoloMin = 0;
+
 export const UpdateBeneficiarioStatoResponse = zod
   .object({
+    fascicolo: zod
+      .string()
+      .max(updateBeneficiarioStatoResponseFascicoloMax)
+      .nullish()
+      .describe(
+        "Codice fascicolo facoltativo, conservato nel profilo FSE esistente.",
+      ),
+    versioneFascicolo: zod
+      .number()
+      .min(updateBeneficiarioStatoResponseVersioneFascicoloMin)
+      .optional()
+      .describe(
+        "Versione del profilo FSE; richiesta per modificare il fascicolo esistente.",
+      ),
     id: zod.number(),
     codice: zod.string(),
     codiceFiscale: zod.string().nullish(),
@@ -14751,6 +14896,7 @@ export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornataMin = 0;
 export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornabileMin = 0;
 
 export const GetBollaStampaSpesaEmporioResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   intestazione: zod.string(),
   numeroBolla: zod.string().nullish(),
   numeroSpesa: zod.string(),
@@ -15485,6 +15631,7 @@ export const GetDocumentoOperativoResponse = zod.object({
   tipoAggregato: zod.enum(["bolla", "trasferimento"]),
   dettaglio: zod.union([
     zod.object({
+      beneficiarioFascicolo: zod.string().nullish(),
       id: zod.number(),
       numeroBolla: zod.string(),
       dataBolla: zod.string(),
@@ -15837,6 +15984,7 @@ export const GetBollaParams = zod.object({
 });
 
 export const GetBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -15948,6 +16096,7 @@ export const UpdateBollaBody = zod.object({
 });
 
 export const UpdateBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16159,6 +16308,7 @@ export const ConfermaBollaBody = zod.object({
 });
 
 export const ConfermaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16268,6 +16418,7 @@ export const AnnullaBollaBody = zod.object({
 });
 
 export const AnnullaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16382,6 +16533,7 @@ export const StornaAmministrativamenteBollaBody = zod.object({
 });
 
 export const StornaAmministrativamenteBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16490,6 +16642,7 @@ export const ConsegnaBollaBody = zod.object({
 });
 
 export const ConsegnaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16602,6 +16755,7 @@ export const AffidaBollaBody = zod.object({
 });
 
 export const AffidaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16714,6 +16868,7 @@ export const SegnalaMancataConsegnaBollaBody = zod.object({
 });
 
 export const SegnalaMancataConsegnaBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -16952,6 +17107,7 @@ export const RegistraRientroBollaBody = zod.object({
 });
 
 export const RegistraRientroBollaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),
@@ -17057,6 +17213,7 @@ export const SegnalaRitiroNonEffettuatoBody = zod.object({
 });
 
 export const SegnalaRitiroNonEffettuatoResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
   id: zod.number(),
   numeroBolla: zod.string(),
   dataBolla: zod.string(),

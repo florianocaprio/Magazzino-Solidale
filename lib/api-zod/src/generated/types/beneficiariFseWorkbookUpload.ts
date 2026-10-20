@@ -7,6 +7,11 @@
  */
 
 export interface BeneficiariFseWorkbookUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */

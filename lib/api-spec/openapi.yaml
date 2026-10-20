@@ -1150,6 +1150,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/FseImportSource"
 
+  /fse-importazioni/sorgenti/automatica:
+    post:
+      operationId: resolveAutomaticFseImportSource
+      tags: [fse-importazioni]
+      description: Riusa il registro FSE+ dell’Area del magazzino o lo configura al primo import. Più registri richiedono una scelta esplicita; i registri disattivati non vengono sostituiti.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseAutomaticSourceInput"
+      responses:
+        "200":
+          description: Registro FSE+ dell’Area
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSource"
+        "409":
+          description: Scelta esplicita necessaria o registro disattivato
+
   /fse-importazioni/analizza:
     post:
       operationId: analyzeFsePracticeImport
@@ -11789,6 +11810,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento:
           type: string
@@ -11811,6 +11836,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento:
           type: string
@@ -11928,6 +11957,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: integer
+          minimum: 1
+          description: Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
         centroAscoltoId: { type: integer, minimum: 1 }
         dataRiferimento: { type: string, format: date }
         soloAttivi: { type: boolean, default: true }
@@ -13318,6 +13351,13 @@ components:
           creatoDa,
           dataCreazione,
         ]
+
+    FseAutomaticSourceInput:
+      type: object
+      additionalProperties: false
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+      required: [magazzinoId]
 
     FseImportSourceInput:
       type: object
@@ -16028,6 +16068,14 @@ components:
       type: object
       description: Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         id:
           type: integer
         codice:
@@ -16161,6 +16209,12 @@ components:
     BeneficiarioDettaglio:
       type: object
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+        versioneFascicolo:
+          type: integer
+          minimum: 0
         id:
           type: integer
         codice:
@@ -16329,6 +16383,14 @@ components:
       type: object
       additionalProperties: false
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         codice:
           type: string
         codiceFiscale:
@@ -16415,6 +16477,14 @@ components:
       type: object
       additionalProperties: false
       properties:
+        fascicolo:
+          type: [string, "null"]
+          maxLength: 255
+          description: Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+        versioneFascicolo:
+          type: integer
+          minimum: 0
+          description: Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
         codiceFiscale:
           type: ["string", "null"]
         statoAnagrafica:
@@ -20063,6 +20133,8 @@ components:
     BollaEmporioStampa:
       type: object
       properties:
+        beneficiarioFascicolo:
+          type: [string, "null"]
         intestazione:
           type: string
         numeroBolla:
@@ -20450,6 +20522,8 @@ components:
     BollaDettaglio:
       type: object
       properties:
+        beneficiarioFascicolo:
+          type: [string, "null"]
         id:
           type: integer
         numeroBolla:

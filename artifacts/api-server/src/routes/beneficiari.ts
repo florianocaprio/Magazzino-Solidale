@@ -1,3 +1,4 @@
+import { readBeneficiarioFascicolo, saveBeneficiarioFascicolo, BeneficiarioFascicoloError } from "../lib/beneficiarioFascicolo";
 import { isModuloAttivo } from "../lib/featureFlags";
 import { requireCurrentCommandActor, CurrentCommandActorError } from "../lib/currentCommandActor";
 import { beneficiarioAccessScopeFromRequest, canAccessBeneficiarioScope } from "../lib/beneficiarioPolicy";
@@ -596,7 +597,7 @@ export async function createBeneficiarioOne(
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const parsed = CreateBeneficiarioInput.safeParse(body);
   if (!parsed.success) return { error: zodErrorMessage(parsed.error), status: 400 };
-  const b = parsed.data;
+  const { fascicolo, versioneFascicolo, ...b } = parsed.data;
   if (!options.allowSensitiveFields && !hasPermission(req, "beneficiari.sensitive.view")
     && Object.keys(b).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
     return { error: "Non hai il permesso di modificare i dati sociali sensibili.", status: 403 };
@@ -682,6 +683,7 @@ export async function createBeneficiarioOne(
     if (!codice) values.codice = await allocateBeneficiaryCode(executor, values.areaOperativaId ?? null);
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
+    if (fascicolo?.trim()) await saveBeneficiarioFascicolo(executor, row.id, fascicolo, 0, req.user?.id ?? null);
     await executor.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `beneficiario:${row.id}`,
@@ -704,6 +706,7 @@ export async function createBeneficiarioOne(
       : await db.transaction((tx) => persist(tx));
     return { row };
   } catch (e) {
+    if (e instanceof BeneficiarioFascicoloError || (e as { constraint?: string }).constraint === "fse_fascicoli_sociali_codice_norm_uidx") return { error: "Fascicolo già associato a un altro beneficiario.", status: 409 };
     if (e instanceof BeneficiaryCodeError) return { error: e.message, status: 409 };
     if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
     throw e;
@@ -713,13 +716,13 @@ export async function createBeneficiarioOne(
 router.post("/beneficiari", requirePermission("beneficiari.manage"), async (req, res) => {
   const r = await createBeneficiarioOne(req.body, req);
   if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
-  res.status(201).json(fmtBenefForRequest(
+  res.status(201).json({ ...await readBeneficiarioFascicolo(r.row.id), ...fmtBenefForRequest(
     r.row,
     req,
     null,
     null,
     await magazzinoEmporioNomeOf(r.row.magazzinoEmporioPreferitoId),
-  ));
+  ) });
 });
 
 router.post("/beneficiari/bulk", requirePermission("beneficiari.manage"), async (req, res) => {
@@ -985,6 +988,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   );
   res.json({
     ...anagrafica,
+    ...await readBeneficiarioFascicolo(id),
     nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
@@ -1039,7 +1043,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   const id = Number(req.params.id);
   const parsed = UpdateBeneficiarioInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
-  const input = parsed.data;
+  const { fascicolo, versioneFascicolo, ...input } = parsed.data;
   if (!hasPermission(req, "beneficiari.sensitive.view")
     && Object.keys(input).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
     res.status(403).json({ error: "Non hai il permesso di modificare i dati sociali sensibili." });
@@ -1280,15 +1284,19 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     }, { requireArea: true, requireActiveArea: true });
     if (assignmentError) { res.status(assignmentError.status).json({ error: assignmentError.error }); return; }
   }
-  const changedFields = Object.keys(inputUpdates);
+  const changedFields = [...Object.keys(inputUpdates), ...(fascicolo !== undefined ? ["fascicolo"] : [])];
   updates.versione = sql`${beneficiariTable.versione} + 1`;
   try {
     const row = await db.transaction(async (tx) => {
+      if (fascicolo !== undefined) await saveBeneficiarioFascicolo(tx, id, fascicolo, versioneFascicolo ?? 0, req.user?.id ?? null);
       const [updated] = await tx.update(beneficiariTable).set(updates).where(and(
         eq(beneficiariTable.id, id),
         eq(beneficiariTable.versione, versione),
       )).returning();
-      if (!updated) return null;
+      if (!updated) {
+        if (fascicolo !== undefined) throw new BeneficiarioFascicoloError("Il beneficiario è stato modificato. Ricarica la scheda e riprova.");
+        return null;
+      }
       await tx.insert(auditConfigurazioniTable).values({
         area: "beneficiari",
         chiave: `beneficiario:${id}`,
@@ -1317,14 +1325,17 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
       return updated;
     });
     if (!row) { res.status(409).json({ error: "Il Beneficiario è stato modificato da un altro utente. Ricarica la scheda e riprova." }); return; }
-    res.json(fmtBenefForRequest(
+    res.json({ ...await readBeneficiarioFascicolo(row.id), ...fmtBenefForRequest(
       row,
       req,
       null,
       null,
       await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId),
-    ));
+    ) });
   } catch (e) {
+    if (e instanceof BeneficiarioFascicoloError || (e as { constraint?: string }).constraint === "fse_fascicoli_sociali_codice_norm_uidx") {
+      res.status(409).json({ error: e instanceof BeneficiarioFascicoloError ? e.message : "Fascicolo già associato a un altro beneficiario." }); return;
+    }
     if (isCodiceBeneficiarioUniqueViolation(e)) {
       res.status(409).json({ error: CODICE_BENEFICIARIO_DUPLICATO_MSG });
       return;

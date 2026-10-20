@@ -8,6 +8,8 @@
 import type { SpesaEmporioRiga } from "./spesaEmporioRiga";
 
 export interface BollaEmporioStampa {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   intestazione: string;
   /** @nullable */
   numeroBolla?: string | null;

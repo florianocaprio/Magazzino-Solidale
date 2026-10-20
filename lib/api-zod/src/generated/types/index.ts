@@ -318,6 +318,7 @@ export * from "./fornitore";
 export * from "./fornitoreInput";
 export * from "./fornitoreUpdate";
 export * from "./fornitoriBulkInput";
+export * from "./fseAutomaticSourceInput";
 export * from "./fseBadRequestResponse";
 export * from "./fseCancelInput";
 export * from "./fseConflictResponse";

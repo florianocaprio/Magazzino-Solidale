@@ -665,10 +665,11 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     const rollback = new Error("rollback fixture collisione origini");
     await expect(
       db.transaction(async (tx) => {
-        // Reserve an unused ID only inside this rolled-back fixture: no sequence changes.
+        // Reserve an ID unused by both documents and ledger namespaces; no sequence changes.
         const result = await tx.execute(sql`select greatest(
         coalesce((select max(id) from interventi),0),
-        coalesce((select max(id) from carichi_magazzino),0)) + 1 as id`);
+        coalesce((select max(id) from carichi_magazzino),0),
+        coalesce((select max(entita_origine_id) from movimenti),0)) + 1 as id`);
         const id = Number(result.rows[0].id);
         const [beneficiary] = await tx
           .insert(beneficiariTable)

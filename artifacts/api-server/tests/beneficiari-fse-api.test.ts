@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +17,7 @@ import {
   utentiTable,
   zoneUdsTable,
 } from "@workspace/db";
+import beneficiariRouter from "../src/routes/beneficiari";
 import beneficiariFseRouter from "../src/routes/beneficiari-fse";
 import {
   FSE_BENEFICIARI_HEADERS,
@@ -156,6 +158,64 @@ async function insertBeneficiary(
   beneficiaryIds.push(created.id);
   return created;
 }
+
+it.runIf(Boolean(process.env.FSE_BENEFICIARI_REAL_PATH))("importa il workbook FSE+ reale e ripete senza duplicati", async () => {
+  const [area] = await db.insert(areeOperativeTable).values({ nome: `Import reale ${suffix}` }).returning(); areaIds.push(area.id);
+  const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Import reale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id);
+  const target = app({ areaOperativaId: area.id });
+  const buffer = readFileSync(process.env.FSE_BENEFICIARI_REAL_PATH!);
+  if (process.env.FSE_REGISTRY_ORIGINAL_PATH) {
+    const wrongFile = await upload(target, "/beneficiari/fse/preview", centre.id, [], { buffer: readFileSync(process.env.FSE_REGISTRY_ORIGINAL_PATH), dataRiferimento: "2026-10-20" });
+    expect(wrongFile.status).toBe(400); expect(wrongFile.body.error).toContain("ElencoFascicoliSociali");
+    expect(wrongFile.body.errori.join(" ")).toContain("ElencoFascicoliSociali");
+  }
+  const preview = await upload(target, "/beneficiari/fse/preview", centre.id, [], { buffer, dataRiferimento: "2026-10-20" });
+  expect(preview.status).toBe(200);
+  expect(preview.body.numeroRighe).toBe(117);
+  expect(preview.body.conteggi.errore ?? 0).toBe(0);
+  const risoluzioni = preview.body.righe.filter((r: { classificazione: string }) => r.classificazione === "possibile_duplicato")
+    .map((r: { numeroRiga: number }) => ({ numeroRiga: r.numeroRiga, azione: "crea" }));
+  const imported = await upload(target, "/beneficiari/fse/import", centre.id, [], { buffer, risoluzioni, dataRiferimento: "2026-10-20" });
+  expect(imported.status).toBe(200);
+  expect({ creati: imported.body.creati, errori: imported.body.errori, conflitti: imported.body.conflitti }).toEqual({ creati: 117, errori: 0, conflitti: 0 });
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(XLSX.read(buffer, { type: "buffer", cellDates: false }).Sheets.Table1);
+  const importedDates = await db.select({ codice: fseFascicoliSocialiTable.codiceFascicolo, data: beneficiariTable.dataPresaInCarico }).from(beneficiariTable)
+    .innerJoin(fseFascicoliSocialiTable, eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId)).where(eq(beneficiariTable.centroAscoltoId, centre.id));
+  expect(importedDates).toHaveLength(117);
+  for (const actual of importedDates) {
+    const source = raw.find((r) => String(r["Codice fascicolo"]).trim() === actual.codice)!;
+    const serial = source["Data di presa in carico"];
+    const date = XLSX.SSF.parse_date_code(Number(serial));
+    expect(actual.data).toBe(`${date.y}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}`);
+  }
+  const replay = await upload(target, "/beneficiari/fse/import", centre.id, [], { buffer, risoluzioni, dataRiferimento: "2026-10-20" });
+  expect(replay.status).toBe(200);
+  expect({ creati: replay.body.creati, invariati: replay.body.invariati, errori: replay.body.errori }).toEqual({ creati: 0, invariati: 117, errori: 0 });
+});
+
+it("conserva Fascicolo facoltativo nella stessa identità FSE per creazione, modifica e lettura", async () => {
+  const [area] = await db.insert(areeOperativeTable).values({ nome: `Fascicolo manuale ${suffix}` }).returning(); areaIds.push(area.id);
+  const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Fascicolo manuale ${suffix}`, areaOperativaId: area.id }).returning(); centerIds.push(centre.id);
+  const api = app({ areaOperativaId: area.id, permessi: [...permissions, "beneficiari.manage", "beneficiari.view"] }); api.use(beneficiariRouter);
+  const created = await request(api).post("/beneficiari").send({ nome: "Identità", cognome: `Fascicolo ${suffix}`, sesso: "F", areaOperativaId: area.id, centroAscoltoId: centre.id, fascicolo: ` MAN-${suffix} ` });
+  expect(created.status).toBe(201); beneficiaryIds.push(created.body.id);
+  expect({ fascicolo: created.body.fascicolo, versione: created.body.versioneFascicolo }).toEqual({ fascicolo: `MAN-${suffix}`, versione: 1 });
+  const read = await request(api).get(`/beneficiari/${created.body.id}`); expect(read.body.fascicolo).toBe(`MAN-${suffix}`);
+  const changed = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: read.body.versione, fascicolo: `MAN-EDIT-${suffix}`, versioneFascicolo: 1 });
+  expect(changed.status).toBe(200); expect(changed.body.fascicolo).toBe(`MAN-EDIT-${suffix}`);
+  const stale = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: changed.body.versione, fascicolo: "STALE", versioneFascicolo: 1 });
+  expect(stale.status).toBe(409);
+  const staleBeneficiary = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: created.body.versione, fascicolo: "ROLLBACK", versioneFascicolo: 2 });
+  expect(staleBeneficiary.status).toBe(409);
+  const rolledBack = await request(api).get(`/beneficiari/${created.body.id}`); expect(rolledBack.body.fascicolo).toBe(`MAN-EDIT-${suffix}`); expect(rolledBack.body.versioneFascicolo).toBe(2);
+  const reverted = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: changed.body.versione, fascicolo: `MAN-${suffix}`, versioneFascicolo: 2 });
+  expect(reverted.status).toBe(200);
+  const repeated = await request(api).patch(`/beneficiari/${created.body.id}`).send({ versione: reverted.body.versione, fascicolo: `MAN-EDIT-${suffix}`, versioneFascicolo: 3 });
+  expect(repeated.status).toBe(200); expect(repeated.body.versioneFascicolo).toBe(4);
+  const duplicate = await request(api).post("/beneficiari").send({ nome: "Seconda", cognome: "Persona", sesso: "F", areaOperativaId: area.id, centroAscoltoId: centre.id, fascicolo: `man-edit-${suffix}` });
+  expect(duplicate.status).toBe(409);
+  const final = await request(api).get(`/beneficiari/${created.body.id}`); expect(final.body.fascicolo).toBe(`MAN-EDIT-${suffix}`); expect(final.body.versione).toBe(repeated.body.versione);
+});
 
 beforeAll(async () => {
   const [user] = await db
@@ -828,7 +888,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       .post("/beneficiari/fse/export/preflight")
       .send({
         centroAscoltoId: centerExport,
-        areaOperativaId: areaB,
+        areaOperativaId: areaA,
         dataRiferimento: "2026-08-24",
         soloAttivi: true,
       });
@@ -872,11 +932,20 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       senzaTettoEsclusioneAbitativa: 0,
     });
 
-    const preflight = await request(app())
+    const wrongArea = await request(app())
       .post("/beneficiari/fse/export/preflight")
       .send({
         centroAscoltoId: centerExport,
         areaOperativaId: areaB,
+        dataRiferimento: "2026-08-24",
+        soloAttivi: true,
+      });
+    expect(wrongArea.status).toBe(409);
+    const preflight = await request(app())
+      .post("/beneficiari/fse/export/preflight")
+      .send({
+        centroAscoltoId: centerExport,
+        areaOperativaId: areaA,
         dataRiferimento: "2026-08-24",
         soloAttivi: true,
       });

@@ -194,6 +194,7 @@ import type {
   FornitoreInput,
   FornitoreUpdate,
   FornitoriBulkInput,
+  FseAutomaticSourceInput,
   FseBadRequestResponse,
   FseCancelInput,
   FseConflictResponse,
@@ -4410,6 +4411,92 @@ export const useCreateFseImportSource = <
   TContext
 > => {
   return useMutation(getCreateFseImportSourceMutationOptions(options));
+};
+
+export const getResolveAutomaticFseImportSourceUrl = () => {
+  return `/api/fse-importazioni/sorgenti/automatica`;
+};
+
+/**
+ * Riusa il registro FSE+ dell’Area del magazzino o lo configura al primo import. Più registri richiedono una scelta esplicita; i registri disattivati non vengono sostituiti.
+ */
+export const resolveAutomaticFseImportSource = async (
+  fseAutomaticSourceInput: FseAutomaticSourceInput,
+  options?: RequestInit,
+): Promise<FseImportSource> => {
+  return customFetch<FseImportSource>(getResolveAutomaticFseImportSourceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fseAutomaticSourceInput),
+  });
+};
+
+export const getResolveAutomaticFseImportSourceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>,
+    TError,
+    { data: BodyType<FseAutomaticSourceInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>,
+  TError,
+  { data: BodyType<FseAutomaticSourceInput> },
+  TContext
+> => {
+  const mutationKey = ["resolveAutomaticFseImportSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>,
+    { data: BodyType<FseAutomaticSourceInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return resolveAutomaticFseImportSource(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResolveAutomaticFseImportSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>
+>;
+export type ResolveAutomaticFseImportSourceMutationBody =
+  BodyType<FseAutomaticSourceInput>;
+export type ResolveAutomaticFseImportSourceMutationError = ErrorType<void>;
+
+export const useResolveAutomaticFseImportSource = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>,
+    TError,
+    { data: BodyType<FseAutomaticSourceInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resolveAutomaticFseImportSource>>,
+  TError,
+  { data: BodyType<FseAutomaticSourceInput> },
+  TContext
+> => {
+  return useMutation(
+    getResolveAutomaticFseImportSourceMutationOptions(options),
+  );
 };
 
 export const getAnalyzeFsePracticeImportUrl = (
@@ -14029,6 +14116,12 @@ export const previewBeneficiariFse = async (
   options?: RequestInit,
 ): Promise<BeneficiariFsePreviewResult> => {
   const formData = new FormData();
+  if (beneficiariFseWorkbookUpload.areaOperativaId !== undefined) {
+    formData.append(
+      `areaOperativaId`,
+      beneficiariFseWorkbookUpload.areaOperativaId.toString(),
+    );
+  }
   formData.append(
     `centroAscoltoId`,
     beneficiariFseWorkbookUpload.centroAscoltoId.toString(),
@@ -14142,6 +14235,12 @@ export const importBeneficiariFse = async (
   options?: RequestInit,
 ): Promise<BeneficiariFseImportResult> => {
   const formData = new FormData();
+  if (beneficiariFseWorkbookImportUpload.areaOperativaId !== undefined) {
+    formData.append(
+      `areaOperativaId`,
+      beneficiariFseWorkbookImportUpload.areaOperativaId.toString(),
+    );
+  }
   formData.append(
     `centroAscoltoId`,
     beneficiariFseWorkbookImportUpload.centroAscoltoId.toString(),

@@ -20,6 +20,8 @@ const booleanValue = z.preprocess((value) => {
 const beneficiarioFields = {
   codice: z.string().trim().min(1).max(20).optional(),
   codiceFiscale: nullableText(16),
+  fascicolo: nullableText(255),
+  versioneFascicolo: z.number().int().min(0).optional(),
   statoAnagrafica: z.enum(["provvisoria", "completa"]).optional(),
   cognome: z.string().trim().min(1).max(80),
   nome: z.string().trim().min(1).max(80),

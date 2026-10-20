@@ -312,10 +312,10 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(
       page,
-      page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+      page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }),
       source.descrizione,
     );
-    await page.getByLabel(/Registro FSE\+/).setInputFiles({
+    await page.locator("#fse-registry-file").setInputFiles({
       name: "registro-sintetico-m3b.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -439,10 +439,10 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(
       page,
-      page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+      page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }),
       source.descrizione,
     );
-    await page.getByLabel(/Registro FSE\+/).setInputFiles({
+    await page.locator("#fse-registry-file").setInputFiles({
       name: "prodotto-nuovo.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -525,11 +525,11 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await selectOption(
       deniedPage,
       deniedPage.getByRole("combobox", {
-        name: "Sorgente / registro esterno",
+        name: "Registro FSE+ dell’Area",
       }),
       source.descrizione,
     );
-    await deniedPage.getByLabel(/Registro FSE\+/).setInputFiles({
+    await deniedPage.locator("#fse-registry-file").setInputFiles({
       name: "prodotto-nuovo-senza-permesso.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -590,10 +590,10 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(
       page,
-      page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+      page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }),
       source.descrizione,
     );
-    await page.getByLabel(/Registro FSE\+/).setInputFiles({
+    await page.locator("#fse-registry-file").setInputFiles({
       name: "registro-parziale.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -734,7 +734,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     expect((await replay.json()).replay).toBe(true);
   });
 
-  test("inizializza da due originali, registra 1177 pezzi e reimporta senza effetti", async ({
+  test("inizializza da due originali, registra i saldi reali e reimporta senza effetti", async ({
     page,
   }) => {
     test.skip(
@@ -742,7 +742,12 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       "I due Excel originali M3B non sono disponibili",
     );
     const suffix = Date.now();
-    const base = await ensureContext(page, suffix);
+    const existing = await ensureContext(page, suffix);
+    const areaResponse = await page.request.post("/api/aree-operative", { data: { nome: `FSE reali ${suffix}` } });
+    expect(areaResponse.status()).toBe(201);
+    const area = (await areaResponse.json()) as Area;
+    const logicalLots = await (await page.request.get(`/api/lotti-logici?areaOperativaId=${area.id}`)).json() as LogicalLot[];
+    const base = { ...existing, area, logicalLot: logicalLots.find((row) => row.isGenerale)! };
     const warehouseResponse = await page.request.post("/api/magazzini", {
       data: {
         nome: `M3B saldo reale E2E ${suffix}`,
@@ -752,7 +757,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     expect(warehouseResponse.status()).toBe(201);
     const warehouse = (await warehouseResponse.json()) as Warehouse;
     const context = { ...base, warehouse };
-    const source = await createSource(page, base.area, `REAL-${suffix}`);
+
     const description = `Pratica M3B saldo reale ${suffix}`;
     const practice = await createPractice(page, context, description);
     const registryBytes = readFileSync(originalRegistryPath!);
@@ -767,7 +772,13 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
           .filter(Boolean),
       ),
     ];
-    expect(externalProducts).toHaveLength(7);
+    const rawStock = XLSX.utils.sheet_to_json<Record<string, unknown>>(stockSheet);
+    const expectedRows = rawStock.length;
+    const expectedPieces = rawStock.reduce((sum, row) => sum + Number(row.GiacenzaPezzi), 0);
+    const rawRegistry = XLSX.read(registryBytes, { type: "buffer" }).Sheets.Table1;
+    const [day, month, year] = String(rawRegistry.C1.v).match(/(\d{2}\/\d{2}\/\d{4})/)![1].split("/");
+    const referenceDate = `${year}-${month}-${day}`;
+    if (referenceDate === "2026-10-20") expect({ rows: expectedRows, pieces: expectedPieces, products: externalProducts.length }).toEqual({ rows: 11, pieces: 3244, products: 10 });
     const mappedProducts = new Map<string, Product>();
     for (const [index, externalProduct] of externalProducts.entries()) {
       const response = await page.request.post("/api/prodotti", {
@@ -792,12 +803,9 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       page.getByRole("combobox", { name: "Scopo dell'importazione" }),
       "Imposta giacenza iniziale",
     );
-    await selectOption(
-      page,
-      page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
-      source.descrizione,
-    );
-    await page.getByLabel(/Registro FSE\+/).setInputFiles({
+    await expect(page.getByRole("combobox", { name: "Registro FSE+ dell’Area" })).toHaveCount(0);
+    await expect(page.getByPlaceholder("Codice interno sorgente")).toHaveCount(0);
+    await page.locator("#fse-registry-file").setInputFiles({
       name: "Registro Feliciangeli originale.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -809,7 +817,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: stockBytes,
     });
-    await page.getByLabel("Data di riferimento").fill("2026-09-17");
+    await page.getByLabel("Data di riferimento").fill(referenceDate);
     await page
       .getByText(/Confermo che il Registro copre lo storico necessario/)
       .click();
@@ -828,7 +836,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       await card.getByRole("button", { name: "Associa", exact: true }).click();
     }
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
-    await expect(page.getByText(/1177/)).toBeVisible();
+    await expect(page.getByText(new RegExp(String(expectedPieces)))).toBeVisible();
     const balanceAttach = page.waitForResponse(
       (response) =>
         /\/api\/fse-importazioni\/sessioni\/\d+\/aggiungi-pratica$/.test(
@@ -851,16 +859,16 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       versione: number;
       righe: Array<{ id: number }>;
     };
-    expect(detail.righe).toHaveLength(7);
+    expect(detail.righe).toHaveLength(expectedRows);
     const zeroStock = await page.request.get(
       `/api/giacenze?areaOperativaId=${base.area.id}&magazzinoId=${warehouse.id}`,
     );
     expect((await zeroStock.json()) as Stock[]).toHaveLength(0);
     const importedRows = page.locator('[data-testid^="carico-row-"]');
-    await expect(importedRows).toHaveCount(7);
+    await expect(importedRows).toHaveCount(expectedRows);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     const importedCheckboxes = importedRows.getByRole("checkbox");
-    await expect(importedCheckboxes).toHaveCount(7);
+    await expect(importedCheckboxes).toHaveCount(expectedRows);
     for (const checkbox of await importedCheckboxes.all())
       await checkbox.check();
     const registerButton = page.getByRole("button", {
@@ -889,12 +897,15 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         (total, row) => total + row.giacenzaFisica,
         0,
       ),
-    ).toBe(1_177);
+    ).toBe(expectedPieces);
     const movements = await page.request.get(
       `/api/movimenti?magazzinoId=${warehouse.id}`,
     );
-    expect((await movements.json()) as unknown[]).toHaveLength(7);
+    expect((await movements.json()) as unknown[]).toHaveLength(expectedRows);
 
+    const sources = await (await page.request.get("/api/fse-importazioni/sorgenti")).json();
+    const source = sources.find((row: { areaOperativaId: number }) => row.areaOperativaId === area.id);
+    expect(source).toBeTruthy();
     const replayQuery = new URLSearchParams({
       sourceRegistryId: String(source.id),
       areaOperativaId: String(base.area.id),
@@ -922,7 +933,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         (total, row) => total + row.giacenzaFisica,
         0,
       ),
-    ).toBe(1_177);
+    ).toBe(expectedPieces);
   });
 });
 
@@ -967,10 +978,10 @@ test.describe("M3B — viewport tablet", () => {
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(
       page,
-      page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+      page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }),
       source.descrizione,
     );
-    await page.getByLabel(/Registro FSE\+/).setInputFiles({
+    await page.locator("#fse-registry-file").setInputFiles({
       name: "registro-tablet.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1105,11 +1116,11 @@ test("BUG18 — Saldo sintetico con due file, esito esplicito e stock solo alla 
   );
   await selectOption(
     page,
-    page.getByRole("combobox", { name: "Sorgente / registro esterno" }),
+    page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }),
     source.descrizione,
   );
   await page
-    .getByLabel(/Registro FSE\+/)
+    .locator("#fse-registry-file")
     .setInputFiles({
       name: "Registro sintetico.xlsx",
       mimeType:

@@ -9,7 +9,7 @@ import {
   getListFseImportSourcesQueryKey,
   getListFseImportSessionsQueryKey,
   useAddFseImportToPractice,
-  useCreateFseImportSource,
+  resolveAutomaticFseImportSource,
   useCreateProdotto,
   useGetFseImportSession,
   useListFseImportSessions,
@@ -124,12 +124,10 @@ export function FseImportPracticeWizard({
 }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { hasPermission, user } = useAuth();
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManageProducts = hasPermission("magazzino.products.manage");
   const canManageMappings = hasPermission("magazzino.agea.mapping.manage");
-  const canCreateSource =
-    canManageMappings && Boolean(user?.isAdmin || user?.isSuperAdmin);
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
   const [step, setStep] = useState(0);
   const [inlineError, setInlineError] = useState("");
@@ -155,8 +153,6 @@ export function FseImportPracticeWizard({
   const [mappingProduct, setMappingProduct] = useState<Record<string, string>>(
     {},
   );
-  const [newSourceCode, setNewSourceCode] = useState("");
-  const [newSourceDescription, setNewSourceDescription] = useState("");
   const [newProduct, setNewProduct] = useState<NewProduct>(emptyProduct);
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
@@ -184,7 +180,13 @@ export function FseImportPracticeWizard({
       queryKey: getGetFseImportSessionQueryKey(sessionId ?? 0),
     },
   });
-  const createSource = useCreateFseImportSource();
+  const areaSources = useMemo(
+    () =>
+      (sourcesQuery.data ?? []).filter(
+        (source) => source.areaOperativaId === practice.areaOperativaId,
+      ),
+    [sourcesQuery.data, practice.areaOperativaId],
+  );
   const mapProduct = useMapFseImportProduct();
   const addToPractice = useAddFseImportToPractice();
   const createProduct = useCreateProdotto();
@@ -198,7 +200,6 @@ export function FseImportPracticeWizard({
   );
   const pending =
     busy ||
-    createSource.isPending ||
     mapProduct.isPending ||
     addToPractice.isPending ||
     createProduct.isPending ||
@@ -235,9 +236,9 @@ export function FseImportPracticeWizard({
   }, [detail, busy]);
 
   useEffect(() => {
-    if (!sourceId && sourcesQuery.data?.length === 1)
-      setSourceId(String(sourcesQuery.data[0].id));
-  }, [sourceId, sourcesQuery.data]);
+    if (!sourceId && areaSources.length === 1)
+      setSourceId(String(areaSources[0].id));
+  }, [sourceId, areaSources]);
 
   const descriptionsToMap = useMemo(
     () => [
@@ -262,17 +263,20 @@ export function FseImportPracticeWizard({
     });
   };
 
-  const disabledReason = !sourceId
-    ? t("blocco07.missingSource")
-    : !registryFile && !registryAcquired
-      ? t("blocco07.missingRegistry")
-      : mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired
-        ? t("blocco07.missingStock")
-        : mode === "SALDO_INIZIALE" && !referenceDate
-          ? t("blocco07.missingDate")
-          : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
-            ? t("blocco07.missingCoverage")
-            : "";
+  const disabledReason =
+    sourcesQuery.isLoading || sourcesQuery.isError
+      ? t("blocco07.sourceLoading")
+      : !sourceId && areaSources.length > 1
+        ? t("blocco07.missingSource")
+        : !registryFile && !registryAcquired
+          ? t("blocco07.missingRegistry")
+          : mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired
+            ? t("blocco07.missingStock")
+            : mode === "SALDO_INIZIALE" && !referenceDate
+              ? t("blocco07.missingDate")
+              : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
+                ? t("blocco07.missingCoverage")
+                : "";
   const chooseFile = (file: File | null, registry: boolean) => {
     if (
       file &&
@@ -300,8 +304,18 @@ export function FseImportPracticeWizard({
       return;
     setBusy(true);
     try {
+      const resolvedSourceId =
+        sourceId ||
+        String(
+          (
+            await resolveAutomaticFseImportSource({
+              magazzinoId: practice.magazzinoId,
+            })
+          ).id,
+        );
+      setSourceId(resolvedSourceId);
       const base = {
-        sourceRegistryId: Number(sourceId),
+        sourceRegistryId: Number(resolvedSourceId),
         areaOperativaId: practice.areaOperativaId,
         magazzinoId: practice.magazzinoId,
         lottoLogicoId: practice.lottoLogicoId,
@@ -314,7 +328,7 @@ export function FseImportPracticeWizard({
         acquiredRegistry.current.context === context
           ? acquiredRegistry.current.sessionId
           : registryAcquired &&
-              detail?.sourceRegistryId === Number(sourceId) &&
+              detail?.sourceRegistryId === Number(resolvedSourceId) &&
               detail.modalita === mode
             ? detail.id
             : null;
@@ -361,24 +375,6 @@ export function FseImportPracticeWizard({
       showError(error);
     } finally {
       setBusy(false);
-    }
-  };
-
-  const saveSource = async () => {
-    try {
-      const created = await createSource.mutateAsync({
-        data: {
-          codice: newSourceCode.trim(),
-          descrizione: newSourceDescription.trim(),
-          areaOperativaId: practice.areaOperativaId,
-        },
-      });
-      setSourceId(String(created.id));
-      setNewSourceCode("");
-      setNewSourceDescription("");
-      await sourcesQuery.refetch();
-    } catch (error) {
-      showError(error);
     }
   };
 
@@ -509,6 +505,7 @@ export function FseImportPracticeWizard({
   };
 
   const reset = () => {
+    setSourceId("");
     setStep(0);
     setInlineError("");
     setAddedPracticeId(null);
@@ -575,7 +572,10 @@ export function FseImportPracticeWizard({
         <ScrollArea className="max-h-[60vh] pr-4">
           {step === 0 && (
             <div className="space-y-5">
-              <h3 className="font-semibold">{t("blocco07.source")}</h3>
+              <h3 className="font-semibold">{t("blocco07.sourceTitle")}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t("blocco07.modeHelp")}
+              </p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t("caricoPratiche.fseMode")}</Label>
@@ -602,58 +602,43 @@ export function FseImportPracticeWizard({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("caricoPratiche.fseSource")}</Label>
-                  <Select
-                    value={sourceId}
-                    onValueChange={(value) => {
-                      setSourceId(value);
-                      acquiredRegistry.current = null;
-                      setSessionId(null);
-                    }}
-                  >
-                    <SelectTrigger aria-label={t("caricoPratiche.fseSource")}>
-                      <SelectValue
-                        placeholder={t("caricoPratiche.fseSelectSource")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sourcesQuery.data?.map((source) => (
-                        <SelectItem key={source.id} value={String(source.id)}>
-                          {source.descrizione}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {areaSources.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>{t("blocco07.registerPicker")}</Label>
+                    <Select
+                      value={sourceId}
+                      onValueChange={(value) => {
+                        setSourceId(value);
+                        acquiredRegistry.current = null;
+                        setSessionId(null);
+                      }}
+                    >
+                      <SelectTrigger aria-label={t("blocco07.registerPicker")}>
+                        <SelectValue
+                          placeholder={t("blocco07.registerPicker")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areaSources.map((source) => (
+                          <SelectItem key={source.id} value={String(source.id)}>
+                            {source.descrizione}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
-
-              {canCreateSource && (sourcesQuery.data?.length ?? 0) === 0 && (
-                <div className="grid gap-2 rounded-md border p-3 md:grid-cols-3">
-                  <Input
-                    value={newSourceCode}
-                    onChange={(event) => setNewSourceCode(event.target.value)}
-                    placeholder={t("caricoPratiche.fseSourceCode")}
-                  />
-                  <Input
-                    value={newSourceDescription}
-                    onChange={(event) =>
-                      setNewSourceDescription(event.target.value)
-                    }
-                    placeholder={t("caricoPratiche.fseSourceDescription")}
-                  />
-                  <Button
-                    variant="outline"
-                    disabled={
-                      !newSourceCode.trim() ||
-                      !newSourceDescription.trim() ||
-                      pending
-                    }
-                    onClick={() => void saveSource()}
-                  >
-                    {t("caricoPratiche.fseCreateSource")}
-                  </Button>
-                </div>
+              <p className="rounded-md bg-muted p-3 text-sm">
+                {t("blocco07.automaticSource")}
+              </p>
+              {sourcesQuery.isError && (
+                <Button
+                  variant="outline"
+                  onClick={() => void sourcesQuery.refetch()}
+                >
+                  {t("blocco07.reloadSources")}
+                </Button>
               )}
 
               <div className="border-t pt-4">

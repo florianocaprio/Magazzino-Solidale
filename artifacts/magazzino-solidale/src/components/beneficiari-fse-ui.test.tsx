@@ -300,7 +300,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       ),
     );
     await act(async () => button("Importa FSE+")?.click());
-    expect(document.body.textContent).toContain("Area Operativa: Area UI");
+    expect(document.querySelector('[aria-label="Area Operativa FSE+"]')).not.toBeNull();
     const dataRiferimento = document.querySelector<HTMLInputElement>(
       'input[aria-label="Data di riferimento import FSE+"]',
     )!.value;
@@ -323,9 +323,10 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(mocks.preview).toHaveBeenCalled();
     expect(mocks.preview).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, dataRiferimento, file },
+      data: { centroAscoltoId: 7, areaOperativaId: 3, dataRiferimento, file },
     });
     expect(document.body.textContent).toContain(
       "Le righe non valide saranno escluse",
@@ -338,7 +339,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     });
     expect(mocks.importRows).toHaveBeenCalled();
     expect(mocks.importRows).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, dataRiferimento, file, risoluzioni: "[]" },
+      data: { centroAscoltoId: 7, areaOperativaId: 3, dataRiferimento, file, risoluzioni: "[]" },
     });
     expect(onImported).toHaveBeenCalledOnce();
     expect(document.body.textContent).toContain("Risultato import · batch 11");
@@ -633,6 +634,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(
       (button("Conferma importazione") as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -648,6 +650,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(mocks.importRows).toHaveBeenCalledWith({
       data: {
         centroAscoltoId: 7,
+        areaOperativaId: 3,
         dataRiferimento,
         file,
         risoluzioni: JSON.stringify([{ numeroRiga: 2, azione: "crea" }]),
@@ -689,6 +692,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    await act(async () => button("Carica e analizza")?.click());
     expect(document.body.textContent).toContain("Codice associato altrove");
     expect(
       (button("Conferma importazione") as HTMLButtonElement).disabled,

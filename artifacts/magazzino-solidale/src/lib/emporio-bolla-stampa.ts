@@ -20,6 +20,7 @@ export function adattaBollaEmporioPerPdf(
     tipoDestinatario: "beneficiario",
     beneficiarioId: spesa.beneficiarioId,
     beneficiarioNome: stampa.beneficiario,
+    beneficiarioFascicolo: stampa.beneficiarioFascicolo ?? null,
     destinatarioSnapshotCongelato: false,
     magazzinoId: spesa.magazzinoEmporioId,
     magazzinoNome: stampa.emporio,

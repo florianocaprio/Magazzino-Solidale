@@ -469,6 +469,11 @@ export interface BeneficiariFseRowInput {
 }
 
 export interface BeneficiariFseWorkbookUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
@@ -494,6 +499,11 @@ export interface BeneficiariFseImportResolution {
 }
 
 export interface BeneficiariFseWorkbookImportUpload {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   /** Data confermata nella preview e rivalidata dal server. */
@@ -590,6 +600,11 @@ export interface BeneficiariFseImportResult {
 }
 
 export interface BeneficiariFseExportInput {
+  /**
+   * Area selezionata prima del Centro, rivalidata dal server per evitare cambi di perimetro.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   /** @minimum 1 */
   centroAscoltoId: number;
   dataRiferimento: string;
@@ -1746,6 +1761,17 @@ export const BeneficiarioInputSesso = {
 } as const;
 
 export interface BeneficiarioInput {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   codice?: string;
   /** @nullable */
   codiceFiscale?: string | null;
@@ -2022,6 +2048,11 @@ export interface FseImportSource {
   attiva: FseImportSourceAttiva;
   creatoDa: number;
   dataCreazione: string;
+}
+
+export interface FseAutomaticSourceInput {
+  /** @minimum 1 */
+  magazzinoId: number;
 }
 
 export interface FseImportSourceInput {
@@ -4305,6 +4336,17 @@ export const BeneficiarioCreditoSolidaleStato = {
  * Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
  */
 export interface Beneficiario {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */
@@ -4700,6 +4742,13 @@ export interface Consegna {
 }
 
 export interface BeneficiarioDettaglio {
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /** @minimum 0 */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */
@@ -4848,6 +4897,17 @@ export const BeneficiarioUpdateSesso = {
 } as const;
 
 export interface BeneficiarioUpdate {
+  /**
+   * Codice fascicolo facoltativo, conservato nel profilo FSE esistente.
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /**
+   * Versione del profilo FSE; richiesta per modificare il fascicolo esistente.
+   * @minimum 0
+   */
+  versioneFascicolo?: number;
   /** @nullable */
   codiceFiscale?: string | null;
   /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
@@ -7528,6 +7588,8 @@ export interface SpesaEmporioChiusuraResult {
 }
 
 export interface BollaEmporioStampa {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   intestazione: string;
   /** @nullable */
   numeroBolla?: string | null;
@@ -7884,6 +7946,8 @@ export interface BollaRiga {
 }
 
 export interface BollaDettaglio {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   id: number;
   numeroBolla: string;
   dataBolla: string;

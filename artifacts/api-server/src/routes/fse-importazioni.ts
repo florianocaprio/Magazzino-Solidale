@@ -1,6 +1,7 @@
 import express, { Router, type IRouter, type Response } from "express";
 import {
   db,
+  magazziniTable,
   fseImportFilesTable,
   fseImportRowsTable,
   fseImportSessionsTable,
@@ -15,7 +16,11 @@ import {
   recordAuditEvent,
 } from "../lib/auditEvent";
 import { callerAreaOperativaId, callerCentroId } from "../lib/centroScope";
-import { canAccessFseWarehouse, fseTerritory } from "../lib/fseAccess";
+import {
+  canAccessFseWarehouse,
+  fseTerritory,
+  requireCurrentFseWarehouse,
+} from "../lib/fseAccess";
 import { CurrentCommandActorError } from "../lib/currentCommandActor";
 import { requireCurrentM5bActor } from "../lib/m5bRequestAccess";
 import { AGEA_MAX_BYTES, AgeaParserError } from "../lib/ageaSifeadParser";
@@ -241,6 +246,76 @@ router.post(
         return created;
       });
       res.status(201).json(source);
+    } catch (error) {
+      if (!sendKnownError(res, error)) throw error;
+    }
+  },
+);
+
+router.post(
+  "/fse-importazioni/sorgenti/automatica",
+  requirePermission("magazzino.agea.import"),
+  async (req, res) => {
+    try {
+      const magazzinoId = positiveId(req.body?.magazzinoId, "magazzinoId");
+      const command = auditContextFromRequest(req);
+      const source = await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended('fse-agea-writer-transition', 0))`,
+        );
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.agea.import",
+          magazzinoId,
+        );
+        const [warehouse] = await tx
+          .select()
+          .from(magazziniTable)
+          .where(eq(magazziniTable.id, magazzinoId));
+        const area = warehouse.areaOperativaId!;
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source-area:${area}`}, 0))`,
+        );
+        const sources = await tx
+          .select()
+          .from(fseSourceRegistriesTable)
+          .where(eq(fseSourceRegistriesTable.areaOperativaId, area));
+        const active = sources.filter((row) => row.attiva === 1);
+        if (active.length === 1) return active[0];
+        if (active.length > 1)
+          throw new FsePracticeImportError(
+            409,
+            "REGISTRO_DA_SCEGLIERE",
+            "Sono presenti più registri FSE+ nell’Area: seleziona quello da utilizzare.",
+          );
+        // Never replace a disabled source: doing so would bypass its claims and coverage.
+        if (sources.length)
+          throw new FsePracticeImportError(
+            409,
+            "REGISTRO_DISATTIVATO",
+            "Il registro FSE+ dell’Area è disattivato. Rivolgiti all’amministratore.",
+          );
+        const [created] = await tx
+          .insert(fseSourceRegistriesTable)
+          .values({
+            codice: `FSE-AREA-${area}`,
+            descrizione: "FSE+",
+            areaOperativaId: area,
+            creatoDa: req.user!.id,
+          })
+          .returning();
+        await recordAuditEvent(tx, {
+          command,
+          azione: "FSE_SORGENTE_CREATA",
+          entitaTipo: "fse_source_registry",
+          entitaId: created.id,
+          areaOperativaIdSnapshot: area,
+          changes: auditFields({ codice: created.codice }, ["codice"]),
+        });
+        return created;
+      });
+      res.json(source);
     } catch (error) {
       if (!sendKnownError(res, error)) throw error;
     }

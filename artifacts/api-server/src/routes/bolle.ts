@@ -7,6 +7,7 @@ import {
   bolleTable,
   bollaRigheTable,
   beneficiariTable,
+  fseFascicoliSocialiTable,
   magazziniTable,
   lottiTable,
   prodottiTable,
@@ -291,6 +292,7 @@ export async function buildDettaglio(id: number) {
       benefDomicilio: beneficiariTable.domicilio,
       benefComune: beneficiariTable.comune,
       benefTelefono: beneficiariTable.telefono,
+      beneficiarioFascicolo: fseFascicoliSocialiTable.codiceFascicolo,
       enteDenominazione: entiDestinatariTable.denominazione,
       enteIndirizzo: entiDestinatariTable.indirizzo,
       enteTelefono: entiDestinatariTable.telefono,
@@ -308,6 +310,7 @@ export async function buildDettaglio(id: number) {
       beneficiariTable,
       eq(bolleTable.beneficiarioId, beneficiariTable.id),
     )
+    .leftJoin(fseFascicoliSocialiTable, eq(bolleTable.beneficiarioId, fseFascicoliSocialiTable.beneficiarioId))
     .leftJoin(
       entiDestinatariTable,
       eq(bolleTable.enteDestinatarioId, entiDestinatariTable.id),
@@ -481,6 +484,7 @@ export async function buildDettaglio(id: number) {
     tipoDestinatario: row.b.tipoDestinatario,
     areaOperativaIdSnapshot: row.b.areaOperativaIdSnapshot,
     beneficiarioId: row.b.beneficiarioId,
+    beneficiarioFascicolo: row.b.tipoDestinatario === "ente" ? null : row.beneficiarioFascicolo,
     beneficiarioNome:
       row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
     enteDestinatarioId: row.b.enteDestinatarioId ?? null,

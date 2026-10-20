@@ -10,6 +10,8 @@ import type { BollaDettaglioTipoDestinatario } from "./bollaDettaglioTipoDestina
 import type { BollaRiga } from "./bollaRiga";
 
 export interface BollaDettaglio {
+  /** @nullable */
+  beneficiarioFascicolo?: string | null;
   id: number;
   numeroBolla: string;
   dataBolla: string;

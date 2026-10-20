@@ -91,9 +91,9 @@ function dateOnlyFromParts(year: number, month: number, day: number): string | n
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export function parseFseDate(value: unknown): string | null {
+export function parseFseDate(value: unknown, date1904 = false): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    const parsed = XLSX.SSF.parse_date_code(value);
+    const parsed = XLSX.SSF.parse_date_code(value, { date1904 });
     return parsed ? dateOnlyFromParts(parsed.y, parsed.m, parsed.d) : null;
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -141,6 +141,9 @@ function integerCount(value: unknown, label: string, max: number, errors: string
 
 export function validateFseHeaders(headers: unknown[]): { errori: string[]; warning: string[] } {
   const normalized = headers.map(normalizeContractText);
+  if (normalized.includes("fondo") && normalized.includes("prodotto")) {
+    return { errori: ["Questo è un file di magazzino (Registro o Giacenze). Per importare i beneficiari seleziona il file ElencoFascicoliSociali di FSE+."], warning: [] };
+  }
   const errori: string[] = [];
   const warning: string[] = [];
   const seen = new Set<string>();
@@ -151,18 +154,17 @@ export function validateFseHeaders(headers: unknown[]): { errori: string[]; warn
     seen.add(header);
   });
 
-  FSE_BENEFICIARI_HEADERS.forEach((expected, index) => {
-    const actual = normalized[index];
-    if (actual !== normalizeContractText(expected)) {
-      errori.push(actual
-        ? `Colonna ${index + 1} non valida: attesa ${expected}.`
-        : `Colonna obbligatoria mancante: ${expected}.`);
+  const required = new Set(FSE_BENEFICIARI_HEADERS.map(normalizeContractText));
+  for (const expected of FSE_BENEFICIARI_HEADERS) {
+    if (!seen.has(normalizeContractText(expected))) {
+      errori.push(`Colonna obbligatoria mancante: ${expected}.`);
+    }
+  }
+  headers.forEach((header, index) => {
+    if (normalized[index] && !required.has(normalized[index])) {
+      warning.push(`Colonna extra ignorata: ${String(header).trim()}.`);
     }
   });
-
-  for (let index = FSE_BENEFICIARI_HEADERS.length; index < headers.length; index++) {
-    if (normalized[index]) warning.push(`Colonna extra ignorata: ${String(headers[index]).trim()}.`);
-  }
   return { errori: [...new Set(errori)], warning };
 }
 
@@ -244,7 +246,7 @@ export function validateFseRows(rawRows: Array<Record<string, unknown>>): FseRow
 }
 
 export function parseFseBeneficiariWorkbook(input: Buffer | Uint8Array) {
-  const workbook = XLSX.read(input, { type: "buffer", cellDates: true });
+  const workbook = XLSX.read(input, { type: "buffer", cellDates: false });
   const sheetName = workbook.SheetNames[0] ?? null;
   const sheet = sheetName ? workbook.Sheets[sheetName] : null;
   if (!sheet) {
@@ -254,6 +256,20 @@ export function parseFseBeneficiariWorkbook(input: Buffer | Uint8Array) {
   const headers = (matrix[0] ?? []).map((value) => String(value ?? ""));
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true, defval: null });
   const header = validateFseHeaders(headers);
+  // Match by heading, not by position: current FSE exports insert two date columns.
+  const canonicalHeaders = new Map(FSE_BENEFICIARI_HEADERS.map((name) => [normalizeContractText(name), name]));
+  for (const row of rawRows) {
+    for (const key of Object.keys(row)) {
+      const canonical = canonicalHeaders.get(normalizeContractText(key));
+      if (canonical && canonical !== key) row[canonical] = row[key];
+    }
+  }
+  // Excel civil dates are serial numbers, not instants in the server timezone.
+  const date1904 = workbook.Workbook?.WBProps?.date1904 === true;
+  for (const row of rawRows) {
+    const value = row[FSE_BENEFICIARI_HEADERS[3]];
+    if (typeof value === "number") row[FSE_BENEFICIARI_HEADERS[3]] = parseFseDate(value, date1904) ?? value;
+  }
   const sheetErrors = workbook.SheetNames.length === 1 && sheetName === FSE_BENEFICIARI_SHEET
     ? []
     : [`Il workbook deve contenere un solo foglio denominato ${FSE_BENEFICIARI_SHEET}.`];

@@ -134,6 +134,8 @@ import {
   useBeneficiarioEmporio,
 } from "@/components/beneficiario-emporio-card";
 import { emporioReadableData } from "@/hooks/use-emporio-security";
+import { registerBlocco07 } from "@/lib/i18n/namespaces/blocco07";
+registerBlocco07(i18n);
 import { BeneficiarioFseCard } from "@/components/beneficiario-fse-card";
 
 registerLogisticaCampaign(i18n);
@@ -397,7 +399,7 @@ export default function BeneficiarioDettaglio() {
       {udsContext && <div className="flex items-center gap-3"><Button asChild variant="outline"><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button><h2>{t("blocco04.udsPerson")}</h2></div>}
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold tracking-tight">
               {b.cognome} {b.nome}
             </h1>
@@ -407,6 +409,7 @@ export default function BeneficiarioDettaglio() {
             >
               {b.codice}
             </Badge>
+            {b.fascicolo && <Badge variant="outline" className="max-w-full whitespace-normal break-all">{t("blocco07.dossier")}: {b.fascicolo}</Badge>}
             {b.statoAnagrafica === "provvisoria" && (
               <Badge variant="secondary">Anagrafica provvisoria</Badge>
             )}
@@ -1031,6 +1034,7 @@ const makeEditSchema = (t: (k: string) => string) =>
     cognome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     nome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     codiceFiscale: z.string().optional(),
+    fascicolo: z.string().trim().max(255).optional(),
     dataNascita: z
       .string()
       .optional()
@@ -1575,6 +1579,7 @@ export function EditBeneficiarioSheet({
       cognome: b.cognome ?? "",
       nome: b.nome ?? "",
       codiceFiscale: b.codiceFiscale ?? "",
+      fascicolo: b.fascicolo ?? "",
       dataNascita: b.dataNascita ? b.dataNascita.slice(0, 10) : "",
       sesso: b.sesso ?? "",
       cittadinanza: b.cittadinanza ?? "",
@@ -1681,6 +1686,7 @@ export function EditBeneficiarioSheet({
         : null,
       centroAscoltoId: centroAscoltoIdFinale,
       versione: b.versione,
+      versioneFascicolo: b.versioneFascicolo ?? 0,
       magazzinoEmporioPreferitoId:
         magazzinoEmporioPreferitoId &&
         magazzinoEmporioPreferitoId !== NONE_VALUE
@@ -1768,6 +1774,10 @@ export function EditBeneficiarioSheet({
 
               <FormField
                 control={form.control}
+                name="fascicolo"
+                render={({ field }) => <FormItem><FormLabel>{t("blocco07.fascicolo")}</FormLabel><FormControl><Input {...field} maxLength={255} /></FormControl></FormItem>}
+              />
+              <FormField control={form.control}
                 name="codiceFiscale"
                 render={({ field }) => (
                   <FormItem>

@@ -1,3 +1,4 @@
+import { canonicalFseSnapshot, type SnapshotOrigin } from "../lib/beneficiarioFascicolo";
 import { allocateBeneficiaryCode } from "../lib/beneficiariCodice";
 import { createHash } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
@@ -124,7 +125,7 @@ function parseMultipartWorkbook(req: Request):
         nomeFile = filename.replace(/[^\p{L}\p{N}._ -]/gu, "_").slice(0, 255);
       } else {
         if (
-          !["centroAscoltoId", "risoluzioni", "dataRiferimento"].includes(
+          !["centroAscoltoId", "areaOperativaId", "risoluzioni", "dataRiferimento"].includes(
             name,
           ) ||
           name in fields
@@ -172,7 +173,7 @@ function authoritativeWorkbookBody(
     return {
       ok: false,
       status: 400,
-      error: "Workbook FSE+ non conforme.",
+      error: parsed.header.errori[0] ?? "Workbook FSE+ non conforme.",
       errori: parsed.header.errori,
       warning: parsed.header.warning,
     };
@@ -189,6 +190,7 @@ function authoritativeWorkbookBody(
     ok: true,
     body: {
       centroAscoltoId: upload.fields.centroAscoltoId,
+      areaOperativaId: upload.fields.areaOperativaId,
       nomeFile: upload.nomeFile,
       sha256File: createHash("sha256").update(upload.file).digest("hex"),
       headers: parsed.headers,
@@ -227,6 +229,9 @@ async function selectedCentro(body: RawBody, req: Request) {
       error: "Il Centro selezionato non è attivo o non ha un'Area Operativa valida.",
       status: 400,
     } as const;
+  }
+  if (body.areaOperativaId != null && Number(body.areaOperativaId) !== centro.areaOperativaId) {
+    return { ok: false, error: "Il Centro non appartiene all’Area selezionata. Seleziona nuovamente Area e Centro.", status: 409 } as const;
   }
   if (
     !canAccessCentro(centro.id, callerCentroId(req)) ||
@@ -325,67 +330,6 @@ function snapshotValues(row: FseBeneficiariRow, batchId: number) {
     ultimoImportAt: new Date(),
     hashUltimaRigaImportata: row.hash,
     dataAggiornamento: new Date(),
-  };
-}
-
-type SnapshotOrigin = "import_fse" | "aggiornamento_manuale" | "export_fse";
-
-function canonicalFseSnapshot(input: {
-  beneficiarioId: number;
-  dataRiferimento: string;
-  origineSnapshot: SnapshotOrigin;
-  importBatchId?: number | null;
-  utenteId?: number | null;
-  versioneProfilo: number;
-  codiceFascicolo?: string | null;
-  numeroComponenti?: number | null;
-  donne?: number | null;
-  uomini?: number | null;
-  eta017?: number | null;
-  eta1829?: number | null;
-  eta3064?: number | null;
-  eta65Plus?: number | null;
-  origineStranieraMinoranze?: number | null;
-  personeDisabilita?: number | null;
-  cittadiniPaesiTerzi?: number | null;
-  senzaTettoEsclusioneAbitativa?: number | null;
-  tipologiaAttivita?: string | null;
-  statoAttuale?: string | null;
-  attendibilitaDato?: string | null;
-  riferimentoSorgente?: string | null;
-  metadatiQualita?: Record<string, unknown>;
-}) {
-  const content = {
-    beneficiarioId: input.beneficiarioId,
-    dataRiferimento: input.dataRiferimento,
-    origineSnapshot: input.origineSnapshot,
-    codiceFascicolo: input.codiceFascicolo ?? null,
-    numeroComponenti: input.numeroComponenti ?? null,
-    donne: input.donne ?? null,
-    uomini: input.uomini ?? null,
-    eta017: input.eta017 ?? null,
-    eta1829: input.eta1829 ?? null,
-    eta3064: input.eta3064 ?? null,
-    eta65Plus: input.eta65Plus ?? null,
-    origineStranieraMinoranze: input.origineStranieraMinoranze ?? null,
-    personeDisabilita: input.personeDisabilita ?? null,
-    cittadiniPaesiTerzi: input.cittadiniPaesiTerzi ?? null,
-    senzaTettoEsclusioneAbitativa: input.senzaTettoEsclusioneAbitativa ?? null,
-    tipologiaAttivita: input.tipologiaAttivita ?? null,
-    statoAttuale: input.statoAttuale ?? null,
-    attendibilitaDato: input.attendibilitaDato ?? null,
-  };
-  return {
-    ...content,
-    origineSnapshot: input.origineSnapshot,
-    importBatchId: input.importBatchId ?? null,
-    utenteId: input.utenteId ?? null,
-    versioneProfilo: input.versioneProfilo,
-    hashCanonico: createHash("sha256")
-      .update(JSON.stringify(content))
-      .digest("hex"),
-    metadatiQualita: input.metadatiQualita ?? {},
-    riferimentoSorgente: input.riferimentoSorgente ?? null,
   };
 }
 
@@ -719,6 +663,17 @@ router.post(
       errori: string[];
     }> = [];
 
+    // A distinct FSE dossier created earlier in this workbook must not become
+    // a new interactive duplicate after preview. Revalidate candidates once,
+    // before creating any beneficiaries; existing local candidates still require a choice.
+    const candidatesBeforeImport = new Map<number, Awaited<ReturnType<typeof searchBeneficiariDuplicates>>>();
+    for (const item of validations) {
+      if (item.row) candidatesBeforeImport.set(item.numeroRiga, await searchBeneficiariDuplicates({
+        areaOperativaId: scoped.centro.areaOperativaId,
+        nome: item.row.nome, cognome: item.row.cognome,
+      }));
+    }
+
     for (const item of validations) {
       if (!item.row) {
         totals.errori++;
@@ -855,11 +810,7 @@ router.post(
             return "aggiornato" as const;
           }
 
-          const suggestions = await searchBeneficiariDuplicates({
-            areaOperativaId: scoped.centro.areaOperativaId,
-            nome: row.nome,
-            cognome: row.cognome,
-          });
+          const suggestions = candidatesBeforeImport.get(item.numeroRiga) ?? [];
           const accessibleSuggestions = suggestions.filter(
             (candidate) => candidate.centroAscoltoId === scoped.centro.id,
           );

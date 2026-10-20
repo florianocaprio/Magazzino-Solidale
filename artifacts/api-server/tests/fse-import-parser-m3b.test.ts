@@ -281,27 +281,28 @@ describe("parser FSE+/AGEA M3B", () => {
   });
 
   it.runIf(originalsAvailable)(
-    "T01/T04/T06 legge i due originali e ricalcola profili, movimenti e sette saldi",
+    "T01/T04/T06 legge i due originali e ricalcola profili, movimenti e saldi",
     () => {
       const registryBytes = readFileSync(originalRegistryPath!);
       const stockBytes = readFileSync(originalStockPath!);
+      const current = XLSX.read(registryBytes, { type: "buffer" }).Sheets.Table1["C1"]?.v === "Giacenza al 20/10/2026 Pezzi";
       expect(createHash("sha256").update(registryBytes).digest("hex")).toBe(
-        "4e4b8ba724a35cb048d42070299c34b3ecfe673206390c8fde2d67c20488c901",
+        current ? "da57f46e01cf61a91f9acb9c0e378cf40e5105609d3b3d2ac79fbeabfaee46cf" : "4e4b8ba724a35cb048d42070299c34b3ecfe673206390c8fde2d67c20488c901",
       );
       expect(createHash("sha256").update(stockBytes).digest("hex")).toBe(
-        "e1b4ab9c0b647adb0f3fb48bb4f0f76b493aee005933cb0a223a3218cba554de",
+        current ? "80811a32526c7a564d0cd4b09df13297bcb2aefd70d1d053159c13a0e7391f44" : "e1b4ab9c0b647adb0f3fb48bb4f0f76b493aee005933cb0a223a3218cba554de",
       );
       const registryWorkbook = XLSX.read(registryBytes, { type: "buffer" });
       const stockWorkbook = XLSX.read(stockBytes, { type: "buffer" });
       expect(registryWorkbook.SheetNames).toContain("Table1");
       expect(stockWorkbook.SheetNames).toContain("Table1");
-      expect(registryWorkbook.Sheets.Table1["!ref"]).toBe("A1:S240");
-      expect(stockWorkbook.Sheets.Table1["!ref"]).toBe("A1:O8");
+      expect(registryWorkbook.Sheets.Table1["!ref"]).toBe(current ? "A1:U257" : "A1:S240");
+      expect(stockWorkbook.Sheets.Table1["!ref"]).toBe(current ? "A1:O12" : "A1:O8");
 
       const registry = parseFseFile(registryBytes, { profile: "REGISTRO" });
       const stock = parseFseFile(stockBytes, {
         profile: "GIACENZE",
-        referenceDate: "2026-09-17",
+        referenceDate: current ? "2026-10-20" : "2026-09-17",
       });
       const loads = registry.registryRows.filter(
         (row) => row.tipoMovimentoEsterno === "CARICO",
@@ -318,17 +319,17 @@ describe("parser FSE+/AGEA M3B", () => {
         format: "XLSX",
         profile: "REGISTRO",
         sheetName: "Table1",
-        dataRiferimento: "2026-09-17",
+        dataRiferimento: current ? "2026-10-20" : "2026-09-17",
       });
-      expect(registry.registryRows).toHaveLength(239);
-      expect(loads).toHaveLength(80);
-      expect(distributions).toHaveLength(158);
+      expect(registry.registryRows).toHaveLength(current ? 256 : 239);
+      expect(loads).toHaveLength(current ? 89 : 80);
+      expect(distributions).toHaveLength(current ? 166 : 158);
       expect(returns).toHaveLength(1);
-      expect(sumPieces(loads)).toBe(24_216);
-      expect(sumPieces([...distributions, ...returns])).toBe(-23_039);
+      expect(sumPieces(loads)).toBe(current ? 27_126 : 24_216);
+      expect(sumPieces([...distributions, ...returns])).toBe(current ? -23_882 : -23_039);
       expect(
         registry.registryRows.filter((row) => row.dataDocumento),
-      ).toHaveLength(239);
+      ).toHaveLength(current ? 256 : 239);
       expect(
         registry.registryRows.filter((row) => row.dataCaricoMagazzinoRaw),
       ).toHaveLength(0);
@@ -347,13 +348,13 @@ describe("parser FSE+/AGEA M3B", () => {
         profile: "GIACENZE",
         sheetName: "Table1",
       });
-      expect(stock.stockRows).toHaveLength(7);
+      expect(stock.stockRows).toHaveLength(current ? 11 : 7);
       expect(
         stock.stockRows.reduce(
           (total, row) => total + Number(row.giacenzaPezzi ?? 0),
           0,
         ),
-      ).toBe(1_177);
+      ).toBe(current ? 3_244 : 1_177);
       expect(
         stock.stockRows.map((row) => ({
           lot: row.lottoRaw,
@@ -362,7 +363,11 @@ describe("parser FSE+/AGEA M3B", () => {
           factor: row.pesoUnita,
           expiry: row.dataScadenza,
         })),
-      ).toEqual([
+      ).toEqual(current ? XLSX.utils.sheet_to_json<Record<string, unknown>>(stockWorkbook.Sheets.Table1).map((row) => ({
+        lot: row.Lotto, pieces: Number(row.GiacenzaPezzi).toFixed(6), weight: Number(row.GiacenzaPesoVolume).toFixed(6),
+        factor: Number(String(row.PesoUnita).replace(",", ".")).toFixed(6),
+        expiry: (() => { const d = XLSX.SSF.parse_date_code(Number(row.Scadenza)); return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`; })(),
+      })) : [
         {
           lot: "25332L3P02",
           pieces: "384.000000",

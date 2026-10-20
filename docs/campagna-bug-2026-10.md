@@ -1,5 +1,7 @@
 # Campagna dei 20 BUG di ottobre 2026
 
+Correttivo UAT FSE+ del 20/10: import Magazzino e Fascicoli verificati con i tre Excel reali, Fascicolo facoltativo collegato all’anagrafica e alle Bolle. API/GUI/browsers PASS; installazione 8082 in preparazione. Dettagli e manifesto: [FSE-Import-Correttivo-20261020.md](FSE-Import-Correttivo-20261020.md).
+
 20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati e verificati: codice `0519ecc` installato sulla 8082, ledger 62/62. UAT BUG18 da validare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.

@@ -16,6 +16,13 @@ import type { Intervento } from "./intervento";
 import type { NucleoFamiliare } from "./nucleoFamiliare";
 
 export interface BeneficiarioDettaglio {
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  fascicolo?: string | null;
+  /** @minimum 0 */
+  versioneFascicolo?: number;
   id: number;
   codice: string;
   /** @nullable */

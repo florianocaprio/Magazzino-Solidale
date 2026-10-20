@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
   invalidate: vi.fn().mockResolvedValue(undefined),
   ready: vi.fn(),
   close: vi.fn(),
-  sources: [{ id: 1, descrizione: "Registro unitario" }],
+  sources: [{ id: 1, areaOperativaId: 1, descrizione: "Registro unitario" }],
   sessions: [] as Array<{ id: number; stato: string; caricoPraticaId: number }>,
   detail: {
     id: 10,
@@ -57,7 +57,7 @@ vi.mock("@workspace/api-client-react", () => ({
     mutateAsync: api.attach,
     isPending: false,
   }),
-  useCreateFseImportSource: () => ({ isPending: false }),
+  resolveAutomaticFseImportSource: vi.fn().mockResolvedValue({ id: 1 }),
   useMapFseImportProduct: () => ({ isPending: false }),
   useCreateProdotto: () => ({ isPending: false }),
   useReviseFseImportRow: () => ({ isPending: false }),
