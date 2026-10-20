@@ -150,3 +150,21 @@ UAT personale ancora da confermare con Floriano; i test automatici e l’install
 - `lib/api-zod/src/generated/types/bollaEmporioStampa.ts`
 - `lib/api-zod/src/generated/types/fseAutomaticSourceInput.ts`
 - `lib/api-zod/src/generated/types/index.ts`
+
+
+## Aggiornamento UAT — nome proposto per il nuovo prodotto
+
+Richiesta successiva di Floriano: nel mapping FSE+, “Crea prodotto” propone come nome la descrizione esterna del Banco Alimentare. Il testo resta modificabile e viene salvato il valore scelto dall’utente. Aprire un’altra descrizione prepara un nuovo form; premere nuovamente lo stesso pulsante non sovrascrive il nome già corretto. Nessuna modifica a database, API, OpenAPI o tipi generati.
+
+File modificati per questo aggiornamento:
+
+- `artifacts/magazzino-solidale/src/components/fse-import-practice-wizard.tsx`: inizializzazione del form dalla descrizione esterna.
+- `artifacts/magazzino-solidale/e2e/fse-import-practice-m3b.spec.ts`: il flusso esistente verifica il nome proposto prima di correggerlo e controlla il nome effettivamente creato.
+- `docs/FSE-Import-Correttivo-20261020.md`: questa ricevuta.
+- `docs/campagna-bug-2026-10.md`: versione corrente della 8082.
+
+Validazione ripetuta: `CI=true pnpm install --frozen-lockfile`, `pnpm run typecheck`, interfaccia **792 PASS**, API generale tramite runner isolato **1.548 PASS / 5 SKIP**, browser M3B **10 PASS / 20 SKIP**. Per questo ritocco non sono stati ripassati i percorsi dei campioni Excel opzionali: i tre casi API e il caso browser con file reali, già verificati nel correttivo precedente, risultano quindi SKIP insieme ai due casi API legacy e ai limiti di viewport preesistenti. Il caso browser di creazione/modifica del nome è effettivamente PASS. Nessun test sul database personale. Evidenze private sotto `/private/tmp/fse-product-name-*`.
+
+Codice ora installato sulla **8082: `480959a1ed431ed05eed9fc5018e3496d7a065cd`**, da archivio Git immutabile. Immagini API `magazzino-bugfix-uat-api:sha-480959a1ed43`, WEB `magazzino-bugfix-uat-web:sha-480959a1ed43`. Entry servita `/assets/index-BNwe5BZA.js`, confrontata con l’immagine insieme agli asset FSE+. Build e budget PASS: Initial entry index-BNwe5BZA.js: 1392.3 KiB, 386.8 KiB gzip. Health/ready 200, endpoint Utenti anonimo 401; ledger 62/62. PostgreSQL e volumi conservati.
+
+Backup database/uploads `/Users/florianocaprio/Backups/Magazzino-Solidale/FSE-PRODUCT-NAME-480959a1ed43-2026-10-20T09-26-19-739Z`, ripristino verificato su PostgreSQL isolato, migrazioni e replay 62 → 62. **Il confronto non è completamente invariato**: al riavvio la regola preesistente `schedulePriorityDowngrade` ha portato a `bassa` la priorità di 19 beneficiari con presa in carico da almeno due anni. Il confronto riga per riga con il backup conferma soltanto i campi `priorita` e `data_aggiornamento` cambiati, coerenti con il log dell’avvio; tutti gli altri campi dei Beneficiari e le altre 42 tabelle controllate sono identici. Non introdotto alcun cambiamento a tale regola. Override e rollback conservati nel backup; nessun dato ripristinato sul database personale.

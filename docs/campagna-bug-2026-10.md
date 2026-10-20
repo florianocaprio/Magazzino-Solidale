@@ -1,8 +1,8 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-Correttivo UAT FSE+ del 20/10: import Magazzino e Fascicoli verificati con i tre Excel reali, Fascicolo facoltativo collegato all’anagrafica e alle Bolle. API/GUI/browser PASS; API e WEB `fc377e3` installati sulla 8082, backup ripristinato e integrità di 43 tabelle verificata. Dettagli e manifesto: [FSE-Import-Correttivo-20261020.md](FSE-Import-Correttivo-20261020.md).
+Correttivo UAT FSE+ del 20/10: import Magazzino e Fascicoli verificati con i tre Excel reali, Fascicolo facoltativo collegato all’anagrafica e alle Bolle. API/GUI/browser PASS; API e WEB aggiornati a `480959a` sulla 8082, incluso il nome prodotto proposto dalla descrizione FSE+. Backup ripristinato; verificata separatamente la riduzione automatica preesistente della priorità di 19 beneficiari al riavvio, con gli altri dati invariati. Dettagli e manifesto: [FSE-Import-Correttivo-20261020.md](FSE-Import-Correttivo-20261020.md).
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivo FSE+ verificato con i tre Excel reali e installato sulla 8082: codice `fc377e3`, ledger 62/62. UAT BUG18 e correttivo FSE+ da confermare con Floriano. Prompt 08 non avviato.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivo FSE+ verificato con i tre Excel reali e installato sulla 8082: codice `480959a`, ledger 62/62. UAT BUG18 e correttivo FSE+ da confermare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
