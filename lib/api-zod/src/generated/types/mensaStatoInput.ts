@@ -9,7 +9,10 @@ import type { MensaStatoInputStato } from "./mensaStatoInputStato";
 
 export interface MensaStatoInput {
   stato: MensaStatoInputStato;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
   versione: Date;
 }

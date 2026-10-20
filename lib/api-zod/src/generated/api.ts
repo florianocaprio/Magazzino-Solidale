@@ -23200,6 +23200,11 @@ export const ListMensaAbilitazioniResponseItem = zod.object({
   beneficiarioCodice: zod.string().nullish(),
   mensaId: zod.number(),
   mensaNome: zod.string().nullish(),
+  areaOperativaId: zod
+    .number()
+    .nullish()
+    .describe("Area stabile del diritto, ricavata dalla Mensa di riferimento"),
+  areaOperativaNome: zod.string().nullish(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
@@ -23213,13 +23218,15 @@ export const ListMensaAbilitazioniResponse = zod.array(
   ListMensaAbilitazioniResponseItem,
 );
 
+export const createMensaAbilitazioneBodyMotivoMax = 2000;
+
 export const CreateMensaAbilitazioneBody = zod.object({
   beneficiarioId: zod.number(),
   mensaId: zod.number(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   mensaPrincipale: zod.boolean().optional(),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(createMensaAbilitazioneBodyMotivoMax),
 });
 
 /**
@@ -23253,9 +23260,11 @@ export const UpdateMensaAbilitazioneStatoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateMensaAbilitazioneStatoBodyMotivoMax = 2000;
+
 export const UpdateMensaAbilitazioneStatoBody = zod.object({
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(updateMensaAbilitazioneStatoBodyMotivoMax),
   versione: zod.coerce.date(),
 });
 
@@ -23266,6 +23275,11 @@ export const UpdateMensaAbilitazioneStatoResponse = zod.object({
   beneficiarioCodice: zod.string().nullish(),
   mensaId: zod.number(),
   mensaNome: zod.string().nullish(),
+  areaOperativaId: zod
+    .number()
+    .nullish()
+    .describe("Area stabile del diritto, ricavata dalla Mensa di riferimento"),
+  areaOperativaNome: zod.string().nullish(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
@@ -23307,9 +23321,11 @@ export const UpdateTesseraBeneficiarioStatoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateTesseraBeneficiarioStatoBodyMotivoMax = 2000;
+
 export const UpdateTesseraBeneficiarioStatoBody = zod.object({
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(updateTesseraBeneficiarioStatoBodyMotivoMax),
   versione: zod.coerce.date(),
 });
 

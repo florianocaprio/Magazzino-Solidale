@@ -2947,3 +2947,39 @@ Installazione frozen, typecheck, **839 test UI**, build WEB e budget **390,2/400
 - WEB `magazzino-bugfix-uat-web:sha-5c3f32d6832c` / `sha256:16af7100fd785f9119b699ede4e1007b864c4b5a86792060267bc29236c1d576`.
 
 Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2B-R2-5c3f32d6832c-2026-10-20T21-59-44-674Z`: dump/uploads e SHA256 verificati, restore reale effimero senza porte host e replay **63→63** PASS. Ricreati soltanto API/WEB, PostgreSQL e volumi conservati; confronto identico su **48 tabelle**, incluse ricevute, saldi e run mensili. HTTP app/config/healthz/readyz 200, Utenti anonimo 401. Revisioni e hash degli asset effettivamente serviti verificati, inclusi callback del salvataggio congiunto e relativo messaggio. Entry `/assets/index-BWB1KSfN.js`, budget **390,2/400 KiB gzip**. Ricevuta privata `/private/tmp/c2b-r2-final-release-result.json`. Nessuna modifica DB, importazione o simulazione economica sulla 8082. Nessun push, merge o aggiornamento Hetzner. **PRONTA PER UAT DI FLORIANO**; C2B resta aperta fino al suo OK.
+
+
+## C2B chiuso da Floriano; avvio C2C / BUG26 — 21 ottobre 2026
+
+Mandato diretto: «Ho provato sulla 8082, ora funziona tutto. Il punto 02 è chiuso, procedi con il prompt 03 nella cartella BUG 5 e ricompila sempre la 8082 per le prove». **C2B / BUG24–25: CHIUSO, UAT OK di Floriano**, comprese R1/R2, candidato personale `5c3f32d6832ce9658a08f431df93680acaad7310`; checkpoint documentale `7138631`. **C2C / BUG26: IN SVILUPPO** sullo stesso `codex/bugfix-ciclo2-ottobre-2026`. Nessun ripristino alla baseline, modifica main, merge, push o produzione. Cinque documenti locali estranei preservati.
+
+Letti `BUG 5/03_Mensa_Abilitazioni_Area.txt`, `00_Avvio_Ciclo_2.txt`, LEGGIMI e registro. `SPECIFICA_CICLO_2.txt` non presente nel pacchetto locale né nella ricerca dei file sotto Magazzino: i criteri BUG26-01–12 sono interamente riportati nel prompt 03 e consentono lo sviluppo. Il mandato umano esplicito sulla 8082 prevale sul rinvio al separato ##test riportato nel documento; eseguite verifiche pertinenti e installazione solo dopo esito verde. 04/05 non attivati automaticamente.
+
+### Modello e confini confermati
+
+L’Area del diritto è quella della Mensa di riferimento, immutabile dal PATCH ordinario; conserva `mensaId`/`mensaPrincipale` e identificativi storici. **Nessuna migration o modifica schema DB**: ledger atteso 63/63. Una principale temporalmente valida opera nelle destinazioni attive della stessa Area della persona e della principale; sede e magazzino di destinazione devono essere operativi. Una principale inattiva non revoca il diritto. Cambiare Area alla persona non trasferisce il diritto. Righe non principali e autorizzazioni temporanee non diventano nuovi diritti ordinari.
+
+La checkout effettiva contiene già la decisione precedente di Floriano su operatori abilitati per Area: `currentMensaIds` deriva le sedi dall’Area e dal ruolo correnti, non dalle vecchie righe individuali `utenti_mense`. **Nessun cambiamento a questo servizio, ai grant o al RBAC**. La nuova validità del beneficiario non amplia lo scope effettivo dell’operatore né reintroduce assegnazioni personali obsolete. Directory/dossier/gestione rimangono distinti dalla proiezione minima per il comando.
+
+### Intervento
+
+Valutazione temporale/territoriale condivisa tra scansione e rivalidazione transazionale del pasto; verifica con letture bloccanti di persona, tessera, diritto e assegnazioni correnti. La ricerca manuale con destinazione esplicita richiede anche scan/manual e offre soltanto nome/cognome/codice/ID/stato/Area, senza dati sociali o motivazioni. I controlli di affiliazione generali non vengono allargati. Anche DTO operativo e pasto seguono il nuovo percorso; precedenti accessi, replay, eccezioni e temporanei conservati. Nessuna eccezione o nuova abilitazione creata per cambiare sede. Unicità persona/giorno/tipo, advisory lock e comandi inventariali esistenti conservati.
+
+Scheda e variante compatta: motivo obbligatorio, stato/date/Area del diritto, Mensa come riferimento organizzativo, azioni consentite Sospendi/Revoca/Riattiva, nuova abilitazione per revocati/scaduti, errori/409 conservando l’input. Rimosso soltanto il blocco su anagrafica provvisoria. La creazione rapida e l’amministrazione Mensa inviano anch’esse il motivo esplicito. Contesto UDS e suoi endpoint minimali conservati; riepiloghi CdA/UDS non mostrano come attivo un diritto di altra Area. Nessuna abilitazione Emporio, politica o ricarica da Mensa.
+
+Contratto: motivazione obbligatoria per creazione/cambio stato; nuovi campi additivi Area ID/nome nell’abilitazione per descrivere il diritto effettivo. I motivi storici assenti restano null. OpenAPI aggiornato e client/Zod generati con comando canonico; nessuna modifica manuale dei generati. Nuovo esito descrittivo PROGRAMMATA per l’accesso futuro, sempre negato.
+
+### Verifiche in corso
+
+Typecheck e 841 test UI PASS. Primo runner Mensa: 117 PASS/1 KO nella fixture negativa senza motivo, accidentalmente completata con un motivo dalla manutenzione dei payload; ripristinato il caso negativo originario, senza cambiare l’API. Secondo gruppo Mensa e gruppo core PASS; general/browser e ricevuta finale seguono. Le prove storiche di eccezione usano accessi sintetici già negati con il vecchio criterio: le nuove verifiche nella seconda sede sono asserite ordinarie. Mantenuti i test di chiusura concorrente, revoca e privacy.
+
+
+### C2C — checkpoint di verifica
+
+API core **79 PASS**, API Mensa **118 PASS**, evidenze `test-results/quality-gates/api/d4364b21-6e56-4ad7-8646-3ec533c96e86`. General della medesima esecuzione: **1546 PASS, 1 test KO per timeout e 11 test non eseguiti per timeout beforeAll**, oltre ai 7 skip esterni già esistenti. I due timeout riguardano `fse-m64-regressions` F04/F27 e inizializzazione `lotti-produttore`, file non modificati. La ripetizione general avviene su database nuovo, senza modificare le prove o aumentare i timeout. Non classificati come PASS né aggirati.
+
+`pnpm install --frozen-lockfile`, typecheck, build API e WEB PASS; budget iniziale **390,7/400 KiB gzip**. Codegen ripetuto: **1003 file SHA256 identici**. Le sole controparti native macOS ignorate seguono il workaround già documentato; nessuna nuova dipendenza, variazione del lockfile o artefatto locale incluso. UI finale **841 PASS**; la piccola protezione della bozza motivo nel pannello amministrativo viene verificata con il browser del candidato.
+
+File principali: API `routes/mensa.ts`, `routes/beneficiari.ts`, `lib/mensaEligibilitySummary.ts`; UI `components/beneficiario-mensa-card.tsx`, `pages/beneficiari.tsx`, `pages/mensa.tsx`, nuovo namespace `ciclo2Mensa.ts` e indice; OpenAPI e generati Mensa; test `mensa.test.ts`, `beneficiario-mensa-card.test.tsx`, mock `beneficiario-tessera.test.tsx`, browser `m67-p4-mensa-context.spec.ts`. Il servizio corrente `mensaScope.ts` resta invariato.
+
+Matrice di verifica: BUG26-01/05/06/07 nei test ordinari A1/A2, principale inattiva, concorrenti, replay e storico; BUG26-02/03 nel trasferimento Area, dinieghi altra Area, proiezioni minime e regressioni scope/core; BUG26-04 nelle quattro transizioni/datetime prima e dopo scan; BUG26-08/09 nelle prove API provvisoria/motivo e UI compatta/409; BUG26-10/11 nel browser CdA→seconda sede→UDS e assenza effetti credito; BUG26-12 richiede tutte le evidenze finali e la ricevuta 8082 sotto. Nessuna UAT dedotta dai test automatici.

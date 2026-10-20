@@ -1,4 +1,7 @@
-import { riepilogoAbilitazioneMensa, type MensaRiepilogoHistoryRow } from "../lib/mensaEligibilitySummary";
+import {
+  riepilogoAbilitazioneMensa,
+  type MensaRiepilogoHistoryRow,
+} from "../lib/mensaEligibilitySummary";
 export { riepilogoAbilitazioneMensa } from "../lib/mensaEligibilitySummary";
 import {
   Router,
@@ -120,6 +123,7 @@ import {
   assertAssignedMensa,
   currentMensaScope,
   mensaScopeCondition,
+  assertCurrentMensaAssignment,
   MensaScopeError,
 } from "../lib/mensaScope";
 import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
@@ -157,6 +161,7 @@ const ACCESSO_MOTIVI = {
   ABILITAZIONE_SOSPESA: "ABILITAZIONE_SOSPESA",
   ABILITAZIONE_REVOCATA: "ABILITAZIONE_REVOCATA",
   ABILITAZIONE_SCADUTA: "ABILITAZIONE_SCADUTA",
+  ABILITAZIONE_PROGRAMMATA: "ABILITAZIONE_PROGRAMMATA",
   MENSA_NON_AUTORIZZATA: "MENSA_NON_AUTORIZZATA",
   AREA_NON_COMPATIBILE: "AREA_NON_COMPATIBILE",
   MENSA_NON_ATTIVA: "MENSA_NON_ATTIVA",
@@ -469,14 +474,68 @@ async function requireBeneficiarioMensa(req: Request, id: number) {
     throw new MensaError(403, "Beneficiario non accessibile nello scope Mensa");
 }
 
+// Il diritto ordinario deriva dalla principale, la cui Area non è modificabile
+// dal PATCH Mensa. L'operatività della sede di riferimento non revoca il diritto.
+function currentPrincipal(
+  item: typeof mensaAbilitazioniTable.$inferSelect,
+  day: string,
+) {
+  return (
+    item.mensaPrincipale &&
+    item.stato === "attiva" &&
+    item.dataInizio <= day &&
+    (item.dataFine == null || item.dataFine >= day)
+  );
+}
+function ordinaryMensaArea(
+  eligibility: {
+    abilitazione: typeof mensaAbilitazioniTable.$inferSelect;
+    mensa: typeof menseTable.$inferSelect;
+  } | null,
+  beneficiaryArea: number | null,
+  destinationArea: number,
+  day: string,
+) {
+  return (
+    eligibility != null &&
+    currentPrincipal(eligibility.abilitazione, day) &&
+    eligibility.mensa.areaOperativaId === destinationArea &&
+    beneficiaryArea === destinationArea
+  );
+}
+
+// Proiezione operativa: non concede directory, dossier o gestione della principale.
+async function requireOperationalMensaBeneficiary(
+  req: Request,
+  id: number,
+  mensaId: number,
+) {
+  const destination = await requireMensa(mensaId, req);
+  const [person] = await db
+    .select({
+      areaOperativaId: beneficiariTable.areaOperativaId,
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+    })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, id));
+  if (
+    !person ||
+    person.areaOperativaId !== destination.mensa.areaOperativaId ||
+    !canAccessCentro(person.centroAscoltoId, callerCentroId(req))
+  )
+    throw new MensaError(
+      403,
+      "Beneficiario non accessibile nella destinazione Mensa",
+    );
+}
+
 async function revalidateMealEntitlement(
   tx: Tx,
   req: Request,
   access: typeof mensaAccessiTable.$inferSelect,
   day: string,
-  allowNewException = false,
 ) {
-  assertAssignedMensa(req, access.mensaId);
+  await assertCurrentMensaAssignment(tx, req, access.mensaId);
   const [mensa] = await tx
     .select()
     .from(menseTable)
@@ -517,24 +576,22 @@ async function revalidateMealEntitlement(
       .for("share");
     if (
       !card ||
+      card.beneficiarioId !== beneficiary.id ||
       card.stato !== "attiva" ||
       (card.dataScadenza != null && card.dataScadenza < day)
     )
       throw new MensaError(409, "Tessera non più valida per il pasto");
   }
-  const eligibilities = await tx
-    .select()
+  const rights = await tx
+    .select({ abilitazione: mensaAbilitazioniTable, mensa: menseTable })
     .from(mensaAbilitazioniTable)
+    .innerJoin(menseTable, eq(mensaAbilitazioniTable.mensaId, menseTable.id))
     .where(eq(mensaAbilitazioniTable.beneficiarioId, beneficiary.id))
     .orderBy(desc(mensaAbilitazioniTable.id))
     .for("share");
-  const current = eligibilities.find(
-    (item) =>
-      item.mensaPrincipale &&
-      item.stato === "attiva" &&
-      item.dataInizio <= day &&
-      (item.dataFine == null || item.dataFine >= day),
-  );
+  const eligibilities = rights.map((item) => item.abilitazione);
+  const current =
+    rights.find((item) => currentPrincipal(item.abilitazione, day)) ?? null;
   if (access.autorizzazioneTemporaneaId != null) {
     const [temporary] = await tx
       .select()
@@ -551,37 +608,24 @@ async function revalidateMealEntitlement(
       temporary.dataServizio !== day ||
       temporary.tipoServizio !== access.tipoServizio ||
       temporary.mensaId !== access.mensaId ||
-      ["revocata", "sospesa"].includes(eligibilities[0]?.stato ?? "")
+      ["revocata", "sospesa"].includes(
+        eligibilities.find((item) => item.mensaPrincipale)?.stato ?? "",
+      )
     )
       throw new MensaError(409, "Autorizzazione temporanea non più valida");
-  } else if (!current)
-    throw new MensaError(409, "Abilitazione non più valida per il pasto");
-  else if (current.mensaId !== access.mensaId) {
-    const [exception] =
-      access.eccezioneId == null
-        ? []
-        : await tx
-            .select()
-            .from(mensaEccezioniTable)
-            .where(eq(mensaEccezioniTable.id, access.eccezioneId))
-            .for("share");
-    const [principal] = await tx
-      .select()
-      .from(menseTable)
-      .where(eq(menseTable.id, current.mensaId));
-    if (
-      principal?.areaOperativaId !== mensa.areaOperativaId ||
-      (!allowNewException &&
-        (!exception ||
-          exception.mensaPrincipaleId !== current.mensaId ||
-          exception.mensaDestinazioneId !== access.mensaId))
+  } else if (
+    !ordinaryMensaArea(
+      current,
+      beneficiary.areaOperativaId,
+      mensa.areaOperativaId,
+      day,
     )
-      throw new MensaError(
-        409,
-        "L'accesso non autorizza un pasto in questa Mensa",
-      );
-  }
-  return current;
+  )
+    throw new MensaError(
+      409,
+      "Abilitazione non più valida nell'Area per il pasto",
+    );
+  return current?.abilitazione ?? null;
 }
 
 function formatMensa(
@@ -719,6 +763,8 @@ async function requireMensaLogisticsWarehouse(
 function formatAbilitazione(row: {
   abilitazione: typeof mensaAbilitazioniTable.$inferSelect;
   mensaNome: string | null;
+  areaOperativaId?: number;
+  areaOperativaNome?: string | null;
   beneficiarioNome: string | null;
   beneficiarioCognome: string | null;
   beneficiarioCodice: string | null;
@@ -733,6 +779,8 @@ function formatAbilitazione(row: {
     beneficiarioCodice: row.beneficiarioCodice,
     mensaId: row.abilitazione.mensaId,
     mensaNome: row.mensaNome,
+    areaOperativaId: row.areaOperativaId ?? null,
+    areaOperativaNome: row.areaOperativaNome ?? null,
     dataInizio: row.abilitazione.dataInizio,
     dataFine: row.abilitazione.dataFine ?? null,
     stato: row.abilitazione.stato,
@@ -776,7 +824,10 @@ async function loadRiepilogoAbilitazioniBeneficiari(
     .from(beneficiariTable)
     .leftJoin(
       mensaAbilitazioniTable,
-      eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+      and(
+        eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+        sql`exists (select 1 from mense m where m.id=${mensaAbilitazioniTable.mensaId} and m.area_operativa_id=${beneficiariTable.areaOperativaId})`,
+      ),
     )
     .where(and(...conditions))
     .orderBy(
@@ -821,12 +872,17 @@ async function loadAbilitazione(id: number) {
       beneficiarioCognome: beneficiariTable.cognome,
       beneficiarioCodice: beneficiariTable.codice,
       areaOperativaId: menseTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(mensaAbilitazioniTable)
     .innerJoin(menseTable, eq(mensaAbilitazioniTable.mensaId, menseTable.id))
     .innerJoin(
       beneficiariTable,
       eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+    )
+    .innerJoin(
+      areeOperativeTable,
+      eq(menseTable.areaOperativaId, areeOperativeTable.id),
     )
     .where(eq(mensaAbilitazioniTable.id, id));
   return row ?? null;
@@ -896,34 +952,42 @@ async function expireEndedPrincipalEligibilities(
   );
 }
 
-export async function activeEligibility(beneficiarioId: number, today: string) {
-  const [active] = await db
+export async function activeEligibility(
+  beneficiarioId: number,
+  today: string,
+  executor: Tx | typeof db = db,
+) {
+  const rows = await executor
     .select({ abilitazione: mensaAbilitazioniTable, mensa: menseTable })
     .from(mensaAbilitazioniTable)
     .innerJoin(menseTable, eq(mensaAbilitazioniTable.mensaId, menseTable.id))
     .where(
       and(
         eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
-        eq(mensaAbilitazioniTable.stato, "attiva"),
         eq(mensaAbilitazioniTable.mensaPrincipale, true),
-        lte(mensaAbilitazioniTable.dataInizio, today),
-        or(
-          isNull(mensaAbilitazioniTable.dataFine),
-          gte(mensaAbilitazioniTable.dataFine, today),
-        ),
       ),
     )
     .orderBy(desc(mensaAbilitazioniTable.id))
-    .limit(1);
-  return active ?? null;
+    .for("share");
+  return (
+    rows.find((item) => currentPrincipal(item.abilitazione, today)) ?? null
+  );
 }
 
-async function latestEligibility(beneficiarioId: number) {
-  const [latest] = await db
+async function latestEligibility(
+  beneficiarioId: number,
+  executor: Tx | typeof db = db,
+) {
+  const [latest] = await executor
     .select({ abilitazione: mensaAbilitazioniTable, mensa: menseTable })
     .from(mensaAbilitazioniTable)
     .innerJoin(menseTable, eq(mensaAbilitazioniTable.mensaId, menseTable.id))
-    .where(eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId))
+    .where(
+      and(
+        eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
+        eq(mensaAbilitazioniTable.mensaPrincipale, true),
+      ),
+    )
     .orderBy(
       desc(mensaAbilitazioniTable.createdAt),
       desc(mensaAbilitazioniTable.id),
@@ -976,8 +1040,24 @@ async function loadAccessoDto(id: number, req: Request) {
           ),
         )
     : [];
+  let operationalVisible = false;
+  try {
+    assertAssignedMensa(req, row.mensa.id);
+    operationalVisible = Boolean(
+      row.beneficiario?.attivo &&
+      canAccessCentro(row.beneficiario.centroAscoltoId, callerCentroId(req)) &&
+      ordinaryMensaArea(
+        eligibility,
+        row.beneficiario.areaOperativaId,
+        row.mensa.areaOperativaId,
+        dataServizioMensa(row.accesso.dataOra),
+      ),
+    );
+  } catch {
+    /* Nessuna proiezione fuori dalla destinazione autorizzata. */
+  }
   const hidePersonal =
-    !visible ||
+    (!visible && !operationalVisible) ||
     outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
@@ -992,10 +1072,10 @@ async function loadAccessoDto(id: number, req: Request) {
         : null,
     beneficiarioCodice:
       !hidePersonal && row.beneficiario ? row.beneficiario.codice : null,
-    mensaPrincipaleId: hidePersonal ? null : (eligibility?.mensa.id ?? null),
-    mensaPrincipaleNome: hidePersonal
-      ? null
-      : (eligibility?.mensa.nome ?? null),
+    mensaPrincipaleId:
+      hidePersonal || !visible ? null : (eligibility?.mensa.id ?? null),
+    mensaPrincipaleNome:
+      hidePersonal || !visible ? null : (eligibility?.mensa.nome ?? null),
     statoAbilitazione: hidePersonal
       ? null
       : (eligibility?.abilitazione.stato ?? null),
@@ -1511,83 +1591,119 @@ router.post(
       // La verifica di accesso deve restare disponibile anche quando il
       // servizio o il magazzino Mensa non sono operativi: in quel caso
       // registriamo un accesso negato con motivo MENSA_NON_ATTIVA.
-      const mensa = await requireMensa(mensaId, req);
-      const now = new Date();
-      const today = dataServizioMensa(now);
-      let tessera: typeof tessereBeneficiariTable.$inferSelect | null = null;
-      let beneficiario: typeof beneficiariTable.$inferSelect | null = null;
-      if (modalita === "tessera") {
-        const codiceTessera = text(req.body?.codiceTessera, "La tessera", 64);
-        [tessera = null] = await db
-          .select()
-          .from(tessereBeneficiariTable)
-          .where(eq(tessereBeneficiariTable.codice, codiceTessera))
-          .limit(1);
-        if (tessera) {
-          [beneficiario = null] = await db
+      await requireMensa(mensaId, req);
+      const created = await db.transaction(async (tx) => {
+        await assertCurrentMensaAssignment(tx, req, mensaId);
+        const [mensa] = await tx
+          .select({
+            mensa: menseTable,
+            magazzinoStato: magazziniTable.stato,
+            magazzinoTipo: magazziniTable.tipoMagazzino,
+          })
+          .from(menseTable)
+          .innerJoin(
+            magazziniTable,
+            eq(menseTable.magazzinoId, magazziniTable.id),
+          )
+          .where(eq(menseTable.id, mensaId))
+          .for("share");
+        if (!mensa) throw new MensaError(404, "Mensa non trovata");
+        const now = new Date();
+        const today = dataServizioMensa(now);
+        let tessera: typeof tessereBeneficiariTable.$inferSelect | null = null;
+        let beneficiario: typeof beneficiariTable.$inferSelect | null = null;
+        if (modalita === "tessera") {
+          const codiceTessera = text(req.body?.codiceTessera, "La tessera", 64);
+          [tessera = null] = await tx
+            .select()
+            .from(tessereBeneficiariTable)
+            .where(eq(tessereBeneficiariTable.codice, codiceTessera))
+            .limit(1)
+            .for("share");
+          if (tessera) {
+            [beneficiario = null] = await tx
+              .select()
+              .from(beneficiariTable)
+              .where(eq(beneficiariTable.id, tessera.beneficiarioId))
+              .limit(1)
+              .for("share");
+          }
+        } else {
+          const beneficiarioId = positiveInt(
+            req.body?.beneficiarioId,
+            "beneficiarioId",
+          );
+          [beneficiario = null] = await tx
             .select()
             .from(beneficiariTable)
-            .where(eq(beneficiariTable.id, tessera.beneficiarioId))
-            .limit(1);
+            .where(eq(beneficiariTable.id, beneficiarioId))
+            .limit(1)
+            .for("share");
         }
-      } else {
-        const beneficiarioId = positiveInt(
-          req.body?.beneficiarioId,
-          "beneficiarioId",
-        );
-        [beneficiario = null] = await db
-          .select()
-          .from(beneficiariTable)
-          .where(eq(beneficiariTable.id, beneficiarioId))
-          .limit(1);
-      }
 
-      let esito = "negato";
-      let motivoEsito: string = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
-      let eligibility: Awaited<ReturnType<typeof activeEligibility>> | null =
-        null;
-      if (
-        !mensa.mensa.attiva ||
-        mensa.magazzinoStato !== "attivo" ||
-        mensa.magazzinoTipo !== "mensa"
-      ) {
-        motivoEsito = ACCESSO_MOTIVI.MENSA_NON_ATTIVA;
-      } else if (modalita === "tessera" && !tessera) {
-        motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
-      } else if (tessera?.stato === "sospesa") {
-        motivoEsito = ACCESSO_MOTIVI.TESSERA_SOSPESA;
-      } else if (tessera?.stato === "revocata") {
-        motivoEsito = ACCESSO_MOTIVI.TESSERA_REVOCATA;
-      } else if (
-        tessera?.stato === "scaduta" ||
-        (tessera?.dataScadenza != null && tessera.dataScadenza < today)
-      ) {
-        motivoEsito = ACCESSO_MOTIVI.TESSERA_SCADUTA;
-      } else if (!beneficiario) {
-        motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
-      } else if (beneficiario.areaOperativaId !== mensa.mensa.areaOperativaId) {
-        motivoEsito = ACCESSO_MOTIVI.AREA_NON_COMPATIBILE;
-      } else if (!beneficiario.attivo) {
-        motivoEsito = ACCESSO_MOTIVI.BENEFICIARIO_NON_ATTIVO;
-      } else {
-        eligibility = await activeEligibility(beneficiario.id, today);
-        if (!eligibility) {
-          const latest = await latestEligibility(beneficiario.id);
-          if (!latest) motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_NON_PRESENTE;
-          else if (latest.abilitazione.stato === "sospesa")
-            motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_SOSPESA;
-          else if (latest.abilitazione.stato === "revocata")
-            motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_REVOCATA;
-          else motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_SCADUTA;
-        } else if (eligibility.mensa.id !== mensaId) {
-          motivoEsito = ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA;
+        let esito = "negato";
+        let motivoEsito: string = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
+        let eligibility: Awaited<ReturnType<typeof activeEligibility>> | null =
+          null;
+        if (
+          !mensa.mensa.attiva ||
+          mensa.magazzinoStato !== "attivo" ||
+          mensa.magazzinoTipo !== "mensa"
+        ) {
+          motivoEsito = ACCESSO_MOTIVI.MENSA_NON_ATTIVA;
+        } else if (modalita === "tessera" && !tessera) {
+          motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
+        } else if (tessera?.stato === "sospesa") {
+          motivoEsito = ACCESSO_MOTIVI.TESSERA_SOSPESA;
+        } else if (tessera?.stato === "revocata") {
+          motivoEsito = ACCESSO_MOTIVI.TESSERA_REVOCATA;
+        } else if (
+          tessera?.stato === "scaduta" ||
+          (tessera?.dataScadenza != null && tessera.dataScadenza < today)
+        ) {
+          motivoEsito = ACCESSO_MOTIVI.TESSERA_SCADUTA;
+        } else if (!beneficiario) {
+          motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
+        } else if (
+          beneficiario.areaOperativaId !== mensa.mensa.areaOperativaId
+        ) {
+          motivoEsito = ACCESSO_MOTIVI.AREA_NON_COMPATIBILE;
+        } else if (
+          !canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
+        ) {
+          motivoEsito = ACCESSO_MOTIVI.AREA_NON_COMPATIBILE;
+        } else if (!beneficiario.attivo) {
+          motivoEsito = ACCESSO_MOTIVI.BENEFICIARIO_NON_ATTIVO;
         } else {
-          esito = "consentito";
-          motivoEsito = ACCESSO_MOTIVI.CONSENTITO;
+          eligibility = await activeEligibility(beneficiario.id, today, tx);
+          if (!eligibility) {
+            const latest = await latestEligibility(beneficiario.id, tx);
+            if (!latest) motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_NON_PRESENTE;
+            else if (latest.abilitazione.stato === "sospesa")
+              motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_SOSPESA;
+            else if (latest.abilitazione.stato === "revocata")
+              motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_REVOCATA;
+            else if (
+              latest.abilitazione.stato === "attiva" &&
+              latest.abilitazione.dataInizio > today
+            )
+              motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_PROGRAMMATA;
+            else motivoEsito = ACCESSO_MOTIVI.ABILITAZIONE_SCADUTA;
+          } else if (
+            !ordinaryMensaArea(
+              eligibility,
+              beneficiario.areaOperativaId,
+              mensa.mensa.areaOperativaId,
+              today,
+            )
+          ) {
+            motivoEsito = ACCESSO_MOTIVI.AREA_NON_COMPATIBILE;
+          } else {
+            esito = "consentito";
+            motivoEsito = ACCESSO_MOTIVI.CONSENTITO;
+          }
         }
-      }
 
-      const created = await db.transaction(async (tx) => {
         let persistedEsito = esito;
         let persistedMotivoEsito = motivoEsito;
         const [serviceDay] = await tx
@@ -2097,7 +2213,6 @@ router.post(
           req,
           row.accesso,
           day,
-          true,
         );
         if (!eligibility)
           throw new MensaError(
@@ -2288,7 +2403,11 @@ router.post(
       )
         throw new MensaError(409, "Il pasto richiede un accesso consentito");
       const beneficiarioId = access.accesso.beneficiarioId;
-      await requireBeneficiarioMensa(req, beneficiarioId);
+      await requireOperationalMensaBeneficiary(
+        req,
+        beneficiarioId,
+        access.mensa.id,
+      );
       const now = new Date();
       const serviceDate = dataServizioMensa(now);
       if (!stessoGiornoServizioMensa(access.accesso.dataOra, now)) {
@@ -4014,25 +4133,35 @@ router.get(
       const search = text(req.query.search, "La ricerca", 120);
       if (search.length < 2)
         throw new MensaError(400, "Inserire almeno 2 caratteri");
-      const conditions: SQL[] = [
-        beneficiarioMensaScope(req, beneficiariTable.id),
-      ];
+      const ownAreaOperativa = selectedArea(req, true);
+      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
+      const destination =
+        mensaId == null ? null : await requireMensa(mensaId, req);
+      if (destination && destination.mensa.areaOperativaId !== ownAreaOperativa)
+        throw new MensaError(
+          403,
+          "Mensa non appartenente all'Area selezionata",
+        );
+      let visibility = beneficiarioMensaScope(req, beneficiariTable.id);
+      if (destination) {
+        assertPermission(req, "mensa.access.manual");
+        assertPermission(req, "mensa.access.scan");
+        const day = dataServizioMensa();
+        const operational = sql`(${beneficiariTable.attivo} and exists (
+          select 1 from mensa_abilitazioni ma join mense reference on reference.id=ma.mensa_id
+          where ma.beneficiario_id=${beneficiariTable.id} and ma.mensa_principale and ma.stato='attiva'
+            and ma.data_inizio<=${day} and (ma.data_fine is null or ma.data_fine>=${day})
+            and reference.area_operativa_id=${destination.mensa.areaOperativaId}
+            and ${beneficiariTable.areaOperativaId}=${destination.mensa.areaOperativaId}
+        ))`;
+        visibility = or(visibility, operational)!;
+      }
+      const conditions: SQL[] = [visibility];
       const centerScope = centroScopeFilter(
         beneficiariTable.centroAscoltoId,
         callerCentroId(req),
       );
       if (centerScope) conditions.push(centerScope);
-      const ownAreaOperativa = selectedArea(req, true);
-      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
-      if (
-        mensaId != null &&
-        (await requireMensa(mensaId, req)).mensa.areaOperativaId !==
-          ownAreaOperativa
-      )
-        throw new MensaError(
-          403,
-          "Mensa non appartenente all'Area selezionata",
-        );
       if (ownAreaOperativa != null)
         conditions.push(eq(beneficiariTable.areaOperativaId, ownAreaOperativa));
       const s = `%${search}%`;
@@ -4114,6 +4243,8 @@ router.get(
         .select({
           abilitazione: mensaAbilitazioniTable,
           mensaNome: menseTable.nome,
+          areaOperativaId: menseTable.areaOperativaId,
+          areaOperativaNome: areeOperativeTable.nome,
           beneficiarioNome: beneficiariTable.nome,
           beneficiarioCognome: beneficiariTable.cognome,
           beneficiarioCodice: beneficiariTable.codice,
@@ -4126,6 +4257,10 @@ router.get(
         .innerJoin(
           beneficiariTable,
           eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+        )
+        .innerJoin(
+          areeOperativeTable,
+          eq(menseTable.areaOperativaId, areeOperativeTable.id),
         )
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(
@@ -4149,6 +4284,7 @@ router.post(
         req.body?.beneficiarioId,
         "beneficiarioId",
       );
+      const motivo = text(req.body?.motivo, "Il motivo", 2000);
       const mensaId = positiveInt(req.body?.mensaId, "mensaId");
       const dataInizio = dateOnly(
         req.body?.dataInizio,
@@ -4174,6 +4310,21 @@ router.post(
         );
       await requireBeneficiarioMensa(req, beneficiarioId);
       const created = await db.transaction(async (tx) => {
+        await assertCurrentMensaAssignment(tx, req, mensaId);
+        const [person] = await tx
+          .select()
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, beneficiarioId))
+          .for("share");
+        if (
+          !person?.attivo ||
+          person.areaOperativaId !== mensa.mensa.areaOperativaId ||
+          !canAccessCentro(person.centroAscoltoId, callerCentroId(req))
+        )
+          throw new MensaError(
+            409,
+            "Beneficiario o territorio non più valido per l'abilitazione",
+          );
         if (mensaPrincipale) {
           const today = dataServizioMensa();
           await tx.execute(
@@ -4219,7 +4370,7 @@ router.post(
             dataFine,
             stato: "attiva",
             mensaPrincipale,
-            motivo: optionalText(req.body?.motivo, "Il motivo", 2000),
+            motivo,
             createdBy: req.user!.id,
           })
           .returning();
@@ -4234,7 +4385,9 @@ router.post(
               mensaId,
               dataInizio,
               dataFine,
+              mensaPrincipale,
             },
+            motivo,
           ),
         );
         return row;
@@ -4267,9 +4420,7 @@ router.post(
       ) {
         throw new MensaError(400, "Stato abilitazione non valido");
       }
-      const motivo = optionalText(req.body?.motivo, "Il motivo", 2000);
-      if (["sospesa", "revocata"].includes(stato) && !motivo)
-        throw new MensaError(400, "Il motivo è obbligatorio");
+      const motivo = text(req.body?.motivo, "Il motivo", 2000);
       const expected = expectedVersion(req.body?.versione);
       const current = await loadAbilitazione(id);
       if (!current) throw new MensaError(404, "Abilitazione non trovata");
@@ -4284,6 +4435,11 @@ router.post(
       )
         throw new MensaError(403, "Abilitazione non accessibile");
       const updated = await db.transaction(async (tx) => {
+        await assertCurrentMensaAssignment(
+          tx,
+          req,
+          current.abilitazione.mensaId,
+        );
         const allowed: Record<AbilitazioneStato, readonly AbilitazioneStato[]> =
           {
             attiva: ["sospesa", "revocata", "scaduta"],

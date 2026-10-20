@@ -22543,6 +22543,8 @@ components:
         beneficiarioCodice: { type: ["string", "null"] }
         mensaId: { type: integer }
         mensaNome: { type: ["string", "null"] }
+        areaOperativaId: { type: ["integer", "null"], description: "Area stabile del diritto, ricavata dalla Mensa di riferimento" }
+        areaOperativaNome: { type: ["string", "null"] }
         dataInizio: { type: string, format: date }
         dataFine: { type: ["string", "null"], format: date }
         stato: { type: string, enum: [attiva, sospesa, revocata, scaduta] }
@@ -22564,21 +22566,21 @@ components:
 
     MensaAbilitazioneInput:
       type: object
-      required: [beneficiarioId, mensaId, dataInizio]
+      required: [beneficiarioId, mensaId, dataInizio, motivo]
       properties:
         beneficiarioId: { type: integer }
         mensaId: { type: integer }
         dataInizio: { type: string, format: date }
         dataFine: { type: ["string", "null"], format: date }
         mensaPrincipale: { type: boolean }
-        motivo: { type: ["string", "null"] }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
 
     MensaStatoInput:
       type: object
-      required: [stato, versione]
+      required: [stato, versione, motivo]
       properties:
         stato: { type: string, enum: [attiva, sospesa, revocata, scaduta] }
-        motivo: { type: ["string", "null"] }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
         versione: { type: string, format: date-time }
 
     TesseraBeneficiario:

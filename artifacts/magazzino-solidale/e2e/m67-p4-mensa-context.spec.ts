@@ -170,3 +170,132 @@ for (const change of ["Mensa", "Tipo servizio", "Area Operativa"] as const) {
     }
   });
 }
+
+test("C2C: abilitazione motivata dal CdA, seconda Mensa ordinaria e soli stati UDS", async ({
+  page,
+}) => {
+  const f = await m67aMensaFixture(),
+    actor = f.users.admin;
+  const code = `C2C-${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+  const person = (
+    await pool.query(
+      "insert into beneficiari(codice,nome,cognome,area_operativa_id,attivo,stato_anagrafica,uds,sesso,fascia_eta_presunta) values($1,'Persona','C2C browser',$2,true,'provvisoria',true,'F','30_64') returning id",
+      [code, f.area],
+    )
+  ).rows[0];
+  await pool.query(
+    "insert into tessere_beneficiari(beneficiario_id,codice,created_by) values($1,$2,$3)",
+    [person.id, code, actor.id],
+  );
+  await page.goto("/login");
+  await page.getByLabel(/username|nome utente/i).fill(actor.username);
+  await page.getByLabel(/^password$/i).fill(actor.password);
+  await page.getByRole("button", { name: /accedi|login/i }).click();
+  await expect(page).toHaveURL(/\/$/);
+  const openEdit = async () => {
+    await page.goto(`/beneficiari/${person.id}`);
+    await page
+      .getByRole("button", { name: "Modifica anagrafica", exact: true })
+      .click();
+    return page.getByTestId("beneficiario-mensa-card");
+  };
+  let card = await openEdit();
+  await card
+    .getByRole("button", { name: "Abilita alla Mensa", exact: true })
+    .click();
+  const d = page.getByRole("dialog", {
+    name: "Abilita alla Mensa",
+    exact: true,
+  });
+  await selectOption(
+    page,
+    d.getByRole("combobox", { name: "Mensa principale", exact: true }),
+    f.canteens[0].nome,
+  );
+  await d
+    .getByRole("button", { name: "Conferma abilitazione", exact: true })
+    .click();
+  await expect(d.locator('[aria-invalid="true"]')).toHaveCount(1);
+  await d
+    .getByLabel("Motivo dell’abilitazione o della variazione", { exact: true })
+    .fill("Servizio nell’Area C2C");
+  await d
+    .getByRole("button", { name: "Conferma abilitazione", exact: true })
+    .click();
+  await expect(d).not.toBeVisible();
+  await expect(card).toContainText("ATTIVA");
+  await expect(card).toContainText(
+    "La Mensa di riferimento non limita la sede di accesso",
+  );
+  await page.goto("/mensa/postazione");
+  await selectOption(
+    page,
+    page.getByRole("combobox", { name: "Mensa", exact: true }),
+    f.canteens[1].nome,
+  );
+  await page.locator("#mensa-scan").fill(code);
+  const scanResponse = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/mensa/accessi/verifica" &&
+      r.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Verifica accesso", exact: true })
+    .click();
+  const scan = await (await scanResponse).json();
+  expect(scan.esito).toBe("consentito");
+  expect(scan.eccezionePossibile).toBe(false);
+  const mealResponse = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/mensa/pasti" &&
+      r.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Registra pasto", exact: true })
+    .click();
+  expect((await mealResponse).status()).toBe(201);
+  expect(
+    (
+      await pool.query(
+        "select mensa_id,eccezione_id from mensa_pasti where beneficiario_id=$1",
+        [person.id],
+      )
+    ).rows,
+  ).toEqual([{ mensa_id: f.canteens[1].id, eccezione_id: null }]);
+  card = await openEdit();
+  await card
+    .getByLabel("Motivo dell’abilitazione o della variazione", { exact: true })
+    .fill("Sospensione dall’Area");
+  await card
+    .getByRole("button", { name: "Sospendi Mensa", exact: true })
+    .click();
+  await expect(card).toContainText("SOSPESA");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Modifica anagrafica", exact: true })
+    .click();
+  await expect(page.getByTestId("beneficiario-mensa-card")).toContainText(
+    "SOSPESA",
+  );
+  await page.goto(`/uds/anagrafica/${person.id}`);
+  await expect(
+    page.getByRole("button", {
+      name: /Abilita alla Mensa|Sospendi Mensa|Revoca Mensa|Riattiva Mensa/,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Modifica anagrafica", exact: true })
+    .click();
+  await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
+  expect(
+    (
+      await pool.query(
+        "select stato_anagrafica,credito_solidale_abilitato from beneficiari where id=$1",
+        [person.id],
+      )
+    ).rows[0],
+  ).toEqual({
+    stato_anagrafica: "provvisoria",
+    credito_solidale_abilitato: false,
+  });
+});

@@ -4,6 +4,7 @@ import {
   getListMensaAbilitazioniQueryKey,
   getListMenseQueryKey,
   useCreateMensaAbilitazione,
+  useUpdateMensaAbilitazioneStato,
   useListMensaAbilitazioni,
   useListMense,
   type BeneficiarioDettaglio,
@@ -21,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
+import { RequiredField } from "./ui/required-field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -93,14 +96,13 @@ export function getMensaEligibilityDisplay(
 ) {
   const current =
     records.find((item) => isCurrentEligibility(item, today)) ?? null;
-  const latestPrincipal =
-    records.find((item) => item.mensaPrincipale) ?? records[0] ?? null;
+  const latestPrincipal = records.find((item) => item.mensaPrincipale) ?? null;
   const shown = current ?? latestPrincipal;
   const state = displayedState(shown, today);
   const hasBlockingPrincipal = records.some(
     (item) =>
       item.mensaPrincipale &&
-      item.stato === "attiva" &&
+      ["attiva", "sospesa"].includes(item.stato) &&
       (item.dataFine == null || item.dataFine >= today),
   );
 
@@ -142,7 +144,9 @@ export function BeneficiarioMensaSection({
   return (
     <BeneficiarioMensaCard
       beneficiario={beneficiario}
-      canManage={!readOnly && canViewMensa && hasPermission("mensa.eligibility.manage")}
+      canManage={
+        !readOnly && canViewMensa && hasPermission("mensa.eligibility.manage")
+      }
       compact={compact}
     />
   );
@@ -157,6 +161,7 @@ export function BeneficiarioMensaCard({
   canManage: boolean;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const today = todayEuropeRome();
@@ -167,6 +172,10 @@ export function BeneficiarioMensaCard({
     },
   });
   const create = useCreateMensaAbilitazione();
+  const update = useUpdateMensaAbilitazioneStato();
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mensaId, setMensaId] = useState("");
   const [dataInizio, setDataInizio] = useState(today);
@@ -190,13 +199,68 @@ export function BeneficiarioMensaCard({
   const canEnable =
     canManage &&
     beneficiario.attivo &&
-    beneficiario.statoAnagrafica === "completa" &&
     !history.isLoading &&
     !history.isError &&
     !hasBlockingPrincipal;
   const invalidRange = dataFine !== "" && dataFine < dataInizio;
+  const busy = create.isPending || update.isPending;
+  const inArea =
+    shown?.areaOperativaId == null ||
+    shown.areaOperativaId === beneficiario.areaOperativaId;
+  const areaName =
+    (dialogOpen
+      ? mense.data?.find((m) => m.id === Number(mensaId))?.areaOperativaNome
+      : shown?.areaOperativaNome) ??
+    String(beneficiario.areaOperativaId ?? "—");
+  const areaMessage = t("ciclo2Mensa.areaValidity", { area: areaName });
+  const canChange =
+    canManage &&
+    beneficiario.attivo &&
+    shown?.mensaPrincipale &&
+    inArea &&
+    !history.isError &&
+    !history.isLoading;
+  const refresh = async () => {
+    await queryClient.invalidateQueries({
+      predicate: (q) => {
+        const path = String(q.queryKey[0]);
+        return (
+          path.startsWith("/api/mensa/abilitazioni") ||
+          path === "/api/mensa/accessi" ||
+          path === "/api/mensa/beneficiari/ricerca" ||
+          path === `/api/beneficiari/${beneficiario.id}` ||
+          path.startsWith(`/api/beneficiari/${beneficiario.id}/`)
+        );
+      },
+    });
+  };
+  const change = (stato: "attiva" | "sospesa" | "revocata") => {
+    setSubmitted(true);
+    setError("");
+    if (!shown || !motivo.trim()) return;
+    update.mutate(
+      {
+        id: shown.id,
+        data: { stato, motivo: motivo.trim(), versione: shown.versione },
+      },
+      {
+        onSuccess: async () => {
+          await refresh();
+          setMotivo("");
+          setSubmitted(false);
+          toast({ title: t("ciclo2Mensa.updated") });
+        },
+        onError: (e) => {
+          setError(errorMessage(e));
+        },
+      },
+    );
+  };
 
   const openDialog = () => {
+    setError("");
+    setSubmitted(false);
+    setMotivo("");
     setMensaId("");
     setDataInizio(todayEuropeRome());
     setDataFine("");
@@ -204,7 +268,9 @@ export function BeneficiarioMensaCard({
   };
 
   const submit = () => {
-    if (!mensaId || invalidRange) return;
+    setSubmitted(true);
+    setError("");
+    if (!mensaId || !dataInizio || !motivo.trim() || invalidRange) return;
     create.mutate(
       {
         data: {
@@ -213,23 +279,21 @@ export function BeneficiarioMensaCard({
           dataInizio,
           dataFine: dataFine || null,
           mensaPrincipale: true,
+          motivo: motivo.trim(),
         },
       },
       {
         onSuccess: async () => {
-          await queryClient.invalidateQueries({
-            queryKey: getListMensaAbilitazioniQueryKey(historyParams),
-          });
-          await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith(`/api/beneficiari/${beneficiario.id}/`) });
+          await refresh();
           setDialogOpen(false);
-          toast({ title: "Beneficiario abilitato alla Mensa" });
-        },
-        onError: (error) =>
+          setMotivo("");
+          setSubmitted(false);
           toast({
-            title: "Abilitazione Mensa non creata",
-            description: errorMessage(error),
-            variant: "destructive",
-          }),
+            title: "Beneficiario abilitato alla Mensa",
+            description: areaMessage,
+          });
+        },
+        onError: (e) => setError(errorMessage(e)),
       },
     );
   };
@@ -247,7 +311,7 @@ export function BeneficiarioMensaCard({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">
-                {current
+                {current && inArea
                   ? "Abilitazione Mensa attiva"
                   : state === "programmata"
                     ? "Abilitazione Mensa programmata"
@@ -259,14 +323,14 @@ export function BeneficiarioMensaCard({
                 </p>
               )}
             </div>
-            <MensaStatusBadge state={state} />
+            <MensaStatusBadge state={inArea ? state : "non_abilitato"} />
           </div>
 
           {shown && (
             <div className="grid gap-3 text-sm sm:grid-cols-3">
               <div>
                 <div className="text-xs text-muted-foreground">
-                  Mensa principale
+                  {t("ciclo2Mensa.reference")}
                 </div>
                 <div className="font-medium">{shown.mensaNome ?? "-"}</div>
               </div>
@@ -281,6 +345,82 @@ export function BeneficiarioMensaCard({
             </div>
           )}
 
+          {shown && (
+            <p className="text-sm text-muted-foreground">
+              {t("ciclo2Mensa.reason")}:{" "}
+              {shown.motivo || t("ciclo2Mensa.noReason")}
+            </p>
+          )}
+          {shown && inArea && (
+            <p className="text-sm text-muted-foreground">
+              {areaMessage} {state !== "attiva" && t("ciclo2Mensa.notValid")}
+            </p>
+          )}
+          {shown && !inArea && (
+            <p role="alert" className="text-sm text-destructive">
+              {t("ciclo2Mensa.wrongArea")}
+            </p>
+          )}
+          {error && !dialogOpen && (
+            <div className="space-y-2">
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void history.refetch()}
+              >
+                {t("ciclo2Mensa.refresh")}
+              </Button>
+            </div>
+          )}
+          {canChange &&
+            ["attiva", "programmata", "sospesa"].includes(state) && (
+              <>
+                <RequiredField
+                  label={t("ciclo2Mensa.reason")}
+                  missing={submitted && !motivo.trim()}
+                >
+                  <Input
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    maxLength={2000}
+                    disabled={busy}
+                  />
+                </RequiredField>
+                <div className="flex flex-wrap gap-2">
+                  {shown.stato === "attiva" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => change("sospesa")}
+                    >
+                      {t("ciclo2Mensa.suspend")}
+                    </Button>
+                  )}
+                  {shown.stato === "sospesa" &&
+                    (shown.dataFine == null || shown.dataFine >= today) && (
+                      <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => change("attiva")}
+                      >
+                        {t("ciclo2Mensa.reactivate")}
+                      </Button>
+                    )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => change("revocata")}
+                  >
+                    {t("ciclo2Mensa.revoke")}
+                  </Button>
+                </div>
+              </>
+            )}
           {canEnable && (
             <div className="flex justify-end">
               <Button type="button" onClick={openDialog}>
@@ -321,13 +461,15 @@ export function BeneficiarioMensaCard({
           <DialogHeader>
             <DialogTitle>Abilita alla Mensa</DialogTitle>
             <DialogDescription>
-              Crea un'abilitazione esplicita per la Mensa principale
-              selezionata.
+              {areaMessage}
+              {t("ciclo2Mensa.referenceHelp")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Mensa principale</label>
+              <label className="text-sm font-medium">
+                {t("ciclo2Mensa.reference")}
+              </label>
               <Select value={mensaId} onValueChange={setMensaId}>
                 <SelectTrigger aria-label="Mensa principale">
                   <SelectValue placeholder="Seleziona una Mensa" />
@@ -346,7 +488,13 @@ export function BeneficiarioMensaCard({
                   Mensa.
                 </p>
               )}
+              {mense.isError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {t("ciclo2Mensa.loadError")}
+                </p>
+              )}
               {beneficiario.areaOperativaId != null &&
+                !mense.isError &&
                 !mense.isLoading &&
                 (mense.data ?? []).length === 0 && (
                   <p className="text-sm text-muted-foreground">
@@ -391,6 +539,22 @@ export function BeneficiarioMensaCard({
               </p>
             )}
           </div>
+          <RequiredField
+            label={t("ciclo2Mensa.reason")}
+            missing={submitted && !motivo.trim()}
+          >
+            <Input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              maxLength={2000}
+              disabled={busy}
+            />
+          </RequiredField>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <Button
               type="button"
@@ -402,9 +566,7 @@ export function BeneficiarioMensaCard({
             <Button
               type="button"
               onClick={submit}
-              disabled={
-                !mensaId || !dataInizio || invalidRange || create.isPending
-              }
+              disabled={!mensaId || !dataInizio || invalidRange || busy}
             >
               Conferma abilitazione
             </Button>
@@ -425,6 +587,8 @@ export function NuovaAbilitazioneMensaFields({
   onDataInizioChange,
   dataFine,
   onDataFineChange,
+  motivo,
+  onMotivoChange,
 }: {
   enabled: boolean;
   onEnabledChange: (checked: boolean) => void;
@@ -435,7 +599,10 @@ export function NuovaAbilitazioneMensaFields({
   onDataInizioChange: (value: string) => void;
   dataFine: string;
   onDataFineChange: (value: string) => void;
+  motivo: string;
+  onMotivoChange: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const params = { attiva: true, areaOperativaId };
   const mense = useListMense(params, {
     query: {
@@ -465,8 +632,28 @@ export function NuovaAbilitazioneMensaFields({
       </div>
       {enabled && (
         <>
+          <p className="text-sm text-muted-foreground">
+            {t("ciclo2Mensa.areaValidity", {
+              area:
+                mense.data?.find((m) => m.id === Number(mensaId))
+                  ?.areaOperativaNome ?? String(areaOperativaId ?? "—"),
+            })}{" "}
+            {t("ciclo2Mensa.referenceHelp")}
+          </p>
+          <RequiredField
+            label={t("ciclo2Mensa.reason")}
+            missing={!motivo.trim()}
+          >
+            <Input
+              value={motivo}
+              onChange={(e) => onMotivoChange(e.target.value)}
+              maxLength={2000}
+            />
+          </RequiredField>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Mensa principale</label>
+            <label className="text-sm font-medium">
+              {t("ciclo2Mensa.reference")}
+            </label>
             <Select value={mensaId} onValueChange={onMensaIdChange}>
               <SelectTrigger aria-label="Mensa principale nuova persona">
                 <SelectValue placeholder="Seleziona una Mensa" />
@@ -484,11 +671,18 @@ export function NuovaAbilitazioneMensaFields({
                 Seleziona prima l'Area del beneficiario.
               </p>
             )}
+            {mense.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                {t("ciclo2Mensa.loadError")}
+              </p>
+            )}
             {areaOperativaId != null &&
+              !mense.isError &&
               !mense.isLoading &&
               (mense.data ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Nessuna Mensa attiva accessibile nell'Area Operativa selezionata.
+                  Nessuna Mensa attiva accessibile nell'Area Operativa
+                  selezionata.
                 </p>
               )}
           </div>

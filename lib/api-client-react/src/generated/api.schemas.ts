@@ -9810,6 +9810,13 @@ export interface MensaAbilitazione {
   mensaId: number;
   /** @nullable */
   mensaNome?: string | null;
+  /**
+   * Area stabile del diritto, ricavata dalla Mensa di riferimento
+   * @nullable
+   */
+  areaOperativaId?: number | null;
+  /** @nullable */
+  areaOperativaNome?: string | null;
   dataInizio: string;
   /** @nullable */
   dataFine?: string | null;
@@ -9847,8 +9854,11 @@ export interface MensaAbilitazioneInput {
   /** @nullable */
   dataFine?: string | null;
   mensaPrincipale?: boolean;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
 }
 
 export type MensaStatoInputStato =
@@ -9863,8 +9873,11 @@ export const MensaStatoInputStato = {
 
 export interface MensaStatoInput {
   stato: MensaStatoInputStato;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
   versione: string;
 }
 

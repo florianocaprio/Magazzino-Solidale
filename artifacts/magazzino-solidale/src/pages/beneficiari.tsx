@@ -74,6 +74,7 @@ const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.ob
   mensaId: z.string().optional(),
   mensaDataInizio: z.string().optional(),
   mensaDataFine: z.string().optional(),
+  mensaMotivo: z.string().optional(),
   creditoSolidaleAbilitato: z.boolean().default(false),
   creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
   creditoSolidaleNote: z.string().optional(),
@@ -237,7 +238,7 @@ export default function Beneficiari() {
       cognome: "", nome: "", soprannome: "", codiceFiscale: "", fascicolo: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
-      abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
+      abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "", mensaMotivo: "",
       creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleNote: "",
       magazzinoEmporioPreferitoId: NO_EMPORIO,
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
@@ -317,6 +318,7 @@ export default function Beneficiari() {
       mensaId,
       mensaDataInizio,
       mensaDataFine,
+      mensaMotivo,
       ...rest
     } = data;
     // Un amministratore globale deve scegliere sempre l'Area del nuovo Beneficiario.
@@ -333,6 +335,7 @@ export default function Beneficiari() {
       return;
     }
     if (shouldEnableMensa) {
+      if (!mensaMotivo?.trim()) { form.setError("mensaMotivo", {type:"manual",message:t("common.requiredField")}); return; }
       if (!formAreaOperativa) {
         form.setError("areaOperativaId", { type: "manual", message: "Seleziona l'Area" });
         toast({ title: "Mensa", description: "Seleziona l'Area del beneficiario.", variant: "destructive" });
@@ -383,6 +386,7 @@ export default function Beneficiari() {
                 dataInizio: mensaDataInizio!,
                 dataFine: mensaDataFine || null,
                 mensaPrincipale: true,
+                motivo: mensaMotivo!.trim(),
               },
             });
           }
@@ -960,6 +964,8 @@ export default function Beneficiari() {
                     onMensaIdChange={(value) => form.setValue("mensaId", value)}
                     dataInizio={form.watch("mensaDataInizio") ?? ""}
                     onDataInizioChange={(value) => form.setValue("mensaDataInizio", value)}
+                    motivo={form.watch("mensaMotivo") ?? ""}
+                    onMotivoChange={(value)=>form.setValue("mensaMotivo",value)}
                     dataFine={form.watch("mensaDataFine") ?? ""}
                     onDataFineChange={(value) => form.setValue("mensaDataFine", value)}
                   />
