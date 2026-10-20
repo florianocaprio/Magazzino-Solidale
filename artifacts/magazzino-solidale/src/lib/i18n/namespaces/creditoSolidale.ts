@@ -125,7 +125,7 @@ const it = {
   allineatoAlCalcolo: "Allineata al calcolo",
   motivoModificaQuota: "Motivo modifica quota",
   salvaQuotaAssegnata: "Salva quota assegnata",
-  quotaAssegnataSalvata: "Quota mensile assegnata salvata",
+  quotaAssegnataSalvata: "Quota e configurazione credito salvate",
   quotaAssegnataSaveError: "Impossibile salvare la quota mensile assegnata",
   ultimoMovimento: "Ultimo movimento",
   beneficiario: "Beneficiario",

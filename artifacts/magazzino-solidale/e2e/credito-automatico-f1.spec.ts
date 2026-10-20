@@ -341,4 +341,27 @@ test("C2B: conferma integrata con deroga totale 80, prima quota unica e riapertu
   await card.getByRole("button",{name:"Completa o aggiorna Emporio e credito",exact:true}).click();await expect(d).toContainText("Nessuna nuova prima ricarica");
   await d.getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();await expect(d).not.toBeVisible();expect(await balance(f.beneficiary)).toBe(290);
   expect((await db.query("select count(*)::int n from credito_solidale_movimenti where beneficiario_id=$1 and origine='attivazione_emporio'",[f.beneficiary])).rows[0].n).toBe(1);
+  // One lower button persists configuration and quota together, without movements.
+  const sheet = page.getByRole("dialog", {name:"Modifica anagrafica",exact:true});
+  await sheet.getByLabel("Note Credito Solidale",{exact:true}).fill("Configurazione e quota insieme");
+  await sheet.getByRole("combobox",{name:"Stato Credito Solidale",exact:true}).click();
+  await page.getByRole("option",{name:"Credito Solidale: Sospeso",exact:true}).click();
+  await sheet.getByLabel("Quota mensile assegnata",{exact:true}).fill("90");
+  await sheet.getByLabel(/Motivo modifica quota/).fill("Deroga aggiornata insieme alla configurazione");
+  await sheet.getByRole("button",{name:"Salva quota assegnata",exact:true}).click();
+  await expect(page.getByText("Quota e configurazione credito salvate",{exact:true}).first()).toBeVisible();
+  const readConfig=async()=> (await db.query("select credito_solidale_abilitato,credito_solidale_stato,credito_solidale_note,credito_solidale_mensile_assegnato,credito_solidale_motivo_modifica from beneficiari where id=$1",[f.beneficiary])).rows[0];
+  expect(await readConfig()).toMatchObject({credito_solidale_abilitato:true,credito_solidale_stato:"sospeso",credito_solidale_note:"Configurazione e quota insieme",credito_solidale_mensile_assegnato:"90.00",credito_solidale_motivo_modifica:"Deroga aggiornata insieme alla configurazione"});
+  await sheet.getByRole("switch",{name:"Abilita Credito Solidale",exact:true}).uncheck();
+  await expect(sheet.getByRole("button",{name:"Salva quota assegnata",exact:true})).toBeEnabled();
+  await expect(sheet.getByLabel("Quota mensile assegnata",{exact:true})).toBeDisabled();
+  await sheet.getByRole("button",{name:"Salva quota assegnata",exact:true}).click();
+  await expect.poll(async()=> (await readConfig()).credito_solidale_abilitato).toBe(false);
+  expect(await readConfig()).toMatchObject({credito_solidale_stato:"non_abilitato",credito_solidale_note:"Configurazione e quota insieme",credito_solidale_mensile_assegnato:"90.00"});
+  await page.reload();
+  await page.getByRole("button",{name:"Modifica anagrafica",exact:true}).click();
+  await expect(sheet.getByRole("switch",{name:"Abilita Credito Solidale",exact:true})).not.toBeChecked();
+  await expect(sheet.getByLabel("Note Credito Solidale",{exact:true})).toHaveValue("Configurazione e quota insieme");
+  await expect(sheet.getByLabel("Quota mensile assegnata",{exact:true})).toHaveValue("90");
+  expect(await balance(f.beneficiary)).toBe(290);
 });

@@ -1187,10 +1187,14 @@ function CreditoSolidaleQuotaPanel({
   b,
   enabled,
   emporioAbilitato,
+  configuration,
+  onConfigurationSaved,
 }: {
   b: BeneficiarioDettaglioType;
   enabled: boolean;
   emporioAbilitato: boolean;
+  configuration: Pick<EditValues, "creditoSolidaleStato" | "creditoSolidaleNote">;
+  onConfigurationSaved: (saved: Pick<EditValues, "creditoSolidaleAbilitato" | "creditoSolidaleStato" | "creditoSolidaleNote">) => void;
 }) {
   const { t } = useTranslation();
   const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
@@ -1220,34 +1224,41 @@ function CreditoSolidaleQuotaPanel({
     }
   }, [b.creditoSolidaleMensileAssegnato, suggested]);
 
-  if (!enabled) return null;
-
   const assignedNumber = assegnato === "" ? null : Number(assegnato);
   const isManuale =
     assignedNumber != null && suggested != null
       ? Math.round(assignedNumber * 100) !== Math.round(suggested * 100)
       : b.creditoSolidaleMensileManuale;
   const disabled =
-    !emporioAbilitato ||
-    servizio?.stato !== "attivo" ||
+    (enabled && (!emporioAbilitato || servizio?.stato !== "attivo")) ||
     updateCredito.isPending;
 
   const onSave = () => {
     setQuotaSubmitted(true);
-    if (isManuale && !motivo.trim()) return;
+    if (enabled && isManuale && !motivo.trim()) return;
     updateCredito.mutate(
       {
         beneficiarioId: b.id,
         data: {
           versioneBeneficiario: quotaVersion,
-          creditoSolidaleMensileAssegnato:
-            assegnato === "" ? null : Number(assegnato),
-          creditoSolidaleMensileSuggerito: suggested,
-          creditoSolidaleMotivoModifica: motivo.trim() ? motivo.trim() : null,
+          creditoSolidaleAbilitato: enabled,
+          creditoSolidaleStato: configuration.creditoSolidaleStato,
+          creditoSolidaleNote: configuration.creditoSolidaleNote?.trim() || null,
+          ...(enabled ? {
+            creditoSolidaleMensileAssegnato: assegnato === "" ? null : Number(assegnato),
+            creditoSolidaleMensileSuggerito: suggested,
+            creditoSolidaleMotivoModifica: motivo.trim() || null,
+          } : {}),
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
+          if (saved.versioneBeneficiario != null) setQuotaVersion(saved.versioneBeneficiario);
+          onConfigurationSaved({
+            creditoSolidaleAbilitato: saved.creditoSolidaleAbilitato,
+            creditoSolidaleStato: saved.creditoSolidaleStato,
+            creditoSolidaleNote: saved.creditoSolidaleNote ?? "",
+          });
           queryClient.invalidateQueries({
             queryKey: getGetBeneficiarioQueryKey(b.id),
           });
@@ -1269,7 +1280,7 @@ function CreditoSolidaleQuotaPanel({
   };
 
   return (
-    <CreditoQuotaFields suggested={suggested} value={assegnato} reason={motivo} onValueChange={setAssegnato} onReasonChange={setMotivo} disabled={disabled} submitted={quotaSubmitted}>
+    <CreditoQuotaFields suggested={suggested} value={assegnato} reason={motivo} onValueChange={setAssegnato} onReasonChange={setMotivo} disabled={disabled || !enabled} submitted={quotaSubmitted && enabled}>
       <div className="flex justify-end"><Button type="button" onClick={onSave} disabled={disabled}>{t("creditoSolidale.salvaQuotaAssegnata")}</Button></div>
     </CreditoQuotaFields>
   );
@@ -1556,6 +1567,8 @@ export function EditBeneficiarioSheet({
 
   const watchUds = form.watch("uds");
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
+  const creditoSolidaleStato = form.watch("creditoSolidaleStato");
+  const creditoSolidaleNote = form.watch("creditoSolidaleNote");
   const centroAscoltoIdSelezionato = form.watch("centroAscoltoId");
   const centroAscoltoMancantePerCredito =
     creditoSolidaleAbilitato &&
@@ -2237,6 +2250,16 @@ export function EditBeneficiarioSheet({
                     b={b}
                     enabled={creditoSolidaleAbilitato}
                     emporioAbilitato={emporioAbilitato}
+                    configuration={{
+                      creditoSolidaleStato,
+                      creditoSolidaleNote,
+                    }}
+                    onConfigurationSaved={(saved) => {
+                      const submitted = { creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleNote };
+                      for (const key of ["creditoSolidaleAbilitato", "creditoSolidaleStato", "creditoSolidaleNote"] as const) {
+                        if (form.getValues(key) === submitted[key]) form.resetField(key, { defaultValue: saved[key] });
+                      }
+                    }}
                   />
                 </fieldset>
               )}
