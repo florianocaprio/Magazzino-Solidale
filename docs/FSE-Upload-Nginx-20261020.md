@@ -28,6 +28,16 @@ Codice realmente installato **`448ab5d4df75b9307f871b8ea1cb63f9a8485c3b`**, comp
 
 ## File modificati e prova manuale
 
+### Propagazione al rilascio Hetzner
+
+La configurazione è **versionata**, non una modifica manuale del container: commit tecnico `448ab5d4df75b9307f871b8ea1cb63f9a8485c3b`, pubblicato sul branch `codex/bugfix-uat-ottobre-2026`. `Dockerfile.web` copia `nginx.conf` in `/etc/nginx/conf.d/default.conf` nell’immagine finale.
+
+Al rilascio Hetzner, includere questo commit nel candidato approvato e distribuire l’immagine WEB costruita da quel candidato. Il solo aggiornamento dei sorgenti o il riavvio di una vecchia immagine non aggiorna Nginx. Non serve ricreare a mano la correzione sul server.
+
+Verificare nel container WEB la configurazione effettiva con `nginx -T`: nella location `/api/` deve comparire `client_max_body_size 10m;`. Completare il controllo del rilascio con l’anteprima di un Massivo da circa 5 MB dal dominio pubblico, senza confermare l’importazione. Questa prova comprende eventuali proxy esterni al container, non verificati dall’installazione locale sulla 8082. Le evidenze già registrate si riferiscono al candidato locale; il presente aggiornamento documentale non richiede di ripetere le suite applicative né attesta un rilascio su Hetzner.
+
+### Inventario e prova sulla 8082
+
 - `nginx.conf`: due righe per il limite upload API.
 - `docs/FSE-Upload-Nginx-20261020.md`: questo resoconto.
 - `docs/campagna-bug-2026-10.md`: versione corrente e collegamento alla ricevuta.
