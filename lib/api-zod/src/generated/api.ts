@@ -9932,6 +9932,16 @@ export const ListInterventiQueryParams = zod.object({
     .describe(
       "Filtra gli interventi in base ai Bisogni Pianificati collegati.",
     ),
+  tipoBisogno: zod
+    .enum(["richiesta", "azione"])
+    .optional()
+    .describe(
+      "Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.",
+    ),
+  zonaUdsId: zod.coerce
+    .number()
+    .optional()
+    .describe("Zona storica dell'incontro; richiede ambito UDS."),
   stato: zod
     .enum([
       "da_pianificare",
@@ -10228,6 +10238,16 @@ export const ListInterventiPaginaQueryParams = zod.object({
     .describe(
       "Filtra gli interventi in base ai Bisogni Pianificati collegati.",
     ),
+  tipoBisogno: zod
+    .enum(["richiesta", "azione"])
+    .optional()
+    .describe(
+      "Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.",
+    ),
+  zonaUdsId: zod.coerce
+    .number()
+    .optional()
+    .describe("Zona storica dell'incontro; richiede ambito UDS."),
   stato: zod
     .enum([
       "da_pianificare",
@@ -13306,6 +13326,134 @@ export const GetEmporioAbilitazioniRiepilogoBeneficiariResponseItem =
 export const GetEmporioAbilitazioniRiepilogoBeneficiariResponse = zod.array(
   GetEmporioAbilitazioniRiepilogoBeneficiariResponseItem,
 );
+
+/**
+ * @summary Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
+ */
+export const GetEmporioCreditoAnteprimaParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const getEmporioCreditoAnteprimaQueryPoliticaCreditoSolidaleIdRegExp =
+  new RegExp("^(auto|[1-9][0-9]\*)$");
+
+export const GetEmporioCreditoAnteprimaQueryParams = zod.object({
+  politicaCreditoSolidaleId: zod.coerce
+    .string()
+    .regex(getEmporioCreditoAnteprimaQueryPoliticaCreditoSolidaleIdRegExp)
+    .optional()
+    .describe(
+      "Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.",
+    ),
+});
+
+export const GetEmporioCreditoAnteprimaResponse = zod.object({
+  beneficiarioId: zod.number(),
+  versioneBeneficiario: zod.number(),
+  calcoloToken: zod.string(),
+  areaNome: zod.string(),
+  politicaNome: zod.string(),
+  politicaCreditoSolidaleId: zod.number().nullable(),
+  politicheDisponibili: zod.array(
+    zod.object({
+      id: zod.number(),
+      nome: zod.string(),
+      ambito: zod.enum(["centro", "area", "globale"]),
+    }),
+  ),
+  totaleSuggerito: zod.number(),
+  quotaMensileAssegnata: zod.number(),
+  motivoModificaQuota: zod.string().nullish(),
+  primaQuotaAmmessa: zod.boolean(),
+});
+
+/**
+ * @summary Attivazione atomica Emporio, credito e prima quota; stessa chiave e contenuto restituiscono la ricevuta, mismatch 409.
+ */
+export const AttivaEmporioCreditoParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const attivaEmporioCreditoBodyIdempotencyKeyMax = 120;
+
+export const attivaEmporioCreditoBodyCalcoloTokenMin = 64;
+export const attivaEmporioCreditoBodyCalcoloTokenMax = 64;
+
+export const attivaEmporioCreditoBodyMotivoMax = 1000;
+
+export const attivaEmporioCreditoBodyQuotaMensileAssegnataMin = 0;
+export const attivaEmporioCreditoBodyQuotaMensileAssegnataMax = 99999999;
+
+export const attivaEmporioCreditoBodyMotivoModificaQuotaMax = 10000;
+
+export const AttivaEmporioCreditoBody = zod.object({
+  idempotencyKey: zod
+    .string()
+    .min(1)
+    .max(attivaEmporioCreditoBodyIdempotencyKeyMax),
+  versioneBeneficiario: zod.number().min(1),
+  calcoloToken: zod
+    .string()
+    .min(attivaEmporioCreditoBodyCalcoloTokenMin)
+    .max(attivaEmporioCreditoBodyCalcoloTokenMax),
+  motivo: zod.string().min(1).max(attivaEmporioCreditoBodyMotivoMax),
+  quotaMensileAssegnata: zod
+    .number()
+    .min(attivaEmporioCreditoBodyQuotaMensileAssegnataMin)
+    .max(attivaEmporioCreditoBodyQuotaMensileAssegnataMax)
+    .nullish(),
+  politicaCreditoSolidaleId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.",
+    ),
+  motivoModificaQuota: zod
+    .string()
+    .max(attivaEmporioCreditoBodyMotivoModificaQuotaMax)
+    .nullish(),
+});
+
+export const AttivaEmporioCreditoResponse = zod.object({
+  beneficiarioId: zod.number(),
+  politicaCreditoSolidaleId: zod.number().nullish(),
+  politicaNome: zod.string().optional(),
+  quotaMensile: zod.number(),
+  quotaAccreditata: zod.number(),
+  primaQuotaValutata: zod.boolean(),
+  periodo: zod.string(),
+  movimentoId: zod.number().nullable(),
+  stato: zod.string(),
+});
+
+/**
+ * @summary Recupera l'esito con rivalidazione di entrambi i permessi, moduli, attore e territorio.
+ */
+export const GetEmporioCreditoAttivazioneEsitoParams = zod.object({
+  beneficiarioId: zod.coerce.number(),
+});
+
+export const getEmporioCreditoAttivazioneEsitoQueryIdempotencyKeyMax = 120;
+
+export const GetEmporioCreditoAttivazioneEsitoQueryParams = zod.object({
+  idempotencyKey: zod.coerce
+    .string()
+    .min(1)
+    .max(getEmporioCreditoAttivazioneEsitoQueryIdempotencyKeyMax),
+});
+
+export const GetEmporioCreditoAttivazioneEsitoResponse = zod.object({
+  beneficiarioId: zod.number(),
+  politicaCreditoSolidaleId: zod.number().nullish(),
+  politicaNome: zod.string().optional(),
+  quotaMensile: zod.number(),
+  quotaAccreditata: zod.number(),
+  primaQuotaValutata: zod.boolean(),
+  periodo: zod.string(),
+  movimentoId: zod.number().nullable(),
+  stato: zod.string(),
+});
 
 export const GetEmporioAbilitazioneParams = zod.object({
   beneficiarioId: zod.coerce.number(),
@@ -19267,6 +19415,13 @@ export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleM
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax = 99999999;
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
+  versioneBeneficiario: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.",
+    ),
   politicaCreditoSolidaleId: zod
     .number()
     .min(1)
@@ -19302,6 +19457,7 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
 
 export const UpdateCreditoSolidaleBeneficiarioConfigurazioneResponse =
   zod.object({
+    versioneBeneficiario: zod.number().optional(),
     politicaCreditoSolidaleId: zod
       .number()
       .min(1)
@@ -22590,7 +22746,8 @@ export const ReportUdsInterventiPerMeseResponse = zod.array(
 );
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 export const ReportUdsInterventiGiornalieriQueryParams = zod.object({
   da: zod.coerce
@@ -22615,6 +22772,32 @@ export const ReportUdsInterventiGiornalieriResponseItem = zod.object({
   zonaNome: zod.string().nullish(),
   dataIntervento: zod.string(),
   tipoIntervento: zod.string(),
+  stato: zod
+    .enum([
+      "da_pianificare",
+      "pianificato",
+      "in_corso",
+      "concluso",
+      "annullato",
+      "mancata_presentazione",
+    ])
+    .describe("Stato canonico del ciclo di vita dell'intervento."),
+  bisogniPianificati: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        tipo: zod.enum(["richiesta", "azione"]),
+        descrizione: zod.string(),
+        stato: zod.string(),
+        dataPrevista: zod.string().nullish(),
+        priorita: zod.string(),
+        note: zod.string().nullish(),
+        dataCompletamento: zod.string().nullish(),
+      }),
+    )
+    .describe(
+      "Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro.",
+    ),
   descrizione: zod.string().nullish(),
   note: zod.string().nullish(),
   noteUds: zod.string().nullish(),
@@ -23017,6 +23200,11 @@ export const ListMensaAbilitazioniResponseItem = zod.object({
   beneficiarioCodice: zod.string().nullish(),
   mensaId: zod.number(),
   mensaNome: zod.string().nullish(),
+  areaOperativaId: zod
+    .number()
+    .nullish()
+    .describe("Area stabile del diritto, ricavata dalla Mensa di riferimento"),
+  areaOperativaNome: zod.string().nullish(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
@@ -23030,13 +23218,15 @@ export const ListMensaAbilitazioniResponse = zod.array(
   ListMensaAbilitazioniResponseItem,
 );
 
+export const createMensaAbilitazioneBodyMotivoMax = 2000;
+
 export const CreateMensaAbilitazioneBody = zod.object({
   beneficiarioId: zod.number(),
   mensaId: zod.number(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   mensaPrincipale: zod.boolean().optional(),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(createMensaAbilitazioneBodyMotivoMax),
 });
 
 /**
@@ -23070,9 +23260,11 @@ export const UpdateMensaAbilitazioneStatoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateMensaAbilitazioneStatoBodyMotivoMax = 2000;
+
 export const UpdateMensaAbilitazioneStatoBody = zod.object({
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(updateMensaAbilitazioneStatoBodyMotivoMax),
   versione: zod.coerce.date(),
 });
 
@@ -23083,6 +23275,11 @@ export const UpdateMensaAbilitazioneStatoResponse = zod.object({
   beneficiarioCodice: zod.string().nullish(),
   mensaId: zod.number(),
   mensaNome: zod.string().nullish(),
+  areaOperativaId: zod
+    .number()
+    .nullish()
+    .describe("Area stabile del diritto, ricavata dalla Mensa di riferimento"),
+  areaOperativaNome: zod.string().nullish(),
   dataInizio: zod.coerce.date(),
   dataFine: zod.coerce.date().nullish(),
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
@@ -23124,9 +23321,11 @@ export const UpdateTesseraBeneficiarioStatoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateTesseraBeneficiarioStatoBodyMotivoMax = 2000;
+
 export const UpdateTesseraBeneficiarioStatoBody = zod.object({
   stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
-  motivo: zod.string().nullish(),
+  motivo: zod.string().min(1).max(updateTesseraBeneficiarioStatoBodyMotivoMax),
   versione: zod.coerce.date(),
 });
 

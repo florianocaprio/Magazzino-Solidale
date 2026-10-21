@@ -13,6 +13,9 @@ export interface MensaAbilitazioneInput {
   /** @nullable */
   dataFine?: Date | null;
   mensaPrincipale?: boolean;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
 }

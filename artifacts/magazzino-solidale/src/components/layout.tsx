@@ -389,8 +389,8 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/uds/report-giornaliero",
     icon: CalendarClock,
     groupKey: "uds",
-    area: "uds",
-    moduloCodice: "UDS",
+    area: "analisi",
+    moduloCodiciAll: ["UDS", "REPORT"],
     permission: "uds.reports.view",
   },
 

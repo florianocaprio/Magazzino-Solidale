@@ -1,3 +1,4 @@
+import { EmporioCreditoActivationDialog } from "@/components/emporio-credito-activation-dialog";
 import { operationalCentroId } from "@/lib/service-scope";
 import i18n from "@/lib/i18n";
 import { registerBlocco04 } from "@/lib/i18n/namespaces/blocco04";
@@ -36,7 +37,7 @@ import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
-import { getEmporioAbilitazione, useUpdateEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey, useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
+import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey, useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
 import { EmporioStatusBadge } from "@/components/beneficiario-emporio-card";
 import { emporioReadableData, useEmporioSecurity } from "@/hooks/use-emporio-security";
 import { createBeneficiarioWithOptionalServices, type BeneficiarioServicesResult } from "@/lib/beneficiario-mensa-workflow";
@@ -73,6 +74,7 @@ const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.ob
   mensaId: z.string().optional(),
   mensaDataInizio: z.string().optional(),
   mensaDataFine: z.string().optional(),
+  mensaMotivo: z.string().optional(),
   creditoSolidaleAbilitato: z.boolean().default(false),
   creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
   creditoSolidaleNote: z.string().optional(),
@@ -163,7 +165,7 @@ export default function Beneficiari() {
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
   const canViewEmporio = emporioAbilitato && hasPermission("beneficiari.view");
   const emporioSecurity = useEmporioSecurity();
-  const canManageEmporio = emporioAbilitato && isModuloAttivo("EMPORIO_SOLIDALE") && hasPermission("emporio.eligibility.manage") && (user?.isAdmin || hasArea("sociale"));
+  const canManageEmporio = emporioAbilitato && isModuloAttivo("EMPORIO_SOLIDALE") && hasPermission("emporio.eligibility.manage") && hasPermission("credito.quota.manage") && (user?.isAdmin || hasArea("sociale"));
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
   const canManage = hasPermission("beneficiari.manage");
   const canDeactivate = hasPermission("beneficiari.deactivate");
@@ -209,7 +211,7 @@ export default function Beneficiari() {
 
   const createBeneficiario = useCreateBeneficiario();
   const createMensaAbilitazione = useCreateMensaAbilitazione();
-  const updateEmporio = useUpdateEmporioAbilitazione();
+  const [activationRequest,setActivationRequest]=useState<{id:number;motivo:string;resolve:()=>void;reject:(error:Error)=>void}|null>(null);
   const saving = useRef(false);
   const [savingServices, setSavingServices] = useState(false);
   const [postCreate, setPostCreate] = useState<BeneficiarioServicesResult<Awaited<ReturnType<typeof createBeneficiario.mutateAsync>>> | null>(null);
@@ -236,7 +238,7 @@ export default function Beneficiari() {
       cognome: "", nome: "", soprannome: "", codiceFiscale: "", fascicolo: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
-      abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
+      abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "", mensaMotivo: "",
       creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleNote: "",
       magazzinoEmporioPreferitoId: NO_EMPORIO,
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
@@ -316,6 +318,7 @@ export default function Beneficiari() {
       mensaId,
       mensaDataInizio,
       mensaDataFine,
+      mensaMotivo,
       ...rest
     } = data;
     // Un amministratore globale deve scegliere sempre l'Area del nuovo Beneficiario.
@@ -332,6 +335,7 @@ export default function Beneficiari() {
       return;
     }
     if (shouldEnableMensa) {
+      if (!mensaMotivo?.trim()) { form.setError("mensaMotivo", {type:"manual",message:t("common.requiredField")}); return; }
       if (!formAreaOperativa) {
         form.setError("areaOperativaId", { type: "manual", message: "Seleziona l'Area" });
         toast({ title: "Mensa", description: "Seleziona l'Area del beneficiario.", variant: "destructive" });
@@ -382,14 +386,13 @@ export default function Beneficiari() {
                 dataInizio: mensaDataInizio!,
                 dataFine: mensaDataFine || null,
                 mensaPrincipale: true,
+                motivo: mensaMotivo!.trim(),
               },
             });
           }
           : undefined,
         createEmporioAbilitazione: shouldEnableEmporio ? async (beneficiarioId) => {
-          const existing = await getEmporioAbilitazione(beneficiarioId);
-          if (existing.statoEffettivo === "attivo") return;
-          return updateEmporio.mutateAsync({ beneficiarioId, data: { stato: "attivo", motivo: emporioMotivo!.trim() } });
+          await new Promise<void>((resolve,reject)=>setActivationRequest({id:beneficiarioId,motivo:emporioMotivo!.trim(),resolve,reject}));
         } : undefined,
       });
       savedResult = result;
@@ -440,6 +443,9 @@ export default function Beneficiari() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {activationRequest && <EmporioCreditoActivationDialog key={activationRequest.id} beneficiarioId={activationRequest.id} motivo={activationRequest.motivo}
+        onClose={()=>{activationRequest.reject(new Error(t("ciclo2Credito.cancelled")));setActivationRequest(null);}}
+        onComplete={()=>{activationRequest.resolve();setActivationRequest(null);}}/>}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("beneficiari.title")}</h1>
@@ -958,6 +964,8 @@ export default function Beneficiari() {
                     onMensaIdChange={(value) => form.setValue("mensaId", value)}
                     dataInizio={form.watch("mensaDataInizio") ?? ""}
                     onDataInizioChange={(value) => form.setValue("mensaDataInizio", value)}
+                    motivo={form.watch("mensaMotivo") ?? ""}
+                    onMotivoChange={(value)=>form.setValue("mensaMotivo",value)}
                     dataFine={form.watch("mensaDataFine") ?? ""}
                     onDataFineChange={(value) => form.setValue("mensaDataFine", value)}
                   />

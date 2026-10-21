@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   historyHook: vi.fn(),
   menseHook: vi.fn(),
   createMutate: vi.fn(),
+  updateMutate: vi.fn(),
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
   toast: vi.fn(),
 }));
@@ -36,12 +37,29 @@ vi.mock("@workspace/api-client-react", () => ({
     mocks.menseHook(params, options);
     return { data: mocks.mense, isLoading: false };
   },
+  useUpdateMensaAbilitazioneStato: () => ({
+    mutate: mocks.updateMutate,
+    isPending: false,
+  }),
   useCreateMensaAbilitazione: () => ({
     mutate: mocks.createMutate,
     isPending: false,
   }),
 }));
 
+vi.mock("react-i18next", async () => {
+  const { ciclo2Mensa } = await import("@/lib/i18n/namespaces/ciclo2Mensa");
+  return {
+    useTranslation: () => ({
+      t: (key: string, params?: { area?: string }) =>
+        (
+          ciclo2Mensa.it[
+            key.replace("ciclo2Mensa.", "") as keyof typeof ciclo2Mensa.it
+          ] ?? key
+        ).replace("{{area}}", params?.area ?? ""),
+    }),
+  };
+});
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     hasArea: (area: string) => mocks.areas.has(area),
@@ -147,6 +165,7 @@ describe("Mensa nella scheda Beneficiario", () => {
     mocks.historyError = false;
     mocks.mense = [{ id: 12, nome: "Mensa Roma", attiva: true }];
     mocks.createMutate.mockReset();
+    mocks.updateMutate.mockReset();
     mocks.invalidateQueries.mockClear();
     mocks.toast.mockClear();
     mocks.historyHook.mockClear();
@@ -299,6 +318,16 @@ describe("Mensa nella scheda Beneficiario", () => {
     const confirm = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Conferma abilitazione"),
     );
+    const reason = document.querySelector(
+      '[role="dialog"] input:not([type="date"])',
+    ) as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(reason, "Nuova abilitazione motivata");
+      reason.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     await act(async () => confirm?.click());
 
     expect(mocks.createMutate).toHaveBeenCalledWith(
@@ -309,15 +338,83 @@ describe("Mensa nella scheda Beneficiario", () => {
           dataInizio: todayEuropeRome(),
           dataFine: null,
           mensaPrincipale: true,
+          motivo: "Nuova abilitazione motivata",
         },
       },
       expect.any(Object),
     );
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["mensa-abilitazioni", { beneficiarioId: 42 }],
+      predicate: expect.any(Function),
     });
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Beneficiario abilitato alla Mensa",
+      description: expect.stringContaining("Mensa di riferimento"),
     });
+  });
+  it("permette la provvisoria attiva, ma richiede la motivazione", async () => {
+    mocks.permissions.add("mensa.eligibility.manage");
+    await act(async () =>
+      root.render(
+        <BeneficiarioMensaSection
+          beneficiario={{ ...beneficiario, statoAnagrafica: "provvisoria" }}
+          compact
+        />,
+      ),
+    );
+    const button = (name: string) =>
+      Array.from(document.querySelectorAll("button")).find(
+        (b) => b.textContent === name,
+      )!;
+    await act(async () => button("Abilita alla Mensa").click());
+    await act(async () => button("Mensa Roma").click());
+    await act(async () => button("Conferma abilitazione").click());
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-invalid="true"]')).not.toBeNull();
+  });
+  it("varia lo stato con versione e motivo; conserva input e mostra il 409", async () => {
+    mocks.permissions.add("mensa.eligibility.manage");
+    mocks.history = [
+      {
+        ...activeEligibility,
+        motivo: "Motivo storico",
+        areaOperativaId: 1,
+        areaOperativaNome: "Roma",
+      },
+    ];
+    await renderSection();
+    expect(document.body.textContent).toContain("Area Roma");
+    expect(document.body.textContent).toContain("Motivo storico");
+    const suspend = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent === "Sospendi Mensa",
+    )!;
+    await act(async () => suspend.click());
+    expect(mocks.updateMutate).not.toHaveBeenCalled();
+    const input = document.querySelector("input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(input, "Sospensione motivata");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    mocks.updateMutate.mockImplementation((_input, opts) =>
+      opts.onError({ data: { error: "Conflitto: ricarica i dati" } }),
+    );
+    await act(async () => suspend.click());
+    expect(mocks.updateMutate).toHaveBeenCalledWith(
+      {
+        id: 7,
+        data: {
+          stato: "sospesa",
+          motivo: "Sospensione motivata",
+          versione: activeEligibility.versione,
+        },
+      },
+      expect.any(Object),
+    );
+    expect(input.value).toBe("Sospensione motivata");
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+      "Conflitto",
+    );
   });
 });

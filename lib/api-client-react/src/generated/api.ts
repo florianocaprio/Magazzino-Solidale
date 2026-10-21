@@ -182,6 +182,9 @@ import type {
   EmporioAbilitazione,
   EmporioAbilitazioneInput,
   EmporioAbilitazioneRiepilogoBeneficiario,
+  EmporioCreditoAnteprima,
+  EmporioCreditoAttivazioneInput,
+  EmporioCreditoAttivazioneResult,
   EmporioOperativo,
   EnteDestinatario,
   EnteDestinatarioInput,
@@ -230,6 +233,8 @@ import type {
   GetCreditoSolidaleRicaricaMensileStato200,
   GetDocumentoOperativoRichiesta200,
   GetEmporioAbilitazioniRiepilogoBeneficiariParams,
+  GetEmporioCreditoAnteprimaParams,
+  GetEmporioCreditoAttivazioneEsitoParams,
   GetFseReportingPreviewParams,
   GetInterventiRiepilogoVisteParams,
   GetMapsConsegneParams,
@@ -19902,6 +19907,345 @@ export function useGetEmporioAbilitazioniRiepilogoBeneficiari<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+export const getGetEmporioCreditoAnteprimaUrl = (
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito?${stringifiedParams}`
+    : `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`;
+};
+
+/**
+ * @summary Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
+ */
+export const getEmporioCreditoAnteprima = async (
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+  options?: RequestInit,
+): Promise<EmporioCreditoAnteprima> => {
+  return customFetch<EmporioCreditoAnteprima>(
+    getGetEmporioCreditoAnteprimaUrl(beneficiarioId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmporioCreditoAnteprimaQueryKey = (
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+) => {
+  return [
+    `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmporioCreditoAnteprimaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
+  TError = ErrorType<unknown>,
+>(
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetEmporioCreditoAnteprimaQueryKey(beneficiarioId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>
+  > = ({ signal }) =>
+    getEmporioCreditoAnteprima(beneficiarioId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!beneficiarioId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmporioCreditoAnteprimaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>
+>;
+export type GetEmporioCreditoAnteprimaQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
+ */
+
+export function useGetEmporioCreditoAnteprima<
+  TData = Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
+  TError = ErrorType<unknown>,
+>(
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAnteprimaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmporioCreditoAnteprima>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmporioCreditoAnteprimaQueryOptions(
+    beneficiarioId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getAttivaEmporioCreditoUrl = (beneficiarioId: number) => {
+  return `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito`;
+};
+
+/**
+ * @summary Attivazione atomica Emporio, credito e prima quota; stessa chiave e contenuto restituiscono la ricevuta, mismatch 409.
+ */
+export const attivaEmporioCredito = async (
+  beneficiarioId: number,
+  emporioCreditoAttivazioneInput: EmporioCreditoAttivazioneInput,
+  options?: RequestInit,
+): Promise<EmporioCreditoAttivazioneResult> => {
+  return customFetch<EmporioCreditoAttivazioneResult>(
+    getAttivaEmporioCreditoUrl(beneficiarioId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(emporioCreditoAttivazioneInput),
+    },
+  );
+};
+
+export const getAttivaEmporioCreditoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attivaEmporioCredito>>,
+    TError,
+    { beneficiarioId: number; data: BodyType<EmporioCreditoAttivazioneInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attivaEmporioCredito>>,
+  TError,
+  { beneficiarioId: number; data: BodyType<EmporioCreditoAttivazioneInput> },
+  TContext
+> => {
+  const mutationKey = ["attivaEmporioCredito"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attivaEmporioCredito>>,
+    { beneficiarioId: number; data: BodyType<EmporioCreditoAttivazioneInput> }
+  > = (props) => {
+    const { beneficiarioId, data } = props ?? {};
+
+    return attivaEmporioCredito(beneficiarioId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttivaEmporioCreditoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attivaEmporioCredito>>
+>;
+export type AttivaEmporioCreditoMutationBody =
+  BodyType<EmporioCreditoAttivazioneInput>;
+export type AttivaEmporioCreditoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Attivazione atomica Emporio, credito e prima quota; stessa chiave e contenuto restituiscono la ricevuta, mismatch 409.
+ */
+export const useAttivaEmporioCredito = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attivaEmporioCredito>>,
+    TError,
+    { beneficiarioId: number; data: BodyType<EmporioCreditoAttivazioneInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof attivaEmporioCredito>>,
+  TError,
+  { beneficiarioId: number; data: BodyType<EmporioCreditoAttivazioneInput> },
+  TContext
+> => {
+  return useMutation(getAttivaEmporioCreditoMutationOptions(options));
+};
+
+export const getGetEmporioCreditoAttivazioneEsitoUrl = (
+  beneficiarioId: number,
+  params: GetEmporioCreditoAttivazioneEsitoParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito/esito?${stringifiedParams}`
+    : `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito/esito`;
+};
+
+/**
+ * @summary Recupera l'esito con rivalidazione di entrambi i permessi, moduli, attore e territorio.
+ */
+export const getEmporioCreditoAttivazioneEsito = async (
+  beneficiarioId: number,
+  params: GetEmporioCreditoAttivazioneEsitoParams,
+  options?: RequestInit,
+): Promise<EmporioCreditoAttivazioneResult> => {
+  return customFetch<EmporioCreditoAttivazioneResult>(
+    getGetEmporioCreditoAttivazioneEsitoUrl(beneficiarioId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmporioCreditoAttivazioneEsitoQueryKey = (
+  beneficiarioId: number,
+  params?: GetEmporioCreditoAttivazioneEsitoParams,
+) => {
+  return [
+    `/api/emporio/beneficiari/${beneficiarioId}/attivazione-credito/esito`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmporioCreditoAttivazioneEsitoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>,
+  TError = ErrorType<void>,
+>(
+  beneficiarioId: number,
+  params: GetEmporioCreditoAttivazioneEsitoParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetEmporioCreditoAttivazioneEsitoQueryKey(beneficiarioId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>
+  > = ({ signal }) =>
+    getEmporioCreditoAttivazioneEsito(beneficiarioId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!beneficiarioId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmporioCreditoAttivazioneEsitoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>
+>;
+export type GetEmporioCreditoAttivazioneEsitoQueryError = ErrorType<void>;
+
+/**
+ * @summary Recupera l'esito con rivalidazione di entrambi i permessi, moduli, attore e territorio.
+ */
+
+export function useGetEmporioCreditoAttivazioneEsito<
+  TData = Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>,
+  TError = ErrorType<void>,
+>(
+  beneficiarioId: number,
+  params: GetEmporioCreditoAttivazioneEsitoParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmporioCreditoAttivazioneEsito>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmporioCreditoAttivazioneEsitoQueryOptions(
+    beneficiarioId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
 export const getGetEmporioAbilitazioneUrl = (beneficiarioId: number) => {
   return `/api/emporio/beneficiari/${beneficiarioId}/abilitazione`;
 };
@@ -36575,7 +36919,8 @@ export const getReportUdsInterventiGiornalieriUrl = (
 };
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 export const reportUdsInterventiGiornalieri = async (
   params: ReportUdsInterventiGiornalieriParams,
@@ -36636,7 +36981,7 @@ export type ReportUdsInterventiGiornalieriQueryResult = NonNullable<
 export type ReportUdsInterventiGiornalieriQueryError = ErrorType<unknown>;
 
 /**
- * @summary UDS street interventions for a day or date range, with per-person sequence number
+ * @summary UDS operational detail, current linked needs and absolute per-person sequence
  */
 
 export function useReportUdsInterventiGiornalieri<

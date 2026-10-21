@@ -852,7 +852,9 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
   });
 
   it("aggiorna esplicitamente nascita, codice fiscale e riepilogo per età dal Massivo; conserva i componenti e nasconde il replay invariato", async () => {
-    const target = await insertBeneficiary({ nome: "Persona", cognome: "Massiva", numComponenti: 1 });
+    const target = await insertBeneficiary({ nome: "Persona", cognome: "Massiva", numComponenti: 1,
+      creditoSolidaleAbilitato:true, creditoSolidaleStato:"attivo", creditoSolidaleMensileAssegnato:"80",
+      creditoSolidaleMensileManuale:true, creditoSolidaleMotivoModifica:"Deroga precedente FSE",creditoSolidaleSaldo:"33" });
     const buffer = massivoFixture({ CodiceFascicolo: `MASS-UPDATE-${suffix}` });
     const options = { buffer, filename: "Elenco_Fascicoli_Sociali_Massivo.xlsm", dataRiferimento: "2026-10-20" };
     const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [], options);
@@ -863,6 +865,9 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     expect(linked.body).toMatchObject({ collegati: 1, errori: 0 });
     const [after] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
     expect(after).toMatchObject({ codiceFiscale: "RSSMRA90A01H501U", dataNascita: "1990-01-01", sesso: "F", numComponenti: 3, numMinori: 1, numAnziani: 1, numDisabili: 1, versione: target.versione + 1 });
+    expect(after.creditoSolidaleMensileManuale).toBe(false);
+    expect(after.creditoSolidaleMotivoModifica).toBeNull();
+    expect(Number(after.creditoSolidaleSaldo)).toBe(33);
     // A complete, real local member is retained even when aggregate totals change.
     const [member] = await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Reale", dataNascita: "2015-01-01", sesso: "M" }).returning();
     await db.insert(nucleoFamiliareTable).values({ beneficiarioId: target.id, nome: "Componente", cognome: "Anziano", dataNascita: "1950-01-01", sesso: "F" });

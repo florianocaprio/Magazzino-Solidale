@@ -1,5 +1,18 @@
 export const udsInterventi = {
   it: {
+    clearPerson: "Azzera persona",
+    needType: "Tipo bisogno",
+    request: "Richiesta",
+    action: "Azione pianificata",
+    applyFilters: "Applica filtri",
+    identifyPerson: "Identifica la persona",
+    chooseArea: "Seleziona un’Area per consultare il registro.",
+    loadError: "Impossibile caricare i dati. Riprova.",
+    pageInfo: "Pagina {{page}} · {{total}} interventi",
+    previous: "Precedente",
+    next: "Successiva",
+    exportLimit: "Oltre 10.000 interventi: restringi i filtri.",
+
     title: "Interventi UDS",
     subtitle:
       "Registra gli interventi di strada e stampa lo storico per persona.",
@@ -109,6 +122,19 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Prossima: {{date}}",
   },
   es: {
+    clearPerson: "Quitar persona",
+    needType: "Tipo de necesidad",
+    request: "Solicitud",
+    action: "Acción planificada",
+    applyFilters: "Aplicar filtros",
+    identifyPerson: "Identificar persona",
+    chooseArea: "Selecciona un Área para consultar el registro.",
+    loadError: "No se pueden cargar los datos. Reintenta.",
+    pageInfo: "Página {{page}} · {{total}} intervenciones",
+    previous: "Anterior",
+    next: "Siguiente",
+    exportLimit: "Más de 10.000 intervenciones: limita los filtros.",
+
     title: "Intervenciones UDS",
     subtitle:
       "Registra las intervenciones de calle e imprime el historial por persona.",
@@ -218,6 +244,19 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Próxima: {{date}}",
   },
   en: {
+    clearPerson: "Clear person",
+    needType: "Need type",
+    request: "Request",
+    action: "Planned action",
+    applyFilters: "Apply filters",
+    identifyPerson: "Identify person",
+    chooseArea: "Select an Area to view the register.",
+    loadError: "Unable to load data. Try again.",
+    pageInfo: "Page {{page}} · {{total}} interventions",
+    previous: "Previous",
+    next: "Next",
+    exportLimit: "Over 10,000 interventions: narrow filters.",
+
     title: "Street Unit Interventions",
     subtitle: "Record street interventions and print the history per person.",
     selectPerson: "Person",
@@ -323,6 +362,19 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Next: {{date}}",
   },
   fr: {
+    clearPerson: "Effacer la personne",
+    needType: "Type de besoin",
+    request: "Demande",
+    action: "Action planifiée",
+    applyFilters: "Appliquer les filtres",
+    identifyPerson: "Identifier la personne",
+    chooseArea: "Sélectionnez une zone pour consulter le registre.",
+    loadError: "Chargement impossible. Réessayez.",
+    pageInfo: "Page {{page}} · {{total}} interventions",
+    previous: "Précédente",
+    next: "Suivante",
+    exportLimit: "Plus de 10 000 interventions : réduisez les filtres.",
+
     title: "Interventions UDS",
     subtitle:
       "Enregistrez les interventions de rue et imprimez l'historique par personne.",
@@ -430,6 +482,19 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Prochaine : {{date}}",
   },
   de: {
+    clearPerson: "Person zurücksetzen",
+    needType: "Bedarfsart",
+    request: "Anfrage",
+    action: "Geplante Aktion",
+    applyFilters: "Filter anwenden",
+    identifyPerson: "Person identifizieren",
+    chooseArea: "Wählen Sie ein Gebiet für das Register.",
+    loadError: "Daten konnten nicht geladen werden. Erneut versuchen.",
+    pageInfo: "Seite {{page}} · {{total}} Einsätze",
+    previous: "Zurück",
+    next: "Weiter",
+    exportLimit: "Über 10.000 Einsätze: Filter eingrenzen.",
+
     title: "UDS-Maßnahmen",
     subtitle:
       "Erfassen Sie Straßeneinsätze und drucken Sie den Verlauf pro Person.",
@@ -536,6 +601,19 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Nächste: {{date}}",
   },
   ar: {
+    clearPerson: "مسح الشخص",
+    needType: "نوع الاحتياج",
+    request: "طلب",
+    action: "إجراء مخطط",
+    applyFilters: "تطبيق المرشحات",
+    identifyPerson: "تحديد الشخص",
+    chooseArea: "حدد منطقة لعرض السجل.",
+    loadError: "تعذر تحميل البيانات. حاول مجددًا.",
+    pageInfo: "صفحة {{page}} · {{total}} تدخلات",
+    previous: "السابق",
+    next: "التالي",
+    exportLimit: "أكثر من 10000 تدخل: ضيق المرشحات.",
+
     title: "تدخلات وحدة الشارع",
     subtitle: "سجّل تدخلات الشارع واطبع السجل لكل شخص.",
     selectPerson: "الشخص",

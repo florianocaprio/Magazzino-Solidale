@@ -82,6 +82,7 @@ registerBlocco04(i18n);
 const NO_ZONE = "__none__";
 const NO_CENTRO = "__nocentro__";
 const NO_FASCIA_ETA = "__non_determinata__";
+const KEEP_ORIGIN = "__keep_origin__";
 
 function makeSchema(t: (key: string) => string, isGlobal: boolean) {
   return z
@@ -153,6 +154,7 @@ export interface UdsPersonaSelection {
 
 interface UdsPersonaSheetProps {
   open: boolean;
+  selectionMode?: boolean;
   onOpenChange: (open: boolean) => void;
   initialAreaOperativaId?: number | null;
   initialZonaUdsId?: number | null;
@@ -217,10 +219,12 @@ export function UdsPersonaSheet({
   initialAreaOperativaId,
   initialZonaUdsId,
   onPersonReady,
+  selectionMode = false,
 }: UdsPersonaSheetProps) {
   const [, navigate] = useLocation();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const canManage = !selectionMode || Boolean(user?.isAdmin || user?.isSuperAdmin || user?.permessi?.includes("beneficiari.manage"));
   const canViewSensitive = Boolean(
     user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"),
   );
@@ -237,6 +241,8 @@ export function UdsPersonaSheet({
   const [linkCandidate, setLinkCandidate] = useState<
     BeneficiarioSimile | UdsLinkCandidateItem | null
   >(null);
+  const [linkError, setLinkError] = useState("");
+  useEffect(() => setLinkError(""), [linkCandidate?.id]);
   const [dupDismissed, setDupDismissed] = useState(false);
   const [existingSearch, setExistingSearch] = useState("");
   const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
@@ -380,7 +386,7 @@ export function UdsPersonaSheet({
     page: 1,
     limit: 20,
   };
-  const { data: directoryMatches, isFetching: isDirectoryFetching } =
+  const { data: directoryMatches, isFetching: isDirectoryFetching, isError: directoryError } =
     useListUdsDirectory(directoryParams, {
       query: {
         queryKey: getListUdsDirectoryQueryKey(directoryParams),
@@ -395,13 +401,18 @@ export function UdsPersonaSheet({
   const {
     data: linkCandidateMatches,
     isFetching: isLinkCandidatesFetching,
+    isError: linkCandidatesError,
   } = useListUdsLinkCandidates(linkCandidateParams, {
     query: {
       queryKey: getListUdsLinkCandidatesQueryKey(linkCandidateParams),
       enabled:
-        open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+        canManage && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
     },
   });
+  const lookupFailed = selectionMode && (directoryError || (canManage && linkCandidatesError));
+  const operationScope = JSON.stringify([open, user, selectedAreaOperativa]);
+  const latestOperationScope = useRef(operationScope);
+  latestOperationScope.current = operationScope;
   const minimizedMatchIds = new Set([
     ...(directoryMatches ?? []).map((item) => item.id),
     ...(linkCandidateMatches ?? []).map((item) => item.id),
@@ -460,6 +471,8 @@ export function UdsPersonaSheet({
   };
 
   const confirmLinkToUds = () => {
+    if (!canManage || lookupFailed || updateBenef.isPending) return;
+    const scope = latestOperationScope.current;
     const suggestion = linkCandidate;
     if (!suggestion) return;
     const zonaValue = form.getValues("zonaUdsId");
@@ -469,6 +482,7 @@ export function UdsPersonaSheet({
         : (user?.zonaUdsId ?? null);
     const areaProvenienza = form.getValues("areaProvenienza")?.trim();
     const dataNascita = form.getValues("dataNascita")?.trim();
+    setLinkError("");
     updateBenef.mutate(
       {
         id: suggestion.id,
@@ -486,6 +500,7 @@ export function UdsPersonaSheet({
       },
       {
         onSuccess: (linked) => {
+          if (selectionMode && scope !== latestOperationScope.current) return;
           queryClient.invalidateQueries({
             queryKey: getListBeneficiariQueryKey(),
           });
@@ -493,9 +508,11 @@ export function UdsPersonaSheet({
           finish(linked, "linked");
         },
         onError: (err) => {
+          const message = extractError(err, t("common.requiredField"));
+          setLinkError(message);
           toast({
             title: t("udsAnagrafica.newTitle"),
-            description: extractError(err, t("common.requiredField")),
+            description: message,
             variant: "destructive",
           });
         },
@@ -504,6 +521,8 @@ export function UdsPersonaSheet({
   };
 
   const onSubmit = (data: FormValues) => {
+    if (!canManage || lookupFailed || createBenef.isPending) return;
+    const scope = latestOperationScope.current;
     if (
       !dupDismissed &&
       (dupDebouncing ||
@@ -569,6 +588,7 @@ export function UdsPersonaSheet({
       { data: payload as never },
       {
         onSuccess: (created) => {
+          if (selectionMode && scope !== latestOperationScope.current) return;
           queryClient.invalidateQueries({
             queryKey: getListBeneficiariQueryKey(),
           });
@@ -605,7 +625,7 @@ export function UdsPersonaSheet({
       >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{t("udsAnagrafica.newTitle")}</SheetTitle>
+            <SheetTitle>{t(selectionMode ? "udsInterventi.identifyPerson" : "udsAnagrafica.newTitle")}</SheetTitle>
             <SheetDescription className="sr-only">
               {t("udsAnagrafica.existingSearchHint")}
             </SheetDescription>
@@ -822,7 +842,7 @@ export function UdsPersonaSheet({
                               size="sm"
                               variant="outline"
                               onClick={() => handleLinkCandidate(suggestion)}
-                              disabled={updateBenef.isPending}
+                              disabled={updateBenef.isPending || !canManage}
                             >
                               {t("udsAnagrafica.dupAdd")}
                             </Button>
@@ -883,7 +903,7 @@ export function UdsPersonaSheet({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleSuggestion(suggestion)}
-                                disabled={updateBenef.isPending}
+                                disabled={updateBenef.isPending || !canManage}
                               >
                                 {isUds
                                   ? t("udsAnagrafica.dupSelect")
@@ -1349,11 +1369,12 @@ export function UdsPersonaSheet({
                   >
                     {t("common.cancel")}
                   </Button>
+                  {lookupFailed && <p role="alert" className="text-destructive">{t("udsInterventi.loadError")}</p>}
                   <Button
                     type="submit"
                     className="min-h-11 min-w-28"
                     disabled={
-                      createBenef.isPending ||
+                      !canManage || lookupFailed || createBenef.isPending ||
                       (!dupDismissed &&
                         (dupDebouncing ||
                           isDupFetching ||
@@ -1383,7 +1404,7 @@ export function UdsPersonaSheet({
           if (!dialogOpen) setLinkCandidate(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t("udsAnagrafica.dupConfirmTitle")}
@@ -1396,11 +1417,68 @@ export function UdsPersonaSheet({
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {t("udsAnagrafica.linkMissingDataHint")}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="uds-link-origin">
+              {t("beneficiarioDettaglio.areaProvenienza")}
+            </Label>
+            <Select
+              value={form.watch("areaProvenienza") || KEEP_ORIGIN}
+              onValueChange={(value) => form.setValue("areaProvenienza", value === KEEP_ORIGIN ? "" : value)}
+              disabled={updateBenef.isPending}
+            >
+              <SelectTrigger id="uds-link-origin">
+                <SelectValue placeholder={t("udsAnagrafica.linkKeepRegistered")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={KEEP_ORIGIN}>{t("udsAnagrafica.linkKeepRegistered")}</SelectItem>
+                <SelectItem value="UE">UE</SelectItem>
+                <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="uds-link-birth">{t("udsAnagrafica.fDataNascita")}</Label>
+            <Input
+              id="uds-link-birth"
+              type="date"
+              max={todayDateOnly()}
+              value={wDataNascita || ""}
+              onChange={(event) => form.setValue("dataNascita", event.target.value)}
+              disabled={updateBenef.isPending}
+            />
+          </div>
+          {!wDataNascita && (
+            <div className="space-y-2">
+              <Label htmlFor="uds-link-age">{t("udsAnagrafica.fasciaEtaLabel")}</Label>
+              <Select
+                value={wFasciaEtaPresunta || NO_FASCIA_ETA}
+                onValueChange={(value) => form.setValue("fasciaEtaPresunta", value)}
+                disabled={updateBenef.isPending}
+              >
+                <SelectTrigger id="uds-link-age">
+                  <SelectValue placeholder={t("udsAnagrafica.linkKeepRegistered")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FASCIA_ETA}>{t("udsAnagrafica.linkKeepRegistered")}</SelectItem>
+                  {FASCE_ETA_PRESUNTE.map((fascia) => (
+                    <SelectItem key={fascia} value={fascia}>{fasciaEtaLabel(t, fascia)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {linkError && <p role="alert" className="text-sm text-destructive">{linkError}</p>}
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmLinkToUds}
-              disabled={updateBenef.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmLinkToUds();
+              }}
+              disabled={updateBenef.isPending || !canManage}
             >
               {t("udsAnagrafica.dupConfirmAction")}
             </AlertDialogAction>

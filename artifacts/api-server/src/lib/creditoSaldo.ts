@@ -75,6 +75,8 @@ export async function appendCreditTx(
     motivo: string;
     note?: string | null;
     periodo?: string;
+    origine?: "attivazione_emporio" | "scheduler_mensile";
+    politicaId?: number | null;
     command: AuditCommandContext;
   },
 ) {
@@ -106,7 +108,8 @@ export async function appendCreditTx(
       note: input.note ?? null,
       periodoRiferimento: input.periodo ?? null,
       quotaMensileAssegnata: input.periodo ? String(delta) : null,
-      origine: input.periodo ? "scheduler_mensile" : "manuale",
+      origine: input.origine ?? (input.periodo ? "scheduler_mensile" : "manuale"),
+      politicaCreditoSolidaleId: input.politicaId ?? null,
       operatoreId:
         input.command.actor.actorType === "user"
           ? input.command.actor.actorUserId
@@ -123,7 +126,7 @@ export async function appendCreditTx(
     .where(eq(beneficiariTable.id, b.id));
   await recordAuditEvent(tx, {
     command: input.command,
-    azione: input.periodo
+    azione: input.origine === "attivazione_emporio" ? "CREDITO_PRIMA_QUOTA" : input.periodo
       ? "CREDITO_RICARICA_MENSILE"
       : "CREDITO_SALDO_RETTIFICATO",
     entitaTipo: "credito_solidale_movimento",

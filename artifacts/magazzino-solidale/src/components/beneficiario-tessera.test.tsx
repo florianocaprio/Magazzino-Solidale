@@ -125,6 +125,7 @@ vi.mock("@workspace/api-client-react", () => ({
     mutate: createCardMutate,
     isPending: false,
   }),
+  useUpdateMensaAbilitazioneStato: () => ({mutate:vi.fn(),isPending:false}),
   useCreateMensaAbilitazione: () => ({ mutate: vi.fn(), isPending: false }),
   useListMensaAbilitazioni: () => ({
     data: [],

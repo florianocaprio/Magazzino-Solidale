@@ -1,3 +1,4 @@
+import { CreditoQuotaFields } from "@/components/credito-quota-fields";
 import { UdsServiceStates, UdsTerritoryFields, TesseraDocumentoSection, invalidateBeneficiarioTerritory } from "@/components/beneficiario-uds-tools";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { udsDirectoryReturnPath } from "@/lib/uds-persona-context";
@@ -599,6 +600,7 @@ export default function BeneficiarioDettaglio() {
               queryKey: getListBeneficiariQueryKey(),
             });
             void invalidateBeneficiarioTerritory(queryClient);
+            void queryClient.invalidateQueries({queryKey:getCalcolaCreditoSolidaleBeneficiarioQueryKey(numId)});
             toast({ title: t("beneficiarioDettaglio.toastUpdated") });
             setEditing(false);
           }}
@@ -869,11 +871,7 @@ export default function BeneficiarioDettaglio() {
                 <NucleoSection
                   b={b}
                   canManage={udsContext && canManage}
-                  onChanged={() =>
-                    queryClient.invalidateQueries({
-                      queryKey: getGetBeneficiarioQueryKey(numId),
-                    })
-                  }
+                  onChanged={() => { void queryClient.invalidateQueries({predicate:q=>/\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0]))}); }}
                 />
               </TabsContent>
 
@@ -1126,6 +1124,7 @@ function CreditoSolidaleCalcoloPanel({
         </p>
       ) : data ? (
         <div className="space-y-2 text-sm">
+          <div className="flex items-start justify-between gap-3"><span className="text-muted-foreground">{t("creditoSolidale.politicaApplicata")}</span><span className="text-right font-medium">{data.politicaNome}</span></div>
           {[
             [
               "creditoSolidale.creditoBaseNucleo",
@@ -1188,10 +1187,14 @@ function CreditoSolidaleQuotaPanel({
   b,
   enabled,
   emporioAbilitato,
+  configuration,
+  onConfigurationSaved,
 }: {
   b: BeneficiarioDettaglioType;
   enabled: boolean;
   emporioAbilitato: boolean;
+  configuration: Pick<EditValues, "creditoSolidaleStato" | "creditoSolidaleNote">;
+  onConfigurationSaved: (saved: Pick<EditValues, "creditoSolidaleAbilitato" | "creditoSolidaleStato" | "creditoSolidaleNote">) => void;
 }) {
   const { t } = useTranslation();
   const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
@@ -1212,6 +1215,8 @@ function CreditoSolidaleQuotaPanel({
   );
   const [motivo, setMotivo] = useState(b.creditoSolidaleMotivoModifica ?? "");
   const [quotaSubmitted, setQuotaSubmitted] = useState(false);
+  const [quotaVersion,setQuotaVersion] = useState(b.versione);
+  useEffect(()=>{setQuotaVersion(b.versione);setAssegnato(b.creditoSolidaleMensileAssegnato==null?String(suggested??""):String(b.creditoSolidaleMensileAssegnato));setMotivo(b.creditoSolidaleMotivoModifica??"");},[b.versione]);
 
   useEffect(() => {
     if (b.creditoSolidaleMensileAssegnato == null && suggested != null) {
@@ -1219,39 +1224,46 @@ function CreditoSolidaleQuotaPanel({
     }
   }, [b.creditoSolidaleMensileAssegnato, suggested]);
 
-  if (!enabled) return null;
-
   const assignedNumber = assegnato === "" ? null : Number(assegnato);
   const isManuale =
     assignedNumber != null && suggested != null
       ? Math.round(assignedNumber * 100) !== Math.round(suggested * 100)
       : b.creditoSolidaleMensileManuale;
   const disabled =
-    !emporioAbilitato ||
-    servizio?.stato !== "attivo" ||
+    (enabled && (!emporioAbilitato || servizio?.stato !== "attivo")) ||
     updateCredito.isPending;
 
   const onSave = () => {
     setQuotaSubmitted(true);
-    if (isManuale && !motivo.trim()) return;
+    if (enabled && isManuale && !motivo.trim()) return;
     updateCredito.mutate(
       {
         beneficiarioId: b.id,
         data: {
-          creditoSolidaleMensileAssegnato:
-            assegnato === "" ? null : Number(assegnato),
-          creditoSolidaleMensileSuggerito: suggested,
-          creditoSolidaleMotivoModifica: motivo.trim() ? motivo.trim() : null,
+          versioneBeneficiario: quotaVersion,
+          creditoSolidaleAbilitato: enabled,
+          creditoSolidaleStato: configuration.creditoSolidaleStato,
+          creditoSolidaleNote: configuration.creditoSolidaleNote?.trim() || null,
+          ...(enabled ? {
+            creditoSolidaleMensileAssegnato: assegnato === "" ? null : Number(assegnato),
+            creditoSolidaleMensileSuggerito: suggested,
+            creditoSolidaleMotivoModifica: motivo.trim() || null,
+          } : {}),
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
+          if (saved.versioneBeneficiario != null) setQuotaVersion(saved.versioneBeneficiario);
+          onConfigurationSaved({
+            creditoSolidaleAbilitato: saved.creditoSolidaleAbilitato,
+            creditoSolidaleStato: saved.creditoSolidaleStato,
+            creditoSolidaleNote: saved.creditoSolidaleNote ?? "",
+          });
           queryClient.invalidateQueries({
             queryKey: getGetBeneficiarioQueryKey(b.id),
           });
-          queryClient.invalidateQueries({
-            queryKey: getListBeneficiariQueryKey(),
-          });
+          queryClient.invalidateQueries({queryKey:getCalcolaCreditoSolidaleBeneficiarioQueryKey(b.id)});
+          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
           toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
         },
         onError: (e) =>
@@ -1268,79 +1280,9 @@ function CreditoSolidaleQuotaPanel({
   };
 
   return (
-    <div className="rounded-md border bg-background p-3 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h5 className="text-sm font-medium">
-            {t("creditoSolidale.quotaMensileAssegnata")}
-          </h5>
-          <p className="text-xs text-muted-foreground">
-            {t("creditoSolidale.suggeritoDalCalcolo")}:{" "}
-            {formatCreditoQuota(suggested)}
-          </p>
-        </div>
-        <Badge
-          variant="outline"
-          className={
-            isManuale
-              ? "bg-amber-500/10 text-amber-700"
-              : "bg-emerald-500/10 text-emerald-700"
-          }
-        >
-          {isManuale
-            ? t("creditoSolidale.modificatoManualmente")
-            : t("creditoSolidale.allineatoAlCalcolo")}
-        </Badge>
-      </div>
-      {!emporioAbilitato && (
-        <p className="text-xs text-muted-foreground">
-          {EMPORIO_DISABLED_MESSAGE}
-        </p>
-      )}
-      <div className="space-y-2">
-        <label className="text-sm font-medium leading-none">
-          {t("creditoSolidale.quotaMensileAssegnata")}
-        </label>
-        <Input
-          type="number"
-          min="0"
-          step="1"
-          value={assegnato}
-          onChange={(event) => setAssegnato(event.target.value)}
-          disabled={disabled}
-        />
-      </div>
-      {isManuale ? (
-        <RequiredField
-          label={t("creditoSolidale.motivoModificaQuota")}
-          missing={quotaSubmitted && !motivo.trim()}
-        >
-          <Textarea
-            rows={2}
-            value={motivo}
-            onChange={(event) => setMotivo(event.target.value)}
-            disabled={disabled}
-          />
-        </RequiredField>
-      ) : (
-        <div className="space-y-2">
-          <label className="text-sm font-medium leading-none">
-            {t("creditoSolidale.motivoModificaQuota")}
-          </label>
-          <Textarea
-            rows={2}
-            value={motivo}
-            onChange={(event) => setMotivo(event.target.value)}
-            disabled={disabled}
-          />
-        </div>
-      )}
-      <div className="flex justify-end">
-        <Button type="button" onClick={onSave} disabled={disabled}>
-          {t("creditoSolidale.salvaQuotaAssegnata")}
-        </Button>
-      </div>
-    </div>
+    <CreditoQuotaFields suggested={suggested} value={assegnato} reason={motivo} onValueChange={setAssegnato} onReasonChange={setMotivo} disabled={disabled || !enabled} submitted={quotaSubmitted && enabled}>
+      <div className="flex justify-end"><Button type="button" onClick={onSave} disabled={disabled}>{t("creditoSolidale.salvaQuotaAssegnata")}</Button></div>
+    </CreditoQuotaFields>
   );
 }
 
@@ -1625,6 +1567,8 @@ export function EditBeneficiarioSheet({
 
   const watchUds = form.watch("uds");
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
+  const creditoSolidaleStato = form.watch("creditoSolidaleStato");
+  const creditoSolidaleNote = form.watch("creditoSolidaleNote");
   const centroAscoltoIdSelezionato = form.watch("centroAscoltoId");
   const centroAscoltoMancantePerCredito =
     creditoSolidaleAbilitato &&
@@ -2297,17 +2241,6 @@ export function EditBeneficiarioSheet({
                       </FormItem>
                     )}
                   />
-                  <Button type="button" variant="outline" disabled={updateCredito.isPending || !emporioAbilitato} onClick={async () => {
-                    try {
-                      await updateCredito.mutateAsync({ beneficiarioId: b.id, data: {
-                        creditoSolidaleAbilitato: form.getValues("creditoSolidaleAbilitato"),
-                        creditoSolidaleStato: form.getValues("creditoSolidaleAbilitato") ? form.getValues("creditoSolidaleStato") : "non_abilitato",
-                        creditoSolidaleNote: form.getValues("creditoSolidaleNote") || null,
-                      } });
-                      await queryClient.invalidateQueries({ predicate: (q) => /\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0])) });
-                      toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
-                    } catch (cause) { toast({ title: t("beneficiarioDettaglio.error"), description: apiErrorMessage(cause, t("creditoSolidale.calculateError")), variant: "destructive" }); }
-                  }}>{t("creditoSolidale.saveConfiguration")}</Button>
                   <CreditoSolidaleCalcoloPanel
                     b={b}
                     enabled={creditoSolidaleAbilitato && emporioAbilitato}
@@ -2317,6 +2250,16 @@ export function EditBeneficiarioSheet({
                     b={b}
                     enabled={creditoSolidaleAbilitato}
                     emporioAbilitato={emporioAbilitato}
+                    configuration={{
+                      creditoSolidaleStato,
+                      creditoSolidaleNote,
+                    }}
+                    onConfigurationSaved={(saved) => {
+                      const submitted = { creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleNote };
+                      for (const key of ["creditoSolidaleAbilitato", "creditoSolidaleStato", "creditoSolidaleNote"] as const) {
+                        if (form.getValues(key) === submitted[key]) form.resetField(key, { defaultValue: saved[key] });
+                      }
+                    }}
                   />
                 </fieldset>
               )}
@@ -2415,7 +2358,7 @@ export function EditBeneficiarioSheet({
             {onReplaceTessera && <Button type="button" variant="outline" onClick={onReplaceTessera}>Sostituisci tessera</Button>}
             {hasPermission("credito.view") && <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />}
             {hasPermission("beneficiari.fse.view") && <BeneficiarioFseCard beneficiarioId={b.id} canManage={hasPermission("beneficiari.fse.manage")} />}
-            {hasPermission("beneficiari.sensitive.view") && <NucleoSection b={b} canManage={hasPermission("beneficiari.manage")} onChanged={() => { void queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) }); }} />}
+            {hasPermission("beneficiari.sensitive.view") && <NucleoSection b={b} canManage={hasPermission("beneficiari.manage")} onChanged={() => { void queryClient.invalidateQueries({ predicate:q=>/\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0])) }); }} />}
             {hasPermission("emporio.access.manage") && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo" && servizio?.statoEffettivo === "attivo" && <Button asChild><Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>{t("accessiEmporio.pianificaDaBeneficiario")}</Link></Button>}
           </div>}
         </div>

@@ -2722,3 +2722,405 @@ Test finali 09: corretti esclusivamente otto spec browser rimasti su flussi prec
 
 
 Prosecuzione 09: FSE/replay e suite successive hanno evidenziato ulteriori fixture/selettori precedenti alle decisioni UAT. Il rapporto finale traccia quattordici spec E2E adeguati, lasciando applicazione/API/schema invariati. Ripetizioni complete più recenti: Richieste contestuali 10 PASS, Turni/Maps 10 PASS, residui Mensa 15 PASS, sessioni UDS fra Aree 5 PASS. I cicli CI con KO non vengono dichiarati positivi; nuovo checkpoint sottoposto ai gate completi e prosecuzione delle ultime regressioni locali.
+
+## Ciclo 2 — avvio, BUG 22–26 — 20/10/2026
+
+### Continuità, base e mandato
+
+Floriano conferma il funzionamento su Hetzner del primo ciclo e richiede il primo prompt della cartella BUG 5 con ricompilazione della 8082. Attivato **soltanto `00_Avvio_Ciclo_2.txt`**: preparazione del contesto e del registro, nessuna correzione applicativa C2A/C2B/C2C iniziata. La ricompilazione locale è autorizzata direttamente dal messaggio; nessun nuovo merge o deploy produttivo autorizzato da questo incarico.
+
+- Repository: `https://github.com/florianocaprio/Magazzino-Solidale`.
+- Base effettiva: `main d9d34d72178faa56b5c75e80642e883899750dd7`, merge della PR #28; albero `7e8f4ca2d7f218dd23dcda1375dba715a6f2e1ad`, identico al candidato finale del primo ciclo `b956f9329322558d26d316631f94f3aebd0ed3f7`.
+- Branch unico nuovo: `codex/bugfix-ciclo2-ottobre-2026`, creato dalla main verificata. Il branch precedente è già integrato; nessun ritorno alla vecchia baseline `f668b7e`.
+- Candidato applicativo iniziale: la base main sopra indicata. Il checkpoint di avvio modifica soltanto questo registro; nessuna correzione dei BUG 22–26 è ancora sviluppata.
+- Primo ciclo: UAT 01–08 confermate, gate finali e merge completati. Floriano conferma ora anche la prova produttiva. Rilascio Hetzner già eseguito su `d9d34d7`: API/WEB con revision label, 63 migration applicate senza anomalie, prova di ripristino reale. Ricevuta locale `docs/BUG09-Rilascio-Hetzner-20261020.md`, documento preesistente non incluso nello staging di avvio.
+- Conservati cinque documenti locali non tracciati, incluso il rapporto Hetzner; nessuna modifica ai loro contenuti. Nessuna suite applicativa mutativa sulla 8082 o in produzione.
+
+Letti i prompt 00, C2A, C2B, C2C e LEGGIMI del pacchetto. `SPECIFICA_CICLO_2.txt`, citata dagli stessi file, non è presente né nella cartella BUG 5 né fra i file del percorso `Desktop/Magazzino/Bug`; non ricostruita come documento originale. I requisiti e i criteri dettagliati dei tre prompt consentono questo avvio senza blocco. La loro lettura non attiva lo sviluppo. Nessuna skill aggiuntiva necessaria per questa ricognizione documentale.
+
+### Decisioni e conservazione del primo ciclo
+
+| Decisione | Stato e significato |
+| --- | --- |
+| D2-01 | Confermata nel prompt 00: Tipo bisogno = Richiesta/Azione pianificata (`richiesta`/`azione`), separato da stato e tipo intervento. |
+| D2-02 | Confermata: Altro credito riusa Quota mensile assegnata con motivazione; 60 suggeriti e 80 assegnati significano 80 totali. Nessun nuovo extra, Rettifica o selettore individuale introdotto per soddisfare questo requisito. |
+| D2-03 | Confermata: una variazione effettiva rilevante del nucleo interrompe la deroga, anche se il totale calcolato resta uguale; salvataggi identici o campi estranei la conservano. Saldi e movimenti maturati invariati. |
+| D01–D04 | Conferme del primo ciclo conservate, incluse la precisazione sulle pratiche Aperte e la gestione Enti globali. Nessuna domanda riaperta. |
+
+Il codice corrente comprende il selettore individuale di politica richiesto e approvato da Floriano nel primo ciclo, successivo alla baseline studiata dal pacchetto. In avvio viene conservato. In C2B il resolver e il riuso della quota vanno valutati sul codice effettivo, senza rimuovere silenziosamente una funzione già approvata né aggiungere un secondo selettore. Conservati contesto CdA/UDS, tessera, Centro/Zona e viste UDS di sola lettura del BUG 21.
+
+### Consegne e criteri da verificare
+
+| BUG | Consegna | Stato | Criteri da soddisfare | Commit/test/UAT nuovi |
+| --- | --- | --- | --- | --- |
+| 22 | C2A — Interventi UDS | DA SVILUPPARE | BUG22-01–07: identificazione integrata, filtri opzionali/applicati, date e snapshot, paginazione, azioni di riga, scope. | Nessuno; UAT non svolta. |
+| 23 | C2A — Report operativo/PDF | DA SVILUPPARE | BUG23-01–06: incontro distinto, contenuti separati, bisogni batch, stato corrente, PDF completo, autorizzazioni storiche. | Nessuno; UAT non svolta. |
+| 24 | C2B — Attivazione Emporio/credito | DA SVILUPPARE | BUG24-01–05: comando integrato atomico, prima quota unica, quota totale motivata, ricevuta/idempotenza, permessi. | Nessuno; UAT non svolta. |
+| 25 | C2B — Ricalcolo mensile/nucleo | DA SVILUPPARE | BUG25-01–06: motore unico, cambio nucleo e writer, deroga, concorrenza, calendario/coorte, nessuna retroattività. | Nessuno; UAT non svolta. |
+| 26 | C2C — Mensa nell'Area | DA SVILUPPARE | BUG26-01–12: diritto ordinario multi-sede della stessa Area, catena scan/pasto, unicità, scope, azioni CdA e soli stati UDS. | Nessuno; UAT non svolta. |
+
+C2A, C2B e C2C sono **DA SVILUPPARE**. Nessuna modifica a contratti, generati, schema o migration in questo avvio. Un solo registro; tre consegne funzionali con UAT di Floriano. `04_TEST_Riutilizzabile.txt` e `05_MERGE_Finale.txt` restano incarichi distinti non attivati.
+
+### Ricognizione tecnica circoscritta
+
+Manifest/workflow confermano React/Vite/TypeScript, Express, PostgreSQL/Drizzle, Node 24 e pnpm 10.34.5. Workflow qualità su PR/main, nessun deploy. Canonici `scripts/quality-gates-run.mjs`, `scripts/quality-gates-plan.mjs` e `.github/workflows/quality-gates.yml`; nessun allentamento dei gate o delle guardie.
+
+Delta pertinente dalla baseline del pacchetto: UdsPersonaSheet conserva le modifiche del primo ciclo; card Emporio/Mensa e route credito comprendono abilitazione/contesto e politica individuale. Registro UDS, report giornaliero e job mensile non risultano modificati dal primo ciclo nei punti indicati: riferimenti dei prompt da confermare durante ogni sviluppo, senza presumere i nuovi BUG già risolti.
+
+8082 identificata prima della ricompilazione: progetto `magazzino-solidale`, API `magazzino-api`, WEB `magazzino-web`, PostgreSQL `magazzino-postgres` (porta host 5434). API/WEB su candidato primo ciclo `b956f93`, albero identico alla nuova main; volumi `magazzino-solidale_magazzino_pgdata` e `magazzino-solidale_magazzino_uploads`. Catena Compose recuperata dalle label effettive, senza sostituirla con il solo file base. Le ricevute della ricompilazione di avvio seguiranno qui; non rappresentano implementazione o UAT del Ciclo 2.
+
+### Ricevuta avvio e ricompilazione 8082
+
+API/WEB ricompilate da archivio Git esatto della base `d9d34d72178faa56b5c75e80642e883899750dd7`, installazione frozen prevista dai Dockerfile e build riuscite. API `magazzino-bugfix-uat-api:sha-d9d34d72178f`, ID `sha256:26508edc010c9a05fecadd8de41feda6c71ac45d96ae0a0a08359a323c81c0b9`; WEB `magazzino-bugfix-uat-web:sha-d9d34d72178f`, ID `sha256:cd0ef0bf48d6413a685dfd757ff7e86c8440af747afeb2aa85e83b355dc4163f`. Revision label e asset JS/CSS effettivamente serviti verificati. Budget iniziale **387,9/400 KiB gzip**.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-AVVIO-d9d34d72178f-2026-10-20T19-27-24-425Z`: dump DB e uploads con SHA256 e indici verificati, ripristino reale su PostgreSQL effimero isolato e replay canonico **63→63** riusciti, nessun dato modificato. Ricreati solo API/WEB sulla catena Compose effettiva; PostgreSQL conserva ID/avvio/volume, uploads conserva il volume. Confrontate **45 tabelle**, impronte identiche prima/dopo. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Nginx conserva limite upload 10 MB. Ricevuta privata `/private/tmp/ciclo2-avvio-release-result.json`.
+
+Produzione ricontrollata esclusivamente tramite metadati SSH: API/WEB con revision `d9d34d7` e immagini coincidenti con il rilascio precedente; nessuna modifica remota in questo incarico. Nessun typecheck o suite applicativa estesa rieseguiti per il solo aggiornamento documentale, come richiesto dal prompt 00; build, budget, restore e controlli di rilascio sopra sono esecuzioni reali. Nessun nuovo contratto o migration. Nessun impedimento concreto all'avvio C2A; specifica separata mancante registrata come limite documentale, senza inventarne il contenuto.
+
+**PRONTO PER C2A.** Si attende l'incarico `01_Interventi_Report_UDS.txt`; nessuna UAT o implementazione del secondo ciclo è dichiarata conclusa e nessun nuovo merge/produzione è avviato.
+
+## Ciclo 2 — C2A, Interventi e report UDS — 20/10/2026
+
+Floriano attiva `01_Interventi_Report_UDS.txt` e richiede esplicitamente la ricompilazione della 8082. Il mandato comprende questa installazione personale, senza avviare C2B/C2C, merge o produzione. Base di avvio `1d8e1f1`, branch `codex/bugfix-ciclo2-ottobre-2026`; cinque documenti locali preesistenti preservati e non inclusi nel commit. Il file SPECIFICA separato resta assente; requisiti e criteri completi sono quelli del prompt C2A letto integralmente.
+
+BUG22 e BUG23 **IN SVILUPPO / verifiche conclusive**. Persona facoltativa nei filtri e persona dell'intervento separate; Nuovo intervento avvia l'identificazione UdsPersonaSheet e poi il form sullo stesso ID. Riuso/collegamento/creazione conservano i percorsi e i permessi esistenti. La toolbar non contiene Nuova persona; ricerca con filtri applicati esplicitamente (anche Invio), periodo giorno/intervallo, tipo richiesta/azione e stato dei bisogni distinti. Rettifica/Nota/Bisogni operano sulla riga selezionata, con versione e invalidazione delle liste/dettagli/report pertinenti. Pagine server da 50 righe, esportazioni che recuperano tutte le pagine, con limite esplicito 10.000 e controllo di cambiamento totale/duplicazione durante il recupero.
+
+Il registro UDS filtra `dataIntervento` civile Europe/Rome e Zona/Area snapshot; ordine data decrescente e ID decrescente. Sociale conserva la propria semantica temporale. Tipo e stato devono corrispondere allo stesso bisogno, senza moltiplicare gli interventi; tipo+nessuno produce 400 comprensibile. Una persona riassegnata non riclassifica incontri preesistenti.
+
+Il report dedicato `/uds/report-giornaliero` mantiene un record per incontro, numero storico personale assoluto e scope storico (Zona vincolante inclusa). Una singola query SQL seleziona prima gli incontri autorizzati e aggrega solo i relativi bisogni, nella stessa lettura coerente. Proiezione esplicita, senza dossier o dati finanziari. Piani futuri conservati; stato corrente al momento della generazione dichiarato. Distinti Sintesi, Materiale, Note operative e Richieste/Azioni; materiale assente indicato come non registrato. Stessa mappatura per UI e PDF, schede mobile, contenuti lunghi su più pagine e numerazione PDF. Nessuna scrittura inventariale.
+
+Allineati accesso e navigazione frontend del report ai guard backend: Area Analisi, permesso `uds.reports.view`, moduli UDS+REPORT. Nessun nuovo grant, nessun obbligo `uds.interventi.view` per il report. Errori/revoca nascondono i dati e disabilitano export; lettura fresca e rivalidazione finale prima del download. Report oltre 10.000 incontri respinto con 413 esplicito, senza file parziali.
+
+### Contratto e file coinvolti
+
+Nessuna migration o variazione dello schema DB. OpenAPI: nuovi filtri opzionali `tipoBisogno` e `zonaUdsId` su elenco/pagina Interventi; DTO giornaliero esteso con stato e bisogni minimizzati. Client React/Zod rigenerati tramite comando canonico, senza modifiche manuali ai generati.
+
+- API: `routes/interventi.ts`, `routes/report.ts`.
+- UI: `pages/uds-interventi.tsx`, `pages/uds-report-giornaliero.tsx`, `components/uds-persona-sheet.tsx`, `App.tsx`, `components/layout.tsx`.
+- Contenuto/PDF: `lib/uds-report-content.ts`, `lib/uds-report-pdf.ts`; namespace `udsInterventi.ts`, `udsReportGiornaliero.ts` (sei lingue).
+- Test API: `interventi-uds-area-operativa-scope.test.ts`, `report-uds-giornaliero.test.ts`, allowlist additiva del solo giornaliero in `reporting-m66-security.test.ts`.
+- Test UI: `uds-interventi-hardening.test.tsx`, nuovi `uds-report-content.test.ts`, `uds-report-pdf.test.ts`, `uds-report-giornaliero.test.tsx`. Browser `e2e/uds-workflows.spec.ts` adattato al passaggio di identificazione, con controllo del report e piano futuro.
+- Contratti: `lib/api-spec/openapi.yaml` e generati sotto `lib/api-client-react/src/generated`, `lib/api-zod/src/generated`.
+
+### Criteri ed evidenze
+
+BUG22-01–03: identificazione esplicita senza filtro, stesso ID al retry, toolbar e applicazione filtri coperti dalle prove UI. BUG22-04–05: data civile distinta dalla conclusione, Zona storica distinta da quella attuale, tipo/stato sullo stesso bisogno e 205 righe in due pagine provati via API. BUG22-06–07: comandi di riga/versioni, guardie e regressioni UDS/BUG21 mantenuti; prova browser in completamento.
+
+BUG23-01–03: due incontri con progressivo storico, contenuti separati, più bisogni inclusi quelli futuri, lettura dello stato aggiornato e scope verificati. BUG23-04–06: mapping condiviso, PDF multipagina sintetico realmente generato e renderizzato, errore/revoca e download bloccato provati; API aggregata senza duplicazioni e nessuna scrittura stock introdotta. Criteri non dichiarati UAT OK prima della verifica di Floriano.
+
+Eseguiti install frozen, codegen, typecheck e 832 test frontend (128 file), più ripetizioni mirate dopo gli ultimi affinamenti. API runner canonico `api general reporting core`: **1.720 PASS / 7 SKIP**, zero failure, database temporanei attestati rimossi con rete e senza volumi creati. Gli skip riguardano gli originali esterni opzionali non passati a questa esecuzione, estranei al delta UDS. Migrazioni/replay dei tre gruppi PASS. Ricevute private in `test-results/quality-gates/api/cd4a2bbf-ee6c-41c4-af04-f41d2beec6ab` (non committate).
+
+Primo tentativo install/test/build/browser locale interrotto per esclusione preesistente delle controparti native macOS di LightningCSS/Oxide nel workspace. `pnpm install --frozen-lockfile` riuscito, ma il modulo restava escluso; ripristinate soltanto in `/private/tmp/c2a-native` le controparti delle stesse versioni (1.32.0/4.3.0), collegate in node_modules, senza cambiare manifest, lockfile o policy del progetto. Build WEB successiva riuscita realmente; **389,3/400 KiB gzip**. Il budget letto prima della correzione proveniva dalla build precedente ed è stato esplicitamente rettificato nella comunicazione; non è usato come evidenza del candidato. Build API PASS. Il primo browser non ha eseguito i casi; ripetizione canonica in corso, senza ignorare il KO preliminare.
+
+Verifiche conclusive C2A: browser canonico **9 PASS / 16 SKIP di matrice**, zero failure/flaky (5 sessioni UDS in tutte le viewport e 4 lifecycle UDS, incluse prove del BUG21). Evidenze in `test-results/quality-gates/browser/1e495586-3591-47a9-9948-771eeaf733e6`. Typecheck finale PASS; ulteriori 33 test mirati PASS dopo eliminazione della sola formattazione superflua. Il tentativo browser preliminare fermo per runtime macOS rimane registrato; entrambe le suite sono poi passate realmente. Nessuna asserzione allentata né soglia modificata.
+
+BUG22-01–07 e BUG23-01–06 implementati e verificati nei percorsi sopra: **PRONTO PER UAT**, subordinato all'installazione e ricevuta 8082 qui sotto. Nessun OK UAT dedotto dai test automatici. Si riusano soltanto le evidenze del primo ciclo per funzionalità applicative rimaste invariate; le prove elencate per C2A sono nuove esecuzioni.
+
+Prova proposta a Floriano sulla 8082:
+
+1. Senza Persona nei filtri, scegliere l'Area se globale e avviare **Nuovo intervento**; cercare e selezionare una persona esistente. Provare anche collegamento o nuova provvisoria dal percorso autorizzato.
+2. Registrare sintesi, materiale, una Richiesta e un'Azione pianificata futura; verificare identità e continuità dei dati, tessera/Centro/Zona nei percorsi BUG21.
+3. Applicare giorno/intervallo, Persona facoltativa, Zona storica, tipo richiesta/azione e stato bisogno. Controllare ordine e pulsanti pagina.
+4. Senza Persona filtrata, aggiornare una Nota, rettificare un incontro o modificare i Bisogni della sua riga; verificare rilettura e conservazione dei filtri.
+5. Aprire il report con un profilo autorizzato: incontri distinti, sezioni separate, piano futuro e indicazione di stato corrente. Confrontare il PDF, anche per testi lunghi e più pagine.
+
+La richiesta diretta di Floriano autorizza la ricompilazione personale in questa consegna, superando il rinvio alla fase separata indicato nel pacchetto. Non attiva C2B, merge o un nuovo rilascio Hetzner.
+
+### Ricevuta 8082 — C2A pronta per le prove
+
+Checkpoint applicativo installato: **`4fbab67582f2adb93a220d6b8bf51174bcee9eeb`**. Build da `git archive` della SHA esatta, API/WEB con revision label corrispondenti:
+
+- API `magazzino-bugfix-uat-api:sha-4fbab67582f2`, image ID `sha256:f07051f56eacd98fdb9b2da5336e9510ac4ca8e6b5574f9336cd53805f7dd00d`.
+- WEB `magazzino-bugfix-uat-web:sha-4fbab67582f2`, image ID `sha256:2511b415ac68f61b41a65013f341593b988c78dc84295bf26e16c14f60ca8295`.
+
+Backup privato DB/uploads `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2A-4fbab67582f2-2026-10-20T19-52-41-345Z`, archivi e SHA256 verificati, dump realmente ripristinato in PostgreSQL effimero isolato, replay canonico **63→63** e integrità invariata. Ricreati solo API/WEB con override della catena Compose reale, senza ricreare PostgreSQL né cambiare mount/volumi. Confrontate **45 tabelle**, impronte prima/dopo identiche. Nessuna importazione o suite mutativa sulla 8082.
+
+Ledger initialized, **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo 401. Asset JS/CSS effettivamente serviti confrontati per SHA256 con l'immagine, inclusi registro e report UDS; sorgenti API distribuiti contengono i nuovi filtri/proiezione. Entry `index-DR5qs2t6.js`, budget **389,3/400 KiB gzip**. Ricevuta privata `/private/tmp/c2a-final-release-result.json`. Il PDF sintetico finale di 11 pagine è stato renderizzato e controllato, inclusi footer e passaggio pagina.
+
+**C2A / BUG22 / BUG23: PRONTO PER UAT sulla 8082.** In attesa dell'esito personale di Floriano; nessuna chiusura UAT anticipata. Questo checkpoint documentale non modifica la versione applicativa distribuita. C2B/C2C, merge e produzione non avviati.
+
+## Ciclo 2 — C2B, Emporio e quota mensile — 20/10/2026
+
+Floriano conferma la UAT sulla 8082 e dichiara **C2A / punto 01 CHIUSO**; attiva il prompt `02_Emporio_Credito_Mensile.txt` (BUG24–25) e richiede nuovamente la ricompilazione personale 8082. Base `5fd418a`, branch unico `codex/bugfix-ciclo2-ottobre-2026`; nessun avvio C2C, merge/main o deploy Hetzner. Specifica separata assente già registrata; prompt 00, C2B e registro letti. Conservati i cinque documenti locali estranei. La richiesta diretta autorizza l'aggiornamento 8082 dopo le verifiche, superando il rinvio del pacchetto a un successivo ##test.
+
+### Comportamento e confine economico
+
+La conferma CdA riusa i campi Quota mensile assegnata/Motivo del pannello corrente: politica, suggerito e importo effettivo sono visibili prima del comando. La deroga è un **totale**: suggerito 60 e assegnato 80 accreditano 80; motivo verificato dal server, non dal suggerito inviato dal client. Conservato il selettore individuale di politica già richiesto e validato da Floriano nel primo ciclo, come decisione successiva alla baseline del pacchetto; nessun nuovo selettore né formula. L'ordine di risoluzione corrente resta scelta valida esistente, Centro, Area, globale, fallback.
+
+Il nuovo comando integrato salva diritto Emporio, configurazione, prima quota dovuta, audit e ricevuta nella stessa transazione. Rilegge identità/grant/Area/Centro/moduli e mantiene il lock del beneficiario; richiede `emporio.eligibility.manage` e `credito.quota.manage`, senza aggiungere `credito.adjust` o assegnare nuovi permessi. Un diritto già attivo si completa senza una falsa riattivazione. Nella nuova anagrafica il salvataggio persona è distinto e recuperabile sullo stesso ID; annullamento/errore del passaggio servizi produce esito parziale, non ricrea la persona. UDS conserva i soli stati. GET, tessera e semplice creazione/import non accreditano.
+
+Prova conservativa della prima quota: nessuna precedente ricevuta integrata, nessun movimento economico storico (anche stornato/speso), quota assegnata ancora NULL e nessun diritto storico attualmente sospeso/revocato. Un diritto già attivo con flag credito ma senza quota/storico può essere completato esplicitamente. Una quota storica già configurata, incluso zero, non viene retroaccreditata; nessuna deduzione dal saldo e nessun backfill/mutazione in massa dei record legacy. Il precedente POST del solo diritto resta compatibile per i vecchi client e non produce movimenti; tutti i percorsi UI di attivazione/riattivazione passano dalla nuova conferma composta.
+
+Registro durevole esistente `comandi_operativi`: comando `emporio.attivazione.credito`, chiave idempotente e hash del contenuto, replay identico, conflitto per contenuto differente, recupero autenticato/riautorizzato dopo risposta persa. Il browser conserva solo la chiave opaca per utente/persona, blocca un nuovo invio finché l'esito è incerto e nasconde l'anteprima dopo diniego canonico. Nessuna nota o anagrafica in sessionStorage.
+
+La ricevuta tecnica `credito.quota.periodo`, chiave beneficiario/periodo Europe/Rome, è comune alla prima quota e allo scheduler, con vincolo univoco esistente e lock del beneficiario. Include la decisione zero, senza creare movimento zero. Lo storico mensile/iniziale già riconosciuto, anche stornato, non si riapre. Le ricevute tecniche del sistema usano il sentinel 0 nel campo snapshot attore senza FK; l'audit economico conserva **actorType system / actorUserId NULL**, mentre la prima quota conserva l'operatore umano reale e origine `attivazione_emporio`, distinta da `scheduler_mensile`. Nessun utente artificiale creato. Le coorti congelate del job non vengono ampliate dal comando iniziale.
+
+### Nucleo, automatico e storico
+
+Un solo motore server alimenta calcolo, configurazione, prima quota, anteprima mensile e scheduler. La formula usa sempre i quattro contatori dichiarati `numComponenti`, `numMinori`, `numAnziani`, `numDisabili`. Non ricostruisce contatori con “1 + schede”, né inferisce disabilità. Il job automatico rilegge dati/politica correnti ogni mensilità; la deroga invariata resta il totale mensile. Calendario, recupero della sola mensilità corrente, esclusioni, retry e destinatari congelati conservati.
+
+Rilevamento effettivo di variazioni dei quattro contatori o della nascita del titolare; aggiunta/rimozione e modifica dei campi anagrafici/relazione/nascita/sesso dei componenti segnalano variazione della composizione dettagliata, senza sostituire la fonte economica dichiarata. Note, taglie, recapiti e salvataggi identici non resettano. Coperti PATCH Beneficiario, CRUD nucleo e merge FSE conservativo/aggiornamento esplicito, solo sui dati realmente persistiti e mantenendo le precedenze del nucleo autorevole. Gli altri writer censiti sono creazioni/seed (nessuna deroga precedente) e aggiornamento profilo FSE dei soli indicatori esterni (non modifica i contatori economici).
+
+La variazione azzera modalità manuale/motivo corrente e salva la quota automatica anche in diminuzione o a risultato invariato per limiti; audit mantiene quota/deroga/motivo precedenti. Nessun movimento o storno durante la modifica del nucleo. Lock/versione impediscono letture quota/modalità disallineate; anche le modifiche dettagliate invalidano le anteprime. La PATCH quota richiede la versione corrente e restituisce 409 per form obsoleto: una vecchia deroga non può essere ripristinata silenziosamente. Saldo, consumi, storico e motivazioni maturate sono conservati.
+
+### File e contratti
+
+Nessuna variazione schema DB o migration: ledger resta **63/63**. Tre nuovi endpoint di anteprima/conferma/esito per l'attivazione; versione aggiunta al contratto configurazione quota. OpenAPI e client/Zod rigenerati dal comando canonico; postprocessore aggiornato per evitare la collisione tra tipo query e validatore dei parametri del nuovo esito. Secondo codegen con SHA256 dei generati identici.
+
+- API: nuovi `lib/creditoCalcolo.ts`, `lib/creditoQuotaPeriodo.ts`, `lib/emporioAttivazione.ts`; modificati `lib/creditoMensile.ts`, `lib/creditoSaldo.ts`, `lib/beneficiarioValidation.ts`, `routes/emporio-servizio.ts`, `routes/credito-solidale.ts`, `routes/beneficiari.ts`, `routes/beneficiari-fse.ts`.
+- UI: nuovi `components/credito-quota-fields.tsx`, `components/emporio-credito-activation-dialog.tsx`, namespace `ciclo2Credito.ts`; aggiornati `components/beneficiario-emporio-card.tsx`, `pages/beneficiari.tsx`, `pages/beneficiario-dettaglio.tsx`, indice i18n e namespace `emporioServizio.ts`/`creditoSolidale.ts`.
+- Contratti: `lib/api-spec/openapi.yaml`, `lib/api-spec/scripts/fix-binary-upload.mjs`, generati `lib/api-client-react/src/generated` e `lib/api-zod/src/generated`.
+- Test: nuovo `tests/emporio-c2b-credito.test.ts` e `components/emporio-credito-activation-dialog.test.tsx`; adattati `credito-automatico-f1.test.ts`, `credito-solidale.test.ts`, `impostazioni-moduli.test.ts`, `beneficiari-fse-api.test.ts`, browser `credito-automatico-f1.spec.ts`/`emporio-uat-f1.spec.ts`. Le fixture dei vecchi test mensili con importo fisso sono ora esplicitamente manuali; aggiunte prove automatiche sui dati/politica correnti.
+
+### Verifiche e stato checkpoint
+
+Installazione frozen, codegen riproducibile, typecheck, build API e WEB riusciti. Budget WEB locale **390,1/400 KiB gzip**. Suite frontend completa **838 PASS**; dopo l'ultimo controllo di diniego/revoca, **7 test mirati PASS** del dialogo. API gruppo Emporio finale **256 PASS**, incluse Cassa/Resi/Rettifica e 25 prove C2B; gruppo general finale e browser in completamento al checkpoint. Nessuna verifica mutativa sulla 8082. Gli iniziali KO di verifica erano fixture C2B con codice oltre 20 caratteri, mock i18n e vecchia fixture quota senza versione; corretti senza allentare controlli applicativi o gate. Le ricevute finali seguono prima della consegna.
+
+Preflight 8082 in sola lettura: mensilità `2026-10` già completata, zero destinatari pendenti/errore. Il nuovo avvio non viene usato per provare ricariche sui dati personali. Installazione preceduta da dump/uploads, restore effimero e confronto di integrità; esiti e SHA saranno registrati sotto.
+
+Prova proposta a Floriano: dal CdA confermare Emporio con motivo e prima quota; verificare deroga 80 sul suggerito 60 (80 totali); riaprire e salvare dati identici mantenendo la deroga; aumentare e diminuire il nucleo e verificare ritorno automatico senza variazione del saldo già maturato; vista UDS con soli stati. Le mensilità future sono provate soltanto sul database temporaneo con clock interno iniettato. **C2B non è dichiarato chiuso prima dell'OK di Floriano.**
+
+
+### Verifiche finali e ricevuta 8082 — C2B pronta
+
+Checkpoint applicativo **`9f6f21fa1a3003c34965f5ad68f665ec27178b60`**; correzione della sola fixture browser **`8d65ada5c3f8d6e1cb5d68ffa86f076cebd244b7`**, SHA esatta compilata e installata. Fra i due commit nessun cambiamento applicativo: aggiunti alla fixture owner il permesso quota composto e l'attesa della prima quota dovuta (100 + 60 = 160). Nessun nuovo grant dei ruoli reali.
+
+Verifiche conclusive realmente eseguite:
+
+- `pnpm install --frozen-lockfile`: PASS; nessuna modifica manifest/lockfile. Restano le controparti native macOS temporanee già documentate in C2A, senza variazione delle dipendenze del prodotto.
+- `pnpm --filter @workspace/api-spec run codegen`: PASS e ripetizione con SHA256 dei generati identici; `pnpm run typecheck`: PASS.
+- `pnpm --filter @workspace/magazzino-solidale test`: **839 PASS / 129 file**, zero failure.
+- `node scripts/quality-gates-run.mjs api general emporio`: **1814 PASS / 7 SKIP**, zero failure. I 7 skip restano quelli degli originali esterni opzionali non forniti, già documentati. Evidenze private `test-results/quality-gates/api/456f50e4-59f3-4138-b5fb-12c8df79704f`. Migrazioni/replay/ledger finali PASS, PostgreSQL/reti usa e getta rimossi.
+- Browser canonico `credito-automatico-f1.spec.ts`: **40 PASS**, tutte e cinque le viewport; flusso integrato 60→80, motivo obbligatorio, prima quota unica e riapertura senza ripetizione. Evidenze `test-results/quality-gates/browser/d162407d-94af-4e27-b985-ab7a99d9e399`.
+- Browser canonico `emporio-uat-f1.spec.ts`: **90 PASS**, zero skip/failure/flaky, inclusi Cassa/Resi/ricevute/PDF e transizioni/caching. Evidenze `test-results/quality-gates/browser/11a146aa-eec9-4405-ae0f-b0992d4120fd`. Il primo avvio di questa suite è stato interrotto con SIGINT al solo Playwright verificato per correggere la fixture obsoleta senza quota.manage/ancora senza primo credito; il runner ha rimosso database/rete e rilasciato il lock. Nessuna rimozione manuale di guardie/lock, nessuna attestazione costruita a mano. La seconda esecuzione completa è verde. Totale finale **130 browser PASS**.
+- Build API/WEB locali e Docker da `git archive` della SHA esatta: PASS. Budget immagine WEB **390,1/400 KiB gzip**, soglia invariata. `git diff --check`: PASS.
+
+BUG24-01–05: conferma integrata, caso diritto già attivo/non configurato, totale motivato, zero durevole, ricevute/replay/concorrenza/rollback e revoca grant coperti. BUG25-01–06: calcolo corrente/manuale, aumento/diminuzione/limite invariato, writer anagrafico/dettagliato/FSE, versione obsoleta e calendario/coorte/storico coperti. Nessun movimento stock aggiunto e nessun saldo modificato dalle variazioni del nucleo. Le prove di date future usano soltanto clock interno sui database isolati.
+
+Installazione personale eseguita su **`8d65ada5c3f8d6e1cb5d68ffa86f076cebd244b7`**:
+
+- API `magazzino-bugfix-uat-api:sha-8d65ada5c3f8`, ID `sha256:5275d6a2115ce9b081a84d39a794d9c82ae81c1f747b5d0e41063654a77d86af`.
+- WEB `magazzino-bugfix-uat-web:sha-8d65ada5c3f8`, ID `sha256:0ee2a215ff28fd2cd7343a948511d325c6181e857c4de5bc05429384b18bf937`.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2B-8d65ada5c3f8-2026-10-20T20-52-46-339Z`: dump PostgreSQL e uploads con SHA256/indici verificati, restore reale su PostgreSQL effimero isolato senza porte host, replay canonico **63→63**. Ricreati soltanto API/WEB mediante override della catena Compose reale; PostgreSQL conserva ID/avvio/volume e gli uploads conservano il volume. Integrità prima/dopo identica su **48 tabelle**, comprese ricevute e run/destinatari mensili. Nessuna suite mutativa, importazione o simulazione del calendario sulla 8082.
+
+Ledger initialized **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Revision label e asset JS/CSS effettivamente serviti verificati per SHA256, incluso nuovo flusso C2B e calcolo mensile API; conservate le verifiche dei blocchi del primo ciclo e C2A. Entry `/assets/index-BR5kU25W.js`; ricevuta privata `/private/tmp/c2b-final-release-result.json`.
+
+**C2B / BUG24 / BUG25: PRONTO PER LE PROVE DI FLORIANO SULLA 8082.** Ricaricare la pagina per caricare gli asset nuovi. Per verificare la prima quota usare una persona nuova o un diritto attivo mai configurato; i record con quota/storico già presenti non vengono retroaccreditati. Nessuna chiusura UAT dedotta dai test. In attesa dell'OK; C2C, merge e Hetzner non avviati. Questo ultimo aggiornamento del registro non cambia il codice applicativo installato.
+
+### C2B R1 — osservazioni UAT: politica iniziale e pulsante duplicato
+
+Floriano segnala la mancanza del selettore nella prima conferma e due azioni di salvataggio del credito nella modifica. Video locale letto tramite fotogrammi AVFoundation: il pulsante bianco è **Salva configurazione Credito**, distinto da **Salva quota assegnata** più sotto. La foto allegata riguarda una pagina di login, non il prodotto; non usata per accedere a servizi o copiare credenziali. Fotogrammi temporanei eliminati e nessun allegato incluso in Git.
+
+Prima conferma: selettore condiviso con la gestione della politica già esistente, opzione automatica e politiche attive applicabili di Centro/Area/globali. Il cambio selezione ricalcola l'anteprima con una GET priva di scritture; politica, quota e primo accredito si salvano soltanto nella medesima transazione di conferma. Il server rivalida applicabilità e stato della politica con lock, include la scelta nel token di calcolo, nell'hash della richiesta, nell'audit e nella ricevuta. Nessuna PATCH preliminare che consumi la prima quota; importi/saldi storici e idempotenza conservati.
+
+Rimosso il pulsante bianco **Salva configurazione Credito** dalla modifica; conservato **Salva quota assegnata** in fondo al pannello. Stato/note continuano a salvarsi con Salva anagrafica. Riepilogo con riga esplicita **Politica applicata**, valorizzata con il nome restituito dal server, anche dopo la prima conferma.
+
+File: `lib/emporioAttivazione.ts`, `routes/emporio-servizio.ts` API; nuovo `components/credito-policy-select.tsx`, `beneficiario-credito-policy.tsx`, `emporio-credito-activation-dialog.tsx`, `pages/beneficiario-dettaglio.tsx`, namespace `ciclo2Credito.ts`; OpenAPI/postprocessore/client/Zod rigenerati; test API `emporio-c2b-credito.test.ts`, UI dialogo e browser `credito-automatico-f1.spec.ts`. Nessuna migration/schema DB; contratto additivo per politica opzionale nell'anteprima/conferma e lista minima delle politiche disponibili, senza richiedere nuovi grant.
+
+Install frozen, typecheck, 839 test UI, build API/WEB e budget locale **390,2/400 KiB gzip** PASS. Runner API `emporio`: **258 PASS**, zero failure/skip, evidenze `test-results/quality-gates/api/72ca5cbf-047d-4f1b-a53d-7c16bbce7061`. Prima prova browser: 35 PASS/5 KO nella sola fixture nuova, che inseriva una politica Centro più recente e si aspettava ancora il precedente suggerito; corretta usando una politica alternativa di Area. Il resolver applicativo resta invariato. Verifica browser finale e ricevuta 8082 seguono.
+
+Una successiva ripetizione browser è stata interrotta perché una rigenerazione concorrente dei client aveva interferito con Vite. Rigenerati integralmente tramite comando canonico, ripetizione riuscita e SHA256 dei generati identici alla prima generazione valida; typecheck nuovamente PASS. Nessuna correzione manuale ai generati. Il browser finale viene eseguito a sorgenti fermi; il runner mantiene pulizia e lock originali.
+
+
+**C2B R1 — verifica e installazione completate.** Browser canonico finale a sorgenti fermi: **40 PASS**, zero skip/failure/flaky sulle cinque viewport, evidenze `test-results/quality-gates/browser/abeb0a80-bff5-403b-a242-403e815df054`. Verifica una politica alternativa di Area scelta al posto dell'automatica del Centro, nessuna scrittura prima della conferma, salvataggio della politica effettiva, quota manuale 80 come totale, riapertura senza nuovo accredito, riga del nome applicato e assenza del pulsante duplicato. Riusate le evidenze del checkpoint precedente solo per i percorsi rimasti invariati; non dichiarate nuovamente eseguite suite general/90 browser.
+
+Installata sulla 8082 la SHA **`0b1e8c90ff91f816366e3b81aaee4c215d0175bc`** da archivio Git esatto. API `magazzino-bugfix-uat-api:sha-0b1e8c90ff91` / `sha256:5bae3d81a91b406b710791a35df5707c8c458205532242fcd4aa633448ddbf6b`; WEB `magazzino-bugfix-uat-web:sha-0b1e8c90ff91` / `sha256:e6828bff35dd24f8d99564d83248ad45874346caaf5ef0b286a9b5f19b304d11`. Budget immagine **390,2/400 KiB gzip**, entry `/assets/index-CSP89xVg.js`. Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2B-R1-0b1e8c90ff91-2026-10-20T21-27-14-486Z`: dump/uploads verificati, restore reale su PostgreSQL effimero senza porte host e replay **63→63** riusciti. Ricreati soltanto API/WEB sulla catena Compose effettiva; PostgreSQL e volumi conservati. Integrità di **48 tabelle identica** prima/dopo, inclusi saldi, storico e ricevute. Nessuna prova economica sui dati personali.
+
+HTTP salute/readiness/config/app: 200; Utenti anonimo: 401. Ledger **63/63** senza anomalie. Revisioni, nuovi asset serviti e supporto alla scelta politica API/UI verificati; ricevuta privata `/private/tmp/c2b-r1-final-release-result.json`. Nessuna modifica Hetzner, main o merge. **R1 PRONTA PER LA VERIFICA DI FLORIANO SULLA 8082**; ricaricare la pagina per usare gli asset nuovi. Crediti già riconosciuti conservati; nessuna chiusura anticipata della UAT C2B.
+
+
+### C2B R2 — Salva quota assegnata comprende la configurazione credito
+
+Chiarimento di Floriano: il pulsante inferiore deve salvare anche la configurazione prima gestita dal pulsante bianco rimosso. Ora una sola PATCH configurazione invia abilitazione, stato, note, quota totale e motivazione con la versione corrente; il server esistente li applica atomicamente. Nessuna modifica API/schema/migrazioni, nessun nuovo accredito. La politica già applicata resta conservata.
+
+Il pulsante resta visibile anche dopo la disattivazione del credito; in quel caso salva configurazione e note senza riscrivere quota e motivazione pregresse. I campi quota sono disabilitati. Dopo il successo si riallineano soltanto i campi configurazione salvati, preservando altre modifiche anagrafiche e gli eventuali nuovi valori digitati mentre la richiesta era in corso. Conservati vincoli di territorio, permessi, diritto attivo per abilitazione/quota e controllo versione.
+
+File modificati: `artifacts/magazzino-solidale/src/pages/beneficiario-dettaglio.tsx`, namespace `src/lib/i18n/namespaces/creditoSolidale.ts` (conferma esplicita del salvataggio congiunto), browser `e2e/credito-automatico-f1.spec.ts` (persistenza quota/stato/note, disattivazione, riapertura e saldo invariato), questo registro. Nessun altro file o servizio funzionale coinvolto.
+
+Installazione frozen, typecheck, **839 test UI**, build WEB e budget **390,2/400 KiB gzip** PASS. Runner API Emporio PASS, evidenze `test-results/quality-gates/api/2f07fb66-799d-4649-ab45-4bbd6897c1f9`; verifica browser e ricevuta 8082 seguono. L'installazione locale iniziale senza rete è stata interrotta al diniego DNS, poi completata con accesso npm senza variazioni al lockfile; ripristinate le sole controparti native macOS ignorate già documentate.
+
+
+**C2B R2 — installazione completata sulla 8082.** Revisione applicativa `5c3f32d6832ce9658a08f431df93680acaad7310`. Browser canonico **40 PASS**, zero failure/skip/flaky sulle cinque viewport, evidenze `test-results/quality-gates/browser/1fe10655-5c62-4069-8305-1fb296a2a46d`. Prova reale: quota 90, stato sospeso e note persistiti insieme con un solo pulsante; successiva disattivazione salvata mantenendo quota/motivazione; riapertura conserva i dati e saldo resta 290. API **258 PASS**, UI **839 PASS**, typecheck e build/budget PASS. Nessuna rigenerazione di contratti necessaria.
+
+- API `magazzino-bugfix-uat-api:sha-5c3f32d6832c` / `sha256:6439d21293951a7d2de7394b7807de92f2e5f18e80a8a71982c37aa48a9d104e`.
+- WEB `magazzino-bugfix-uat-web:sha-5c3f32d6832c` / `sha256:16af7100fd785f9119b699ede4e1007b864c4b5a86792060267bc29236c1d576`.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2B-R2-5c3f32d6832c-2026-10-20T21-59-44-674Z`: dump/uploads e SHA256 verificati, restore reale effimero senza porte host e replay **63→63** PASS. Ricreati soltanto API/WEB, PostgreSQL e volumi conservati; confronto identico su **48 tabelle**, incluse ricevute, saldi e run mensili. HTTP app/config/healthz/readyz 200, Utenti anonimo 401. Revisioni e hash degli asset effettivamente serviti verificati, inclusi callback del salvataggio congiunto e relativo messaggio. Entry `/assets/index-BWB1KSfN.js`, budget **390,2/400 KiB gzip**. Ricevuta privata `/private/tmp/c2b-r2-final-release-result.json`. Nessuna modifica DB, importazione o simulazione economica sulla 8082. Nessun push, merge o aggiornamento Hetzner. **PRONTA PER UAT DI FLORIANO**; C2B resta aperta fino al suo OK.
+
+
+## C2B chiuso da Floriano; avvio C2C / BUG26 — 21 ottobre 2026
+
+Mandato diretto: «Ho provato sulla 8082, ora funziona tutto. Il punto 02 è chiuso, procedi con il prompt 03 nella cartella BUG 5 e ricompila sempre la 8082 per le prove». **C2B / BUG24–25: CHIUSO, UAT OK di Floriano**, comprese R1/R2, candidato personale `5c3f32d6832ce9658a08f431df93680acaad7310`; checkpoint documentale `7138631`. **C2C / BUG26: IN SVILUPPO** sullo stesso `codex/bugfix-ciclo2-ottobre-2026`. Nessun ripristino alla baseline, modifica main, merge, push o produzione. Cinque documenti locali estranei preservati.
+
+Letti `BUG 5/03_Mensa_Abilitazioni_Area.txt`, `00_Avvio_Ciclo_2.txt`, LEGGIMI e registro. `SPECIFICA_CICLO_2.txt` non presente nel pacchetto locale né nella ricerca dei file sotto Magazzino: i criteri BUG26-01–12 sono interamente riportati nel prompt 03 e consentono lo sviluppo. Il mandato umano esplicito sulla 8082 prevale sul rinvio al separato ##test riportato nel documento; eseguite verifiche pertinenti e installazione solo dopo esito verde. 04/05 non attivati automaticamente.
+
+### Modello e confini confermati
+
+L’Area del diritto è quella della Mensa di riferimento, immutabile dal PATCH ordinario; conserva `mensaId`/`mensaPrincipale` e identificativi storici. **Nessuna migration o modifica schema DB**: ledger atteso 63/63. Una principale temporalmente valida opera nelle destinazioni attive della stessa Area della persona e della principale; sede e magazzino di destinazione devono essere operativi. Una principale inattiva non revoca il diritto. Cambiare Area alla persona non trasferisce il diritto. Righe non principali e autorizzazioni temporanee non diventano nuovi diritti ordinari.
+
+La checkout effettiva contiene già la decisione precedente di Floriano su operatori abilitati per Area: `currentMensaIds` deriva le sedi dall’Area e dal ruolo correnti, non dalle vecchie righe individuali `utenti_mense`. **Nessun cambiamento a questo servizio, ai grant o al RBAC**. La nuova validità del beneficiario non amplia lo scope effettivo dell’operatore né reintroduce assegnazioni personali obsolete. Directory/dossier/gestione rimangono distinti dalla proiezione minima per il comando.
+
+### Intervento
+
+Valutazione temporale/territoriale condivisa tra scansione e rivalidazione transazionale del pasto; verifica con letture bloccanti di persona, tessera, diritto e assegnazioni correnti. La ricerca manuale con destinazione esplicita richiede anche scan/manual e offre soltanto nome/cognome/codice/ID/stato/Area, senza dati sociali o motivazioni. I controlli di affiliazione generali non vengono allargati. Anche DTO operativo e pasto seguono il nuovo percorso; precedenti accessi, replay, eccezioni e temporanei conservati. Nessuna eccezione o nuova abilitazione creata per cambiare sede. Unicità persona/giorno/tipo, advisory lock e comandi inventariali esistenti conservati.
+
+Scheda e variante compatta: motivo obbligatorio, stato/date/Area del diritto, Mensa come riferimento organizzativo, azioni consentite Sospendi/Revoca/Riattiva, nuova abilitazione per revocati/scaduti, errori/409 conservando l’input. Rimosso soltanto il blocco su anagrafica provvisoria. La creazione rapida e l’amministrazione Mensa inviano anch’esse il motivo esplicito. Contesto UDS e suoi endpoint minimali conservati; riepiloghi CdA/UDS non mostrano come attivo un diritto di altra Area. Nessuna abilitazione Emporio, politica o ricarica da Mensa.
+
+Contratto: motivazione obbligatoria per creazione/cambio stato; nuovi campi additivi Area ID/nome nell’abilitazione per descrivere il diritto effettivo. I motivi storici assenti restano null. OpenAPI aggiornato e client/Zod generati con comando canonico; nessuna modifica manuale dei generati. Nuovo esito descrittivo PROGRAMMATA per l’accesso futuro, sempre negato.
+
+### Verifiche in corso
+
+Typecheck e 841 test UI PASS. Primo runner Mensa: 117 PASS/1 KO nella fixture negativa senza motivo, accidentalmente completata con un motivo dalla manutenzione dei payload; ripristinato il caso negativo originario, senza cambiare l’API. Secondo gruppo Mensa e gruppo core PASS; general/browser e ricevuta finale seguono. Le prove storiche di eccezione usano accessi sintetici già negati con il vecchio criterio: le nuove verifiche nella seconda sede sono asserite ordinarie. Mantenuti i test di chiusura concorrente, revoca e privacy.
+
+
+### C2C — checkpoint di verifica
+
+API core **79 PASS**, API Mensa **118 PASS**, evidenze `test-results/quality-gates/api/d4364b21-6e56-4ad7-8646-3ec533c96e86`. General della medesima esecuzione: **1546 PASS, 1 test KO per timeout e 11 test non eseguiti per timeout beforeAll**, oltre ai 7 skip esterni già esistenti. I due timeout riguardano `fse-m64-regressions` F04/F27 e inizializzazione `lotti-produttore`, file non modificati. La ripetizione general avviene su database nuovo, senza modificare le prove o aumentare i timeout. Non classificati come PASS né aggirati.
+
+`pnpm install --frozen-lockfile`, typecheck, build API e WEB PASS; budget iniziale **390,7/400 KiB gzip**. Codegen ripetuto: **1003 file SHA256 identici**. Le sole controparti native macOS ignorate seguono il workaround già documentato; nessuna nuova dipendenza, variazione del lockfile o artefatto locale incluso. UI finale **841 PASS**; la piccola protezione della bozza motivo nel pannello amministrativo viene verificata con il browser del candidato.
+
+File principali: API `routes/mensa.ts`, `routes/beneficiari.ts`, `lib/mensaEligibilitySummary.ts`; UI `components/beneficiario-mensa-card.tsx`, `pages/beneficiari.tsx`, `pages/mensa.tsx`, nuovo namespace `ciclo2Mensa.ts` e indice; OpenAPI e generati Mensa; test `mensa.test.ts`, `beneficiario-mensa-card.test.tsx`, mock `beneficiario-tessera.test.tsx`, browser `m67-p4-mensa-context.spec.ts`. Il servizio corrente `mensaScope.ts` resta invariato.
+
+Matrice di verifica: BUG26-01/05/06/07 nei test ordinari A1/A2, principale inattiva, concorrenti, replay e storico; BUG26-02/03 nel trasferimento Area, dinieghi altra Area, proiezioni minime e regressioni scope/core; BUG26-04 nelle quattro transizioni/datetime prima e dopo scan; BUG26-08/09 nelle prove API provvisoria/motivo e UI compatta/409; BUG26-10/11 nel browser CdA→seconda sede→UDS e assenza effetti credito; BUG26-12 richiede tutte le evidenze finali e la ricevuta 8082 sotto. Nessuna UAT dedotta dai test automatici.
+
+
+Seconda general `13776c0e-5498-4765-918e-4dfcb42c7b36`: **1557 PASS / 7 SKIP / 1 timeout** in una differente prova UDS non modificata; FSE/lotti precedentemente in timeout ora PASS senza variazioni. Diagnostica macOS `pmset -g log`: stop/Deep Idle documentati durante entrambe le esecuzioni, inclusi intervalli 00:47→01:00 e 01:14→01:29 del 21 ottobre. Per le nuove verifiche si usa l’inibizione temporanea `caffeinate -is` limitata alla durata del runner, senza impostazioni energetiche permanenti o modifiche ai timeout. Ripetizione generale finale necessaria per una ricevuta verde.
+
+Browser iniziale interrotto al solo Playwright identificato: fixture con `getByLabel(..., exact:true)` non includeva l’asterisco del campo obbligatorio. Corretto soltanto il selettore con regex; non cambiati accessibilità o prodotto per adattarli al test. Cleanup e lock gestiti dal runner; un tentativo anticipato di avvio è stato correttamente respinto dal lock senza operazioni DB/browser. La ripetizione finale avviene con PATH Node 24, a sorgenti applicativi fermi. Il checkpoint `00371ff88419491ff532100811c8f57ac22e59f5` contiene il prodotto; segue checkpoint della fixture corretta e build della SHA finale.
+
+
+Browser finale **PASS**: `m67-p4-mensa-context.spec.ts` **20 PASS** su cinque viewport, incluso il nuovo percorso completo C2C senza skip; `mensa-workflows.spec.ts` **8 PASS / 12 SKIP**, skip preesistenti dei tre scenari mutativi eseguiti soltanto desktop, mentre le cinque viewport sono verificate. Totale **28 PASS / 12 SKIP**, nessun failure/flaky finale. Evidenze `test-results/quality-gates/browser/097c74be-d13d-4077-bddb-83e3fa7ac49e`. Coperti anche pasti temporanei, replay, consumi con risposta persa e trasferimento di lotti reali. Database/reti rimossi dal runner. Le verifiche UDS sono effettuate con lo stesso amministratore del CdA, su persona provvisoria, senza completarne automaticamente l’anagrafica. Verifica UI mirata successiva: **19 PASS** (card, postazione e contesto).
+
+
+### C2C / BUG26 — ricevuta finale e 8082 pronta per Floriano
+
+General finale con stop impedito soltanto durante il runner: **1558 PASS / 7 SKIP**, zero failure, **191 s**; evidenze `test-results/quality-gates/api/b086772d-309c-4d28-896b-980d3ad4786d`. I 7 skip sono gli originali esterni opzionali non disponibili, senza aggiunte. I due precedenti timeout FSE/lotti e quello UDS sono tutti passati senza alcuna modifica a quei test o ai timeout. Riusate le evidenze ancora valide sullo stesso codice API core (79 PASS) e Mensa (118 PASS): totale **1755 API PASS / 7 SKIP**. Nessun insieme parziale dichiarato campagna cumulativa completa.
+
+UI **841 PASS / 129 file**, ulteriore verifica mirata **19 PASS** sui tre componenti coinvolti, typecheck workspace/frontend PASS. Browser **28 PASS / 12 skip preesistenti**, inclusi **20 PASS senza skip** di contesto e flusso C2C sulle cinque viewport. Install frozen, codegen riproducibile per 1003 file, build API/WEB e budget immagine **390,7/400 KiB gzip** PASS. Le evidenze del prodotto corrispondono al checkpoint `00371ff`; `5343464` cambia soltanto fixture browser e registro.
+
+Revisione esatta compilata e installata: **`5343464fae00391a31b1f1b815467db0ae3d1014`**.
+
+- API `magazzino-bugfix-uat-api:sha-5343464fae00`, ID `sha256:5bc1ed1653876fe0d2b50dfb3f123570a9b5ca9a58a38ab6e187a056994d2f3f`.
+- WEB `magazzino-bugfix-uat-web:sha-5343464fae00`, ID `sha256:f2c03b45e0361bc727f5da3ceff9847411311f3bc27246406cff4b7459e49d8b`.
+
+Backup privato `/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2C-5343464fae00-2026-10-20T23-37-26-813Z`: dump PostgreSQL e uploads con SHA256 e indici verificati, restore effettivo su PostgreSQL effimero senza porte host, replay canonico **63→63**. Estesa la verifica in sola lettura alle tabelle Mensa: il primo preflight ha rilevato il limite PostgreSQL di 100 argomenti a json_build_object; corretta soltanto la query privata con jsonb_object_agg, nessuna modifica applicativa o dei dati. Il preflight finale e il confronto prima/dopo sono identici su **57 tabelle**, compresi accessi, pasti, eccezioni, temporanei, consumi, configurazioni, saldi e ricevute. Ricreati soltanto API/WEB sulla catena Compose effettiva; PostgreSQL mantiene ID/avvio/volume e uploads mantengono il volume. Nessuna suite mutativa, importazione, simulazione di date o ricarica di prova sulla 8082.
+
+Ledger initialized **63/63**, zero pendenti/checksum difformi/file mancanti/fuori ordine. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200; Utenti anonimo: 401. Verificate revision label, hash degli asset realmente serviti e presenza dei nuovi controlli API/UI C2C, conservando verifiche C2A/C2B e primo ciclo. Entry `/assets/index-CeN76en1.js`; ricevuta privata `/private/tmp/c2c-final-release-result.json`. Nessun cambiamento main/Hetzner, push o merge.
+
+Elenco dei file applicativi/di verifica modificati nel blocco:
+
+- `artifacts/api-server/src/lib/mensaEligibilitySummary.ts`
+- `artifacts/api-server/src/routes/beneficiari.ts`
+- `artifacts/api-server/src/routes/mensa.ts`
+- `artifacts/api-server/tests/mensa.test.ts`
+- `artifacts/magazzino-solidale/src/components/beneficiario-mensa-card.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-mensa-card.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/pages/mensa.tsx`
+- `artifacts/magazzino-solidale/src/lib/i18n/index.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/ciclo2Mensa.ts`
+- `artifacts/magazzino-solidale/e2e/m67-p4-mensa-context.spec.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/mensaAbilitazione.ts`
+- `lib/api-zod/src/generated/types/mensaAbilitazioneInput.ts`
+- `lib/api-zod/src/generated/types/mensaStatoInput.ts`
+- `docs/campagna-bug-2026-10.md`
+
+**C2C / BUG26: PRONTO PER LA UAT DI FLORIANO SULLA 8082**, in base al suo mandato diretto di ricompilazione. Ricaricare la pagina. Prova proposta: dal CdA aprire Modifica anagrafica e abilitare Mensa con motivo, anche su provvisoria; leggere Area e riferimento; servire nella seconda Mensa autorizzata della stessa Area con un solo pasto ordinario per giorno/tipo; verificare sospensione/revoca e diniego altra Area; nel contesto UDS controllare soli stati anche riaprendo la modifica. Usare una seconda persona o un diverso servizio/giorno per distinguere mobilità e divieto di duplicati. **C2C resta aperta fino all’OK umano**. I prompt 04 di certificazione cumulativa e 05 di rilascio finale restano separati e non attivati; questo blocco non li sostituisce né autorizza il merge.
+
+
+## Certificazione finale Ciclo 2 — prompt 04 / C2C — 21 ottobre 2026
+
+Floriano ha provato la 8082 e dichiarato «il punto 03 è chiuso»: **C2C / BUG26 CHIUSO, UAT OK**, candidato `5343464fae00391a31b1f1b815467db0ae3d1014`. L’OK segue C2A e C2B già chiusi e attiva espressamente `04_TEST_Riutilizzabile.txt` per i gate finali e la ricompilazione 8082; **non attiva ##merge, main o Hetzner**.
+
+Candidato iniziale della certificazione `0a903f11bbc0f4a73c19acd1819c00c62ba64fdc`, branch `codex/bugfix-ciclo2-ottobre-2026`: rispetto alla versione 8082 cambiano soltanto le ricevute nel registro. Tracciati tutti i criteri BUG22-01–07, BUG23-01–06, BUG24-01–05, BUG25-01–06, BUG26-01–12 e le precisazioni umane successive (politica selezionabile, salvataggio quota/configurazione congiunto, operatori per Area). Nessuna funzione nuova in questo incarico.
+
+Letti prompt 04, manifest workspace, runner/inventario, workflow CI e `docs/db-migration-ledger.md`; l’assenza locale di SPECIFICA_CICLO_2 già documentata è compensata dai requisiti completi dei prompt e dalle decisioni registrate, senza inventare nuove approvazioni. Inventario corrente: **171 file API in 8 gruppi e 49 suite browser**. I precedenti esiti mirati restano validi sul codice immutato; qui si completa la copertura cumulativa richiesta dalla CI.
+
+Checkout managed isolata `~/.codex/worktrees/ciclo2-certificazione-finale/Magazzino-Solidale`, HEAD detached esatto del candidato; cinque documenti locali estranei conservati nella checkout personale. Gate statici nella checkout pulita: install frozen, codegen con `git diff --exit-code`, typecheck, **841 UI PASS**, build WEB e budget **390,7/400 KiB gzip** PASS; test delle guardie/inventario eseguiti (ricevuta sotto). Nessuna differenza applicativa o del lockfile. Ripetizione codegen dopo Docker prevista prima della consegna, a Vite fermo. Nessuna modifica a schema/migration.
+
+API completo avviato tramite runner canonico, con fresh-db e tutti i gruppi; output privato ignorato `test-results/quality-gates/api/c2c-cert-0a903f1`. Come nel precedente blocco si usa `caffeinate -is` soltanto durante ciascun processo per evitare gli stop del Mac, senza impostazioni permanenti. API e browser rimangono seriali sul lock comune. Stato certificazione: **IN CORSO**, nessun PASS anticipato.
+
+
+### Gate API e statici completi — candidato 0a903f1
+
+`node scripts/quality-gates-run.mjs api`: **FULL campaign PASS**, tutti gli 8 gruppi e fresh-db, evidenze `test-results/quality-gates/api/c2c-cert-0a903f1`. Conteggi: core 79, reporting 83, interventi 21, Mensa 118, Emporio 258, maps 18, FSE 2, general 1558; totale **2137 PASS / 7 SKIP**, zero failure. I 7 skip restano quelli degli originali esterni opzionali non forniti. Controllo fresh database con API CRUD, migrazioni/replay e ledger 63/63 PASS; cleanup automatico di tutti i database/container/rete. Test del runner PostgreSQL **24 PASS**.
+
+Guardie e inventario: `node --test scripts/quality-gates-plan.test.mjs scripts/m63-test-guards.test.mjs`, **29 PASS**. Docker API/WEB da archivio Git della SHA candidata: build PASS e budget WEB **390,7/400 KiB gzip**. Rigenerazione canonica **dopo** entrambe le build Docker, poi `git diff --exit-code`, `git diff --check` e status nella checkout isolata: PASS, albero pulito. Nessun Vite in esecuzione durante codegen. API e browser non sovrapposti.
+
+Preflight personale di sola lettura: periodo Europe/Rome `2026-10`, run mensile già completato, zero destinatari pendenti/errore. Nessun test economico sul database personale. La procedura privata di rilascio è estesa a confrontare anche il fingerprint SHA256 dei contenuti degli uploads prima/restore/dopo, senza pubblicare percorsi o contenuti degli allegati. Il backup finale verrà acquisito dopo i gate, a ridosso dell’aggiornamento.
+
+Browser completo avviato nella medesima checkout pulita: 49 suite da inventario, output privato `test-results/quality-gates/browser/c2c-cert-0a903f1`. Esiti e copertura finale seguiranno, senza dichiarare verdi suite non concluse.
+
+
+### Allineamento della prova FSE+ al flusso C2B approvato
+
+Prima tratta browser: **11 suite PASS, 218 prove PASS / 27 SKIP**. La dodicesima `fse-beneficiari-import.spec.ts` ha 25 PASS e lo stesso scenario KO su cinque viewport: il test precedente attendeva l’abilitazione immediata e saldo zero, mentre C2B richiede la conferma esplicita di politica/quota e accredita la prima quota una volta. La traccia mostra correttamente la nuova finestra di conferma. Nessuna regressione applicativa individuata.
+
+Corretto soltanto `artifacts/magazzino-solidale/e2e/fse-beneficiari-import.spec.ts`, checkpoint **`a839bd0326f4fad288bf3c83334170adcf1d7af7`**: sceglie la politica Area 45 nella conferma, controlla saldo zero prima del POST, attivazione 200 e saldo 45; passa poi alla politica globale 21 e verifica quota 21 con saldo storico ancora 45. Conservati filtro Area/Centro, esclusione politica altra Area, stato completo dell’importato, assenza di comandi nella sola vista e persistenza dopo riapertura. Nessuna variazione di app/API/schema/dipendenze o timeout.
+
+Checkout isolata pulita aggiornata al checkpoint. Ripresa tramite runner canonico della suite corretta e di tutte le 37 successive, evidenze `test-results/quality-gates/browser/c2c-cert-a839bd0`. Riusati soltanto gli 11 esiti verdi precedenti con prodotto/test/configurazione invariati; il KO resta documentato e non conta come esito positivo. API, statici e build precedenti rimangono pertinenti al medesimo codice applicativo; la SHA finale delle immagini sarà aggiornata dopo le verifiche.
+
+
+Seconda tratta: FSE+ beneficiari **30 PASS**, tutti gli scenari su cinque viewport. Arrivata a **45 suite verdi / 760 PASS / 155 SKIP**, inclusi i 20 casi C2C e tutta la catena integrata. La successiva prova `sociale-workflows` rileva un ulteriore test BUG05 ancora agganciato al vecchio POST `/abilitazione`, senza conferma del nuovo dialogo C2B: 1 PASS / 8 SKIP / 1 KO.
+
+Checkpoint **`1f7d25c5e7e8d4dcfe74f5df66c35508fb1b6a6a`** modifica soltanto quella prova: doppio invio del form crea una sola persona, doppio clic conferma produce un solo POST `/attivazione-credito`; risposta effettiva 200 abortita al browser, recupero tramite «Verifica esito» senza nuovo POST; quota/saldo corrispondenti e un solo movimento, diritto attivo e nessuna tessera implicita. Non rimossi controlli di recupero: aggiornati al comando approvato, con verifica del movimento aggiunta. Nessun codice applicativo, contratto, dipendenza o timeout modificato. Ripresa delle ultime quattro suite su `test-results/quality-gates/browser/c2c-cert-1f7d25c`; esiti finali seguono.
+
+
+Prova sociale aggiornata **2 PASS / 8 SKIP**, incluso BUG05 con risposta persa, doppio clic, GET di recupero e unico movimento. Totale 46 suite verdi. La prova layout successiva presenta 5 PASS / 5 KO perché seleziona Area/Persona UDS ma non applica i filtri espliciti introdotti da C2A; la pagina correttamente non carica ancora il registro. Checkpoint **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**: aggiunta la sola pressione «Applica filtri» in `tablet-operational-layouts.spec.ts`, conservando tutti i controlli responsive/overflow. Prodotto invariato. Riprese le ultime tre suite su `test-results/quality-gates/browser/c2c-cert-bb10377`.
+
+
+### Certificazione cumulativa conclusa — candidato bb10377
+
+Inventario completo browser coperto **49/49 suite: 791 PASS / 179 SKIP / 0 failure / 0 flaky**. Non è un singolo comando FULL verde: la campagna iniziale si è fermata sui tre test precedenti ai comportamenti approvati; dopo ciascun allineamento sono state riprovate la suite coinvolta e tutte le successive con il runner canonico. Copertura aggregata esatta senza omissioni o duplicazione di conteggi: ricevuta privata ignorata `test-results/quality-gates/c2c-cert-browser-coverage.json`, riferita ai quattro percorsi di evidenze sopra. I 178 skip di matrice eseguono i cicli mutativi una sola volta o su formati dedicati; lo skip residuo è «I due Excel originali M3B non sono disponibili». Nessuno skip introdotto durante la certificazione. I tre KO iniziali restano registrati e non sono conteggiati fra i PASS.
+
+SHA finale dei controlli **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**. Rispetto al candidato iniziale cambia esclusivamente la verifica in tre file e2e (28 inserimenti, 6 rimozioni); API/UI, OpenAPI e generati, schema/migration, dipendenze e configurazioni sono identici. Riuso valido delle evidenze complete: **2137 API PASS / 7 skip**, **841 UI PASS**, guardie/inventario **29 PASS**, migration runner **24 PASS**, frozen install, build/budget. Tutte le 49 suite browser hanno un esito finale verde sul codice effettivo invariato; i tre file modificati sono stati nuovamente provati con le loro modifiche. Coperti prerequisiti BUG05/21, contesto Mensa, catena sociale integrata, permessi/revoche/risposte perse e criteri dei tre blocchi.
+
+Build Docker esatte di bb10377 PASS: API `sha256:08ff678bc589ae9dd33915dd23300b19d75c772b14dfcb1b18960f1d069cfe94`, WEB `sha256:2ed99bbe9a510620fd606845da0945eff9fddea7e9e55957a4768d3871254718`. Budget **390,7/400 KiB gzip**, entry invariata `index-CeN76en1.js`. Ricontrollo scheduler in sola lettura prima del rilascio: ottobre 2026 già completato, zero destinatari pendenti/errore. Nessuna simulazione sul calendario personale. Rigenerazione finale post-Docker e verifica finale 8082 documentate nella ricevuta seguente.
+
+
+### Ricevuta installazione finale 8082 e consegna
+
+Codegen canonico ripetuto **dopo entrambe le build Docker finali**, a browser/Vite fermi, seguito da `git diff --exit-code`, `git diff --check` e nuovo `pnpm run typecheck`: **PASS**, checkout isolata pulita. Il primo tentativo senza permessi di scrittura nella worktree managed si è arrestato con EPERM; ripetizione completa con permessi corretti conclusa senza differenze o alterazioni dei generati. Nessun artefatto parziale usato dai browser.
+
+Backup finale privato **`/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2C-CERT-bb103779cd7c-2026-10-21T07-32-13-167Z`**: dump PostgreSQL e uploads con checksum/indici verificati; ripristino reale in DB effimero su rete interna senza porte host, doppio replay canonico **63→63**, identità di 57 tabelle e fingerprint SHA256 del contenuto degli allegati ripristinati. Cleanup del preflight completato. Backup e ricevute non sono inclusi in Git.
+
+Installazione effettiva 8082: **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**, API `magazzino-bugfix-uat-api:sha-bb103779cd7c`, WEB `magazzino-bugfix-uat-web:sha-bb103779cd7c`. Confrontate le image ID finali sopra e le revision label; verificati gli hash degli asset serviti e i percorsi API/UI dei tre blocchi. Catena Compose reale conservata, override immagini privato persistente nel backup, ricreati esclusivamente API/WEB con `--no-deps --no-build`. PostgreSQL mantiene ID e istante di avvio, i volumi sono invariati. **57 tabelle e fingerprint uploads identici prima/restore/dopo**: nessuna nuova persona, pasto, ricarica, importazione o suite mutativa sul database personale.
+
+HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**; Utenti senza login **401**. Ledger initialized=true, **63/63**, zero pending/mismatch/file mancanti/fuori ordine. Budget **390,7/400 KiB gzip**. Ricevuta privata `/private/tmp/c2c-cert-final-release-result.json`, copia persistente `release-result.json` nel backup.
+
+File modificati in questa certificazione: `artifacts/magazzino-solidale/e2e/fse-beneficiari-import.spec.ts`, `artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts`, `artifacts/magazzino-solidale/e2e/tablet-operational-layouts.spec.ts` e questo registro. Nessun nuovo schema, contratto o comportamento del prodotto. Cinque documenti locali estranei preservati; nessun push, merge, main o Hetzner.
+
+**Prompt 04: PRONTO PER RISCONTRO FINALE SULLA 8082**. Le UAT C2A/C2B/C2C restano chiuse dagli OK di Floriano; questa certificazione non le annulla e non sostituisce l’ultimo riscontro umano. Ricaricare la pagina e verificare accesso, apertura Interventi UDS con «Applica filtri», scheda beneficiario con politica/quota salvate e Area Mensa. Non serve attendere mensilità future, coperte dai test isolati; non è richiesto ripetere tutti i flussi mutativi già approvati. Lo skip relativo agli Excel originali M3B mancanti rimane dichiarato. **Attendere l’OK di Floriano; il prompt 05/##merge non è attivato automaticamente.**
+
+
+## Fix del riscontro finale — collegamento Centro → UDS — 21 ottobre 2026
+
+Prima dell’OK finale Floriano segnala nel video il rifiuto di «Aggiungi a UDS» per una persona già presente nel Centro. Video esaminato localmente, senza pubblicare fotogrammi o dati personali. Errore effettivo: «Per aggiungere la persona all’Unità di Strada indica l’Area di provenienza». Le anagrafiche non UDS possono avere provenienza/età mancanti; il PATCH UDS richiede correttamente i dati risultanti. La vecchia conferma offriva solo Conferma/Annulla e si chiudeva anche in caso di rifiuto, senza offrire lì i campi necessari. Non è un divieto di avere insieme Centro e UDS.
+
+Checkpoint applicativo **`76e250e73718fc4b0c0db83c715664dca7d3d83e`**: finestra di collegamento con provenienza, data di nascita oppure fascia d’età; indicazione di lasciare vuoti i valori da conservare, nessun dato inventato o valore predefinito imposto. Errore inline e finestra conservata fino a successo/annullamento; riuso del PATCH versionato sullo stesso ID. Centro, Area, stato anagrafica e servizi esistenti non vengono riassegnati. Traduzioni delle due nuove indicazioni nelle sei lingue. **Nessuna modifica API/OpenAPI/generati/schema/migration, permessi o validazioni server**.
+
+Verifiche: `pnpm install --frozen-lockfile` **PASS** con pnpm 10.34.5/Node 24, lockfile invariato (prima esecuzione non interattiva senza rete fermata prima di modificare i moduli, poi completata con accesso corretto); typecheck workspace **PASS**; UI **843 PASS / 129 file**, inclusi **15 PASS** della scheda. API canonico `general`: **1558 PASS / 7 skip esterni preesistenti**, 144 file, migration runner **24 PASS**, schema e replay ledger 63/63 e cleanup automatico; evidenze `test-results/quality-gates/api/uds-link-76e250e`.
+
+Browser: sessioni UDS **5 PASS** in `test-results/quality-gates/browser/uds-link-76e250e`. Nuovi casi «provenienza mancante», «età mancante» e «dati già completi» su cinque viewport, con controllo di errore/riprova, ID/codice/Centro conservati, zero POST persona, una sola anagrafica, nessuna tessera o movimento credito. Il primo controllo touch sul caso già completo misurava durante l’animazione di apertura (42 px transitori invece dei 44 finali): checkpoint **`f57e1fa18512453f3a19da369a7d7ecba1d2e69d`** attende la fine dell’animazione prima del controllo originale, senza cambiare soglia, timeout o prodotto. Suite UDS finale **19 PASS / 16 skip di matrice preesistenti**, zero failure/flaky, evidenze `test-results/quality-gates/browser/uds-link-f57e1fa`. Totale browser pertinente **24 PASS / 16 skip**. Conservate prove BUG21, lifecycle/interventi/rettifica, tessera e codici; riusata la precedente certificazione completa solo per le parti applicative invariate.
+
+Docker finali esatti di **`f57e1fa18512453f3a19da369a7d7ecba1d2e69d`**: API `sha256:2e34856919687f591b0bc8fe69796749c06d8c248a158093a4f920302ef94e1d`, WEB `sha256:88744282cdec691406d9a70efbe0a6adaa577d634bb26ab9bdc37051d7c52300`. Build **PASS**, entry `index-Dr06pv4F.js`, **391,3/400 KiB gzip**. Codegen canonico ripetuto dopo le build e a browser fermo, `git diff --exit-code`, `git diff --check` e nuovo typecheck **PASS**.
+
+Backup privato **`/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-UDS-LINK-f57e1fa18512-2026-10-21T08-00-33-870Z`**: dump/uploads con SHA256 e indici verificati, restore reale su PostgreSQL effimero senza porte host, doppio replay **63→63**, identità di **57 tabelle** e fingerprint del contenuto degli uploads prima/restore/dopo. Mensilità ottobre già completata, zero destinatari pendenti/errore, nessuna simulazione economica. Applicata la catena Compose effettiva con sole immagini API/WEB; PostgreSQL conserva ID/avvio, volumi invariati. Ricevuta privata `/private/tmp/uds-link-uat-final-release-result.json`, copia persistente nel backup. HTTP `/`, `/config.js`, health/ready **200**, Utenti anonimo **401**; SHA e hash dei nuovi asset UDS verificati. Ledger initialized=true **63/63**, nessuna anomalia. Nessuna suite mutativa o correzione manuale delle persone sulla 8082.
+
+File modificati: `artifacts/magazzino-solidale/src/components/uds-persona-sheet.tsx`, relativa prova `.test.tsx`, `artifacts/magazzino-solidale/src/lib/i18n/namespaces/udsAnagrafica.ts`, `artifacts/magazzino-solidale/e2e/uds-workflows.spec.ts`, questo registro. Cinque documenti locali estranei preservati. Nessun push/merge/main/Hetzner.
+
+**Fix PRONTA PER UAT sulla 8082**, versione f57e1fa. Ricaricare Anagrafica UDS → Nuova persona → Area → ricerca persona esistente → Aggiungi a UDS. Completare nella conferma solo provenienza e/o età mancanti e confermare; se già registrate lasciare vuoti i campi. Atteso: stessa persona con canale UDS + Centro, servizi e storico conservati. Gli OK precedenti di C2A/C2B/C2C restano registrati; il riscontro finale resta in attesa della prova di Floriano su questa fix. Il prompt 05/##merge non è attivato automaticamente.
+
+
+## OK finale di Floriano e attivazione prompt 05 — 21 ottobre 2026
+
+Mandato diretto: «Ho provato sulla 8082, ora funziona tutto anche il collegamento UDS. Ti do l’OK finale, procedi con il prompt 05_MERGE_Finale.txt nella cartella BUG 5». **UAT finale OK**, inclusa fix collegamento Centro→UDS sulla versione **`f57e1fa18512453f3a19da369a7d7ecba1d2e69d`**, ricevuta nel checkpoint documentale `8740d56`. Restano confermati gli OK C2A (4fbab675), C2B/R1/R2 (5c3f32d) e C2C (5343464), oltre al primo ciclo già integrato e rilasciato su main/Hetzner `d9d34d72178faa56b5c75e80642e883899750dd7`. BUG22–26 e raccordo BUG05/21 **UAT OK**; nessun KO funzionale residuo.
+
+Il prompt 05 è ora espressamente attivato: comprende PR/integrazione Git, push secondo workflow e rilascio verificato Hetzner, senza bonifiche, nuove funzioni, modifiche delle politiche economiche o restore con perdita di dati. Branch `codex/bugfix-ciclo2-ottobre-2026`; cinque documenti locali estranei preservati. Fetch remoto: main ancora d9d34d7, antenato del candidato; delta limitato al ciclo 2 e fix/verifiche registrate. Unico workflow GitHub «Quality gates», PR e push main; nessun webhook attivo o trigger di deploy rilevato, main non protetta. Stato iniziale prompt 05: **IN CORSO**, nessun merge/rilascio anticipato dichiarato.
+
+Gate riusabili sul codice validato: certificazione completa 2137 API / 841 UI / 791 browser su tutte le 49 suite; successiva fix UDS con 1558 API / 843 UI / 24 browser pertinenti e assenza di modifiche API/schema/dipendenze. Skip e tre precedenti correzioni dei test documentati sopra. CI della PR e del risultato main da controllare realmente; preflight Hetzner e backup/ripristino prima di qualsiasi ricreazione dei servizi.

@@ -1,16 +1,21 @@
 import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
-import { loadDocumentLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
+import {
+  loadDocumentLogoDataUrl,
+  resolveBrandingAmbiente,
+  type BrandingAmbiente,
+} from "@/lib/branding-ambiente";
 import { todayEuropeRome } from "@/lib/europe-rome";
 
 export type UdsReportPdfRow = {
+  id?: number;
   numeroIntervento: number;
   primoIntervento: boolean;
   data: string;
   persona: string;
   zona: string;
   tipo: string;
-  note: string;
+  sections: { label: string; text: string }[];
   operatore: string;
 };
 
@@ -66,6 +71,7 @@ export async function exportUdsReportGiornalieroPdf(opts: {
   rows: UdsReportPdfRow[];
   branding?: BrandingAmbiente | null;
   associationLogoDataUrl?: string | null;
+  beforeSave?: () => Promise<void>;
 }): Promise<void> {
   const { filename, title, meta, labels, rows } = opts;
   const branding = opts.branding ?? resolveBrandingAmbiente(null);
@@ -126,26 +132,31 @@ export async function exportUdsReportGiornalieroPdf(opts: {
   );
 
   doc.setTextColor(200, 30, 30);
-  doc.text(labels.legend, marginX, 96);
+  const legendLines = doc.splitTextToSize(labels.legend, pageW - 2 * marginX);
+  doc.text(legendLines, marginX, 96);
 
   autoTable(doc, {
-    startY: 108,
-    head: [[
-      labels.colN,
-      labels.colData,
-      labels.colPersona,
-      labels.colZona,
-      labels.colTipo,
-      labels.colNote,
-      labels.colOperatore,
-    ]],
+    startY: 108 + (legendLines.length - 1) * 11,
+    head: [
+      [
+        labels.colN,
+        labels.colData,
+        labels.colPersona,
+        labels.colZona,
+        labels.colTipo,
+        labels.colNote,
+        labels.colOperatore,
+      ],
+    ],
     body: rows.map((r) => [
-      String(r.numeroIntervento),
+      `${r.numeroIntervento}${r.id != null ? `\n#${r.id}` : ""}`,
       r.data,
       r.persona,
       r.zona,
       r.tipo,
-      r.note,
+      r.sections
+        .map((section) => `${section.label}\n${section.text}`)
+        .join("\n\n"),
       r.operatore,
     ]),
     styles: { fontSize: 8, cellPadding: 4 },
@@ -156,7 +167,8 @@ export async function exportUdsReportGiornalieroPdf(opts: {
       1: { cellWidth: 64 },
       5: { cellWidth: 220 },
     },
-    margin: { left: marginX, right: marginX },
+    margin: { left: marginX, right: marginX, top: 40, bottom: 40 },
+    rowPageBreak: "auto",
     didParseCell: (data: CellHookData) => {
       if (data.section === "body" && data.column.index === 0) {
         const row = rows[data.row.index];
@@ -167,5 +179,18 @@ export async function exportUdsReportGiornalieroPdf(opts: {
     },
   });
 
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page++) {
+    doc.setPage(page);
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    doc.text(
+      `${page} / ${pages}`,
+      pageW - marginX,
+      doc.internal.pageSize.getHeight() - 18,
+      { align: "right" },
+    );
+  }
+  await opts.beforeSave?.();
   doc.save(`${filename}_${timestamp()}.pdf`);
 }

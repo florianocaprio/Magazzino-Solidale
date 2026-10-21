@@ -17,6 +17,13 @@ export interface MensaAbilitazione {
   mensaId: number;
   /** @nullable */
   mensaNome?: string | null;
+  /**
+   * Area stabile del diritto, ricavata dalla Mensa di riferimento
+   * @nullable
+   */
+  areaOperativaId?: number | null;
+  /** @nullable */
+  areaOperativaNome?: string | null;
   dataInizio: Date;
   /** @nullable */
   dataFine?: Date | null;

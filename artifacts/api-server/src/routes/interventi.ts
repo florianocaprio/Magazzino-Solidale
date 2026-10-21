@@ -2597,6 +2597,8 @@ router.get(["/interventi", "/interventi/pagina"], async (req, res) => {
     centroAscoltoId,
     areaOperativaId,
     bisogni,
+    tipoBisogno,
+    zonaUdsId,
     stato,
     ambito,
     includiStorici,
@@ -2818,7 +2820,10 @@ router.get(["/interventi", "/interventi/pagina"], async (req, res) => {
     }
     try {
       const range = intervalloDateEuropeRome(da, a);
-      const referenceDate = sql`coalesce(
+      const referenceDate =
+        ambito === "uds"
+          ? sql`${interventiTable.dataIntervento}::timestamp at time zone 'Europe/Rome'`
+          : sql`coalesce(
         ${interventiTable.dataOraPianificata},
         ${interventiTable.dataOraConclusione},
         ${interventiTable.dataOraAvvio},
@@ -2951,24 +2956,51 @@ router.get(["/interventi", "/interventi/pagina"], async (req, res) => {
     res.status(400).json({ error: "Filtro bisogni non valido" });
     return;
   }
-  if (bisogni === "aperti") {
-    conditions.push(sql`exists (
-      select 1 from ${bisogniPianificatiTable}
-      where ${bisogniPianificatiTable.interventoId} = ${interventiTable.id}
-        and ${bisogniPianificatiTable.stato} in ('da_pianificare', 'pianificato')
-    )`);
-  } else if (bisogni === "scaduti") {
-    conditions.push(sql`exists (
-      select 1 from ${bisogniPianificatiTable}
-      where ${bisogniPianificatiTable.interventoId} = ${interventiTable.id}
-        and ${bisogniPianificatiTable.stato} in ('da_pianificare', 'pianificato')
-        and ${bisogniPianificatiTable.dataPrevista} < ${oggiEuropeRome()}
-    )`);
-  } else if (bisogni === "nessuno") {
-    conditions.push(sql`not exists (
-      select 1 from ${bisogniPianificatiTable}
-      where ${bisogniPianificatiTable.interventoId} = ${interventiTable.id}
-    )`);
+  if (tipoBisogno && !["richiesta", "azione"].includes(tipoBisogno)) {
+    res.status(400).json({ error: "tipoBisogno non valido" });
+    return;
+  }
+  if (tipoBisogno && bisogni === "nessuno") {
+    res
+      .status(400)
+      .json({ error: "Tipo bisogno incompatibile con nessun bisogno" });
+    return;
+  }
+  if (zonaUdsId) {
+    const zoneId = parsePositiveInteger(zonaUdsId);
+    if (ambito !== "uds" || zoneId == null) {
+      res
+        .status(400)
+        .json({ error: "zonaUdsId richiede ambito UDS e un ID valido" });
+      return;
+    }
+    conditions.push(eq(interventiTable.zonaUdsIdSnapshot, zoneId));
+  }
+  // Type and state must match the same linked need, without multiplying rows.
+  if (bisogni === "nessuno") {
+    conditions.push(sql`not exists (select 1 from ${bisogniPianificatiTable}
+      where ${bisogniPianificatiTable.interventoId} = ${interventiTable.id})`);
+  } else if (tipoBisogno || bisogni) {
+    const needsConditions: SQL[] = [
+      eq(bisogniPianificatiTable.interventoId, interventiTable.id),
+    ];
+    if (tipoBisogno)
+      needsConditions.push(eq(bisogniPianificatiTable.tipo, tipoBisogno));
+    if (bisogni === "aperti" || bisogni === "scaduti") {
+      needsConditions.push(
+        inArray(bisogniPianificatiTable.stato, [
+          "da_pianificare",
+          "pianificato",
+        ]),
+      );
+    }
+    if (bisogni === "scaduti")
+      needsConditions.push(
+        sql`${bisogniPianificatiTable.dataPrevista} < ${oggiEuropeRome()}`,
+      );
+    conditions.push(
+      sql`exists (select 1 from ${bisogniPianificatiTable} where ${and(...needsConditions)})`,
+    );
   }
 
   const parsedPage = pagina ? parsePositiveInteger(pagina) : 1;
@@ -2984,11 +3016,17 @@ router.get(["/interventi", "/interventi/pagina"], async (req, res) => {
       socialSubjectPredicate(socialActors.get(req)),
     )!,
   );
-  const orderBy = interventiOrderBy(
-    parsedVista,
-    parsedOrdinamento,
-    direzione === "desc" ? "desc" : "asc",
-  );
+  const orderBy =
+    ambito === "uds"
+      ? [
+          sql`${interventiTable.dataIntervento} desc nulls last`,
+          desc(interventiTable.id),
+        ]
+      : interventiOrderBy(
+          parsedVista,
+          parsedOrdinamento,
+          direzione === "desc" ? "desc" : "asc",
+        );
 
   const rows = await db
     .select({

@@ -613,7 +613,15 @@ function AppRoutes() {
           </Route>
 
           <Route path="/uds/anagrafica/:id">
-            {() => <Guard area="uds"><RequireModulo codice="UDS"><RequirePermission permission="beneficiari.view"><BeneficiarioDettaglio /></RequirePermission></RequireModulo></Guard>}
+            {() => (
+              <Guard area="uds">
+                <RequireModulo codice="UDS">
+                  <RequirePermission permission="beneficiari.view">
+                    <BeneficiarioDettaglio />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
           </Route>
           <Route path="/uds/anagrafica">
             {() => (
@@ -678,11 +686,13 @@ function AppRoutes() {
           </Route>
           <Route path="/uds/report-giornaliero">
             {() => (
-              <Guard area="uds">
+              <Guard area="analisi">
                 <RequireModulo codice="UDS">
-                  <RequirePermission permission="uds.reports.view">
-                    <UdsReportGiornaliero />
-                  </RequirePermission>
+                  <RequireModulo codice="REPORT">
+                    <RequirePermission permission="uds.reports.view">
+                      <UdsReportGiornaliero />
+                    </RequirePermission>
+                  </RequireModulo>
                 </RequireModulo>
               </Guard>
             )}

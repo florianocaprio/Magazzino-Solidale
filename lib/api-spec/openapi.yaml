@@ -4240,6 +4240,14 @@ paths:
           schema:
             type: string
             enum: [aperti, scaduti, nessuno]
+        - name: tipoBisogno
+          in: query
+          description: Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+          schema: { type: string, enum: [richiesta, azione] }
+        - name: zonaUdsId
+          in: query
+          description: Zona storica dell'incontro; richiede ambito UDS.
+          schema: { type: integer }
         - name: stato
           in: query
           schema:
@@ -5528,6 +5536,57 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/EmporioAbilitazioneRiepilogoBeneficiario"
+
+  /emporio/beneficiari/{beneficiarioId}/attivazione-credito:
+    get:
+      operationId: getEmporioCreditoAnteprima
+      tags: [emporio]
+      summary: Anteprima senza accrediti; richiede gestione abilitazioni e quota, profilo Sociale e territorio corrente.
+      parameters:
+        - { name: beneficiarioId, in: path, required: true, schema: { type: integer } }
+        - name: politicaCreditoSolidaleId
+          in: query
+          required: false
+          description: Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.
+          schema: { type: string, pattern: '^(auto|[1-9][0-9]*)$' }
+      responses:
+        "200":
+          description: Calcolo autorevole e versione da confermare.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmporioCreditoAnteprima" }
+    post:
+      operationId: attivaEmporioCredito
+      tags: [emporio]
+      summary: Attivazione atomica Emporio, credito e prima quota; stessa chiave e contenuto restituiscono la ricevuta, mismatch 409.
+      parameters:
+        - { name: beneficiarioId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmporioCreditoAttivazioneInput" }
+      responses:
+        "200":
+          description: Esito confermato nella stessa transazione del diritto, credito e audit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmporioCreditoAttivazioneResult" }
+  /emporio/beneficiari/{beneficiarioId}/attivazione-credito/esito:
+    get:
+      operationId: getEmporioCreditoAttivazioneEsito
+      tags: [emporio]
+      summary: Recupera l'esito con rivalidazione di entrambi i permessi, moduli, attore e territorio.
+      parameters:
+        - { name: beneficiarioId, in: path, required: true, schema: { type: integer } }
+        - { name: idempotencyKey, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 120 } }
+      responses:
+        "200":
+          description: Ricevuta di questa intenzione.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmporioCreditoAttivazioneResult" }
+        "404": { description: Nessuna ricevuta per questa intenzione e attore. }
 
   /emporio/beneficiari/{beneficiarioId}/abilitazione:
     parameters:
@@ -9907,7 +9966,8 @@ paths:
     get:
       operationId: reportUdsInterventiGiornalieri
       tags: [report]
-      summary: UDS street interventions for a day or date range, with per-person sequence number
+      summary: UDS operational detail, current linked needs and absolute per-person sequence
+      description: Complete authorized result, latest first. Over 10000 interventions returns 413; narrow the period or filters.
       parameters:
         - name: da
           in: query
@@ -17038,6 +17098,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        versioneBeneficiario:
+          type: integer
+          minimum: 1
+          description: Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.
         politicaCreditoSolidaleId:
           type: ["integer", "null"]
           minimum: 1
@@ -17055,6 +17119,7 @@ components:
     CreditoSolidaleConfigurazione:
       type: object
       properties:
+        versioneBeneficiario: { type: integer }
         politicaCreditoSolidaleId:
           type: ["integer", "null"]
           minimum: 1
@@ -19479,6 +19544,59 @@ components:
           $ref: "#/components/schemas/EmporioStatoEffettivo"
         motivo:
           type: [string, "null"]
+
+    EmporioCreditoAnteprima:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        versioneBeneficiario: { type: integer }
+        calcoloToken: { type: string }
+        areaNome: { type: string }
+        politicaNome: { type: string }
+        politicaCreditoSolidaleId: { type: integer, nullable: true }
+        politicheDisponibili:
+          type: array
+          items:
+            type: object
+            required: [id, nome, ambito]
+            properties:
+              id: { type: integer }
+              nome: { type: string }
+              ambito: { type: string, enum: [centro, area, globale] }
+        totaleSuggerito: { type: integer }
+        quotaMensileAssegnata: { type: integer }
+        motivoModificaQuota: { type: string, nullable: true }
+        primaQuotaAmmessa: { type: boolean }
+      required: [beneficiarioId, versioneBeneficiario, calcoloToken, areaNome, politicaNome, politicaCreditoSolidaleId, politicheDisponibili, totaleSuggerito, quotaMensileAssegnata, primaQuotaAmmessa]
+    EmporioCreditoAttivazioneInput:
+      type: object
+      additionalProperties: false
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versioneBeneficiario: { type: integer, minimum: 1 }
+        calcoloToken: { type: string, minLength: 64, maxLength: 64 }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+        quotaMensileAssegnata: { type: integer, nullable: true, minimum: 0, maximum: 99999999 }
+        politicaCreditoSolidaleId:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.
+        motivoModificaQuota: { type: string, nullable: true, maxLength: 10000 }
+      required: [idempotencyKey, versioneBeneficiario, calcoloToken, motivo]
+    EmporioCreditoAttivazioneResult:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        politicaCreditoSolidaleId: { type: integer, nullable: true }
+        politicaNome: { type: string }
+        quotaMensile: { type: integer }
+        quotaAccreditata: { type: integer }
+        primaQuotaValutata: { type: boolean }
+        periodo: { type: string }
+        movimentoId: { type: integer, nullable: true }
+        stato: { type: string }
+      required: [beneficiarioId, quotaMensile, quotaAccreditata, primaQuotaValutata, periodo, movimentoId, stato]
 
     EmporioAbilitazioneInput:
       type: object
@@ -22221,6 +22339,13 @@ components:
           type: string
         tipoIntervento:
           type: string
+        stato:
+          $ref: "#/components/schemas/InterventoStato"
+        bisogniPianificati:
+          type: array
+          description: Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro.
+          items:
+            $ref: "#/components/schemas/UdsReportBisogno"
         descrizione:
           type: string
           nullable: true
@@ -22245,7 +22370,22 @@ components:
           tipoIntervento,
           numeroIntervento,
           primoIntervento,
+          stato,
+          bisogniPianificati,
         ]
+
+    UdsReportBisogno:
+      type: object
+      properties:
+        id: { type: integer }
+        tipo: { type: string, enum: [richiesta, azione] }
+        descrizione: { type: string }
+        stato: { type: string }
+        dataPrevista: { type: string, nullable: true }
+        priorita: { type: string }
+        note: { type: string, nullable: true }
+        dataCompletamento: { type: string, nullable: true }
+      required: [id, tipo, descrizione, stato, priorita]
 
     UdsInterventiMeseReport:
       type: object
@@ -22403,6 +22543,8 @@ components:
         beneficiarioCodice: { type: ["string", "null"] }
         mensaId: { type: integer }
         mensaNome: { type: ["string", "null"] }
+        areaOperativaId: { type: ["integer", "null"], description: "Area stabile del diritto, ricavata dalla Mensa di riferimento" }
+        areaOperativaNome: { type: ["string", "null"] }
         dataInizio: { type: string, format: date }
         dataFine: { type: ["string", "null"], format: date }
         stato: { type: string, enum: [attiva, sospesa, revocata, scaduta] }
@@ -22424,21 +22566,21 @@ components:
 
     MensaAbilitazioneInput:
       type: object
-      required: [beneficiarioId, mensaId, dataInizio]
+      required: [beneficiarioId, mensaId, dataInizio, motivo]
       properties:
         beneficiarioId: { type: integer }
         mensaId: { type: integer }
         dataInizio: { type: string, format: date }
         dataFine: { type: ["string", "null"], format: date }
         mensaPrincipale: { type: boolean }
-        motivo: { type: ["string", "null"] }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
 
     MensaStatoInput:
       type: object
-      required: [stato, versione]
+      required: [stato, versione, motivo]
       properties:
         stato: { type: string, enum: [attiva, sospesa, revocata, scaduta] }
-        motivo: { type: ["string", "null"] }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
         versione: { type: string, format: date-time }
 
     TesseraBeneficiario:

@@ -190,6 +190,93 @@ describe("Interventi UDS con confine area operativa", () => {
     interventoIds.push(created.body.id);
   });
 
+  it("filtra lo stesso bisogno, usa data civile e zona storica, e pagina oltre 200 senza duplicazioni", async () => {
+    const zone = await createZona(areaOperativaOperatore);
+    const person = await createBeneficiario(
+      areaOperativaOperatore,
+      null,
+      zonaOperatore,
+    );
+    const rows = await db
+      .insert(interventiTable)
+      .values(
+        Array.from({ length: 205 }, (_, n) => ({
+          beneficiarioId: person,
+          tipoIntervento: "ascolto",
+          ambito: "uds",
+          dataIntervento: "2026-08-14",
+          dataOraConclusione: new Date("2026-09-10T10:00:00Z"),
+          areaOperativaIdSnapshot: areaOperativaOperatore,
+          zonaUdsIdSnapshot: zone,
+        })),
+      )
+      .returning({ id: interventiTable.id });
+    interventoIds.push(...rows.map((r) => r.id));
+    const latest = rows.at(-1)!.id;
+    try {
+      await pool.query(
+        `INSERT INTO bisogni_pianificati(intervento_id,tipo,descrizione,stato) VALUES
+        ($1,'richiesta','Richiesta completata','completato'),($1,'azione','Azione aperta','da_pianificare')`,
+        [latest],
+      );
+      const params = {
+        ambito: "uds",
+        beneficiarioId: person,
+        da: "2026-08-14",
+        a: "2026-08-14",
+        zonaUdsId: zone,
+        limite: 200,
+      };
+      const first = await request(makeApp())
+        .get("/interventi/pagina")
+        .query(params);
+      expect(first.status).toBe(200);
+      expect(first.body.total).toBe(205);
+      expect(first.body.items).toHaveLength(200);
+      expect(first.body.items[0].id).toBe(latest);
+      const second = await request(makeApp())
+        .get("/interventi/pagina")
+        .query({ ...params, pagina: 2 });
+      expect(second.body.items).toHaveLength(5);
+      expect(
+        new Set([...first.body.items, ...second.body.items].map((r) => r.id))
+          .size,
+      ).toBe(205);
+      const mismatch = await request(makeApp())
+        .get("/interventi/pagina")
+        .query({ ...params, tipoBisogno: "richiesta", bisogni: "aperti" });
+      expect(mismatch.body.total).toBe(0);
+      const matched = await request(makeApp())
+        .get("/interventi/pagina")
+        .query({ ...params, tipoBisogno: "azione", bisogni: "aperti" });
+      expect(matched.body.total).toBe(1);
+      expect(matched.body.items[0].id).toBe(latest);
+      const currentZone = await request(makeApp())
+        .get("/interventi/pagina")
+        .query({ ...params, zonaUdsId: zonaOperatore });
+      expect(currentZone.body.total).toBe(0);
+      expect(
+        (
+          await request(makeApp())
+            .get("/interventi")
+            .query({ ...params, tipoBisogno: "azione", bisogni: "nessuno" })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await request(makeApp())
+            .get("/interventi")
+            .query({ ...params, tipoBisogno: "invalid" })
+        ).status,
+      ).toBe(400);
+    } finally {
+      await pool.query(
+        "DELETE FROM bisogni_pianificati WHERE intervento_id=$1",
+        [latest],
+      );
+    }
+  });
+
   it.each([
     [
       "un'altra area operativa",

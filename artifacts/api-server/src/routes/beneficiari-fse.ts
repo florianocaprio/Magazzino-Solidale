@@ -1,3 +1,4 @@
+import { riallineaQuotaNucleoTx } from "../lib/creditoCalcolo";
 import { anagraficaImportValues, fseImportComparison } from "../lib/fseBeneficiariImportPlan";
 import { canonicalFseSnapshot, type SnapshotOrigin } from "../lib/beneficiarioFascicolo";
 import { allocateBeneficiaryCode } from "../lib/beneficiariCodice";
@@ -756,10 +757,11 @@ router.post(
             const changes = fullUpdate
               ? { ...anagraficaImportValues(row), versione: target.versione + 1, dataAggiornamento: new Date() }
               : conservativeImportChanges(target, row, nucleo);
-            await tx
+            const [after] = await tx
               .update(beneficiariTable)
               .set(changes)
-              .where(eq(beneficiariTable.id, target.id));
+              .where(eq(beneficiariTable.id, target.id)).returning();
+            await riallineaQuotaNucleoTx(tx,target,after,req.user?.id ?? null);
             return Object.keys(changes).filter(
               (key) => key !== "dataAggiornamento",
             );

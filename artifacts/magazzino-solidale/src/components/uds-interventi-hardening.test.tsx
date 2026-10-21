@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(),
   createdInterventions: [] as unknown[],
   directoryParams: vi.fn(),
+  listParams: vi.fn(),
   personaSheetProps: null as null | {
     open: boolean;
     initialZonaUdsId: number | null;
@@ -43,6 +44,11 @@ const intervention = {
 
 vi.mock("@workspace/api-client-react", () => ({
   getListAreeOperativeQueryKey: () => ["aree"],
+  getListInterventiPaginaQueryKey: (params: unknown) => [
+    "/api/interventi/pagina",
+    params,
+  ],
+  listInterventiPagina: vi.fn(),
   getListInterventiQueryKey: (params: unknown) => ["interventi", params],
   useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({
@@ -70,13 +76,21 @@ vi.mock("@workspace/api-client-react", () => ({
       ],
     };
   },
-  useListInterventi: () => ({
-    data: [
-      intervention,
-      ...(mocks.createdInterventions as Array<typeof intervention>),
-    ],
-    isLoading: false,
-  }),
+  useListInterventiPagina: (params: unknown) => {
+    mocks.listParams(params);
+    return {
+      data: {
+        items: [
+          intervention,
+          ...(mocks.createdInterventions as Array<typeof intervention>),
+        ],
+        total: 1,
+        pagina: 1,
+        limite: 50,
+      },
+      isLoading: false,
+    };
+  },
   useListTipiIntervento: () => ({
     data: [{ id: 1, nome: "ascolto", attivo: true }],
   }),
@@ -209,6 +223,7 @@ describe("hardening UI Interventi UDS", () => {
     mocks.directoryParams.mockReset();
     mocks.personaSheetProps = null;
     mocks.permissions = new Set([
+      "uds.interventi.view",
       "uds.interventi.create",
       "uds.interventi.update",
       "uds.interventi.note",
@@ -236,13 +251,64 @@ describe("hardening UI Interventi UDS", () => {
     await act(async () => select?.click());
   }
 
+  it("nuovo intervento identifica la persona senza filtro e conserva ID e contenuto per il retry", async () => {
+    await act(async () => root.render(<UdsInterventi />));
+    expect(
+      Array.from(document.querySelectorAll("button")).some((b) =>
+        b.textContent?.includes("udsAnagrafica.newPerson"),
+      ),
+    ).toBe(false);
+    const button = Array.from(document.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("udsInterventi.newIntervento"),
+    );
+    expect(button?.disabled).toBe(false);
+    await act(async () => button?.click());
+    await act(async () =>
+      Array.from(document.querySelectorAll("button"))
+        .find((b) => b.textContent === "salva-persona-rapida")
+        ?.click(),
+    );
+    const form = document.querySelector("form.space-y-4");
+    await act(async () =>
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+    const callbacks = mocks.create.mock.calls.at(-1)?.[1];
+    await act(async () => callbacks.onError({ status: 500 }));
+    expect(document.querySelector("form.space-y-4")).not.toBeNull();
+    await act(async () =>
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+    expect(mocks.create.mock.calls.at(-1)?.[0].data.beneficiarioId).toBe(7);
+  });
+
+  it("la persona è un filtro facoltativo applicato solo con Ricerca", async () => {
+    await renderAndSelectPerson();
+    expect(mocks.listParams.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      "beneficiarioId",
+    );
+    await act(async () =>
+      document
+        .querySelector("form.flex")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        ),
+    );
+    expect(mocks.listParams.mock.calls.at(-1)?.[0]).toMatchObject({
+      beneficiarioId: 7,
+      pagina: 1,
+      limite: 50,
+    });
+  });
+
   it("presenta la descrizione come Sintesi e mantiene separato il materiale", () => {
     expect(udsInterventi.it.fBisogni).toBe("Sintesi dell'incontro");
     expect(udsInterventi.it.fBisogni).not.toMatch(/bisogni rilevati/i);
     expect(udsInterventi.it.fMateriale).toBe("Materiale consegnato");
-    expect(udsInterventi.it.bisogniPianificatiTitle).toBe(
-      "Bisogni e azioni",
-    );
+    expect(udsInterventi.it.bisogniPianificatiTitle).toBe("Bisogni e azioni");
   });
 
   it("cerca per default in tutta l'Area e propone la zona operatore alla nuova persona", async () => {
@@ -252,7 +318,7 @@ describe("hardening UI Interventi UDS", () => {
       expect.not.objectContaining({ zonaUdsId: expect.anything() }),
     );
     const newPerson = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+      (button) => button.textContent?.includes("udsInterventi.newIntervento"),
     );
     await act(async () => newPerson?.click());
     expect(mocks.personaSheetProps).toEqual({
@@ -287,7 +353,7 @@ describe("hardening UI Interventi UDS", () => {
       expect.objectContaining({ zonaUdsId: 30 }),
     );
     const newPerson = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+      (button) => button.textContent?.includes("udsInterventi.newIntervento"),
     );
     await act(async () => newPerson?.click());
     expect(mocks.personaSheetProps).toEqual({
@@ -302,7 +368,12 @@ describe("hardening UI Interventi UDS", () => {
       (button) => button.textContent?.includes("udsInterventi.newIntervento"),
     );
     await act(async () => createButton?.click());
-    const form = document.querySelector("form");
+    await act(async () =>
+      Array.from(document.querySelectorAll("button"))
+        .find((b) => b.textContent === "salva-persona-rapida")
+        ?.click(),
+    );
+    const form = document.querySelector("form.space-y-4");
     expect(form).not.toBeNull();
     await act(async () =>
       form?.dispatchEvent(
@@ -346,6 +417,11 @@ describe("hardening UI Interventi UDS", () => {
       (button) => button.textContent?.includes("udsInterventi.newIntervento"),
     );
     await act(async () => createButton?.click());
+    await act(async () =>
+      Array.from(document.querySelectorAll("button"))
+        .find((b) => b.textContent === "salva-persona-rapida")
+        ?.click(),
+    );
     const summary = document.querySelector<HTMLTextAreaElement>(
       'textarea[name="descrizione"]',
     );
@@ -363,7 +439,7 @@ describe("hardening UI Interventi UDS", () => {
     await act(async () => addNeed?.click());
     await act(async () =>
       document
-        .querySelector("form")
+        .querySelector("form.space-y-4")
         ?.dispatchEvent(
           new Event("submit", { bubbles: true, cancelable: true }),
         ),
@@ -392,7 +468,7 @@ describe("hardening UI Interventi UDS", () => {
   it("seleziona automaticamente la persona appena creata e consente subito l'incontro", async () => {
     await act(async () => root.render(<UdsInterventi />));
     const newPerson = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+      (button) => button.textContent?.includes("udsInterventi.newIntervento"),
     );
     await act(async () => newPerson?.click());
     const savePerson = Array.from(document.querySelectorAll("button")).find(

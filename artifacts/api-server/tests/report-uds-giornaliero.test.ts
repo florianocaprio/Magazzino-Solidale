@@ -72,7 +72,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     const mine = (range.body as Array<{ beneficiarioId: number; numeroIntervento: number; dataIntervento: string }>)
       .filter((r) => r.beneficiarioId === ben);
     expect(mine).toHaveLength(2);
-    expect(mine.map((r) => r.numeroIntervento)).toEqual([1, 2]);
+    expect(mine.map((r) => r.numeroIntervento)).toEqual([2, 1]);
 
     // Reversed order (a < da) is normalized to the same range.
     const reversed = await request(appGlobal()).get(
@@ -88,6 +88,30 @@ describe("Report UDS — interventi-giornalieri", () => {
     expect(
       (single.body as Array<{ beneficiarioId: number }>).filter((r) => r.beneficiarioId === ben),
     ).toHaveLength(1);
+  });
+
+  it("proietta bisogni correnti anche futuri, senza duplicare incontri o esporre altri campi", async () => {
+    const area = await createAreaOperativa(scope);
+    const ben = await createBeneficiario(scope, null, { uds: true, areaOperativaId: area });
+    const id = await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-04", ambito: "uds", areaOperativaIdSnapshot: area });
+    try {
+      await pool.query(`INSERT INTO bisogni_pianificati(intervento_id,tipo,descrizione,stato,data_prevista,priorita,note)
+        VALUES ($1,'richiesta','Abiti','da_pianificare',NULL,'normale','Nota richiesta'),
+        ($1,'azione','Accompagnamento','pianificato','2026-08-15','alta','Nota azione')`, [id]);
+      const response = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-07-04");
+      expect(response.status).toBe(200);
+      const mine = response.body.filter((r: {id: number}) => r.id === id);
+      expect(mine).toHaveLength(1);
+      expect(mine[0].bisogniPianificati).toHaveLength(2);
+      expect(mine[0].bisogniPianificati).toEqual(expect.arrayContaining([
+        expect.objectContaining({tipo: "azione", dataPrevista: "2026-08-15", stato: "pianificato"}),
+        expect.objectContaining({tipo: "richiesta", note: "Nota richiesta"}),
+      ]));
+      expect(Object.keys(mine[0].bisogniPianificati[0]).sort()).toEqual(["id","tipo","descrizione","stato","dataPrevista","priorita","note","dataCompletamento"].sort());
+      await pool.query("UPDATE bisogni_pianificati SET stato='completato',data_completamento=now() WHERE intervento_id=$1 AND tipo='azione'", [id]);
+      const updated = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-07-04");
+      expect(updated.body.find((r: {id:number}) => r.id===id).bisogniPianificati).toEqual(expect.arrayContaining([expect.objectContaining({stato:"completato",dataCompletamento:expect.any(String)})]));
+    } finally { await pool.query("DELETE FROM bisogni_pianificati WHERE intervento_id=$1", [id]); }
   });
 
   it("numera esclusivamente gli interventi UDS e segna il primo come primoIntervento", async () => {

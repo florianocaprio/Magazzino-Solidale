@@ -633,42 +633,49 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   const conds = udsHistoricalScopeConds(req, callerAreaOperativaId(req));
   const where = sql.join(conds, sql` AND `);
 
+  // One SQL snapshot: authorize encounters before projecting only their linked needs.
   const result = await db.execute(sql`
     WITH sequenza_uds AS (
-      SELECT i.*,
-             ROW_NUMBER() OVER (
-               PARTITION BY i.beneficiario_id
-               ORDER BY i.data_intervento ASC, i.id ASC
-             ) AS numero
-      FROM interventi i
-      WHERE i.ambito = 'uds'
-    )
-    SELECT * FROM (
-      SELECT i.id,
-             i.beneficiario_id,
-             be.cognome,
-             be.nome,
-             be.soprannome,
-             i.zona_uds_id_snapshot,
-             z.nome AS zona_nome,
-             i.data_intervento::text AS data_intervento,
-             i.tipo_intervento,
-             i.descrizione,
-             i.note,
-             i.note_uds,
-             u.matricola AS operatore_matricola,
-             u.username AS operatore_username,
-             i.numero
+      SELECT i.*, ROW_NUMBER() OVER (
+        PARTITION BY i.beneficiario_id ORDER BY i.data_intervento ASC, i.id ASC
+      ) AS numero FROM interventi i WHERE i.ambito = 'uds'
+    ), autorizzati AS (
+      SELECT i.id, i.beneficiario_id, be.cognome, be.nome, be.soprannome,
+        i.zona_uds_id_snapshot, z.nome AS zona_nome,
+        i.data_intervento::text AS data_intervento, i.tipo_intervento, i.stato,
+        i.descrizione, i.note, i.note_uds, u.matricola AS operatore_matricola,
+        u.username AS operatore_username, i.numero
       FROM sequenza_uds i
       JOIN beneficiari be ON be.id = i.beneficiario_id
       LEFT JOIN zone_uds z ON z.id = i.zona_uds_id_snapshot
       LEFT JOIN utenti u ON u.id = i.operatore_id
-      WHERE ${where}
-    ) s
-    WHERE s.data_intervento::date BETWEEN ${from} AND ${to}
-    ORDER BY s.data_intervento ASC, s.zona_nome NULLS LAST, s.cognome, s.nome, s.id
+      WHERE ${where} AND i.data_intervento BETWEEN ${from} AND ${to}
+      ORDER BY i.data_intervento DESC, i.id DESC LIMIT 10001
+    ), bisogni AS (
+      SELECT b.intervento_id, json_agg(json_build_object(
+        'id', b.id, 'tipo', b.tipo, 'descrizione', b.descrizione,
+        'stato', b.stato, 'dataPrevista', b.data_prevista,
+        'priorita', b.priorita, 'note', b.note,
+        'dataCompletamento', b.data_completamento
+      ) ORDER BY b.data_prevista NULLS LAST, b.id) AS dettagli
+      FROM bisogni_pianificati b
+      WHERE b.intervento_id IN (SELECT id FROM autorizzati)
+      GROUP BY b.intervento_id
+    )
+    SELECT a.*, COALESCE(b.dettagli, '[]'::json) AS bisogni
+    FROM autorizzati a LEFT JOIN bisogni b ON b.intervento_id=a.id
+    ORDER BY a.data_intervento DESC, a.id DESC
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
+  if (rows.length > 10000) {
+    res
+      .status(413)
+      .json({
+        error:
+          "Report oltre 10000 interventi: restringere il periodo o i filtri",
+      });
+    return;
+  }
   res.json(
     rows.map((r) => {
       const numero = Number(r.numero);
@@ -688,6 +695,8 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
         zonaNome: (r.zona_nome as string | null) ?? null,
         dataIntervento: r.data_intervento as string,
         tipoIntervento: r.tipo_intervento as string,
+        stato: r.stato as string,
+        bisogniPianificati: r.bisogni,
         descrizione: (r.descrizione as string | null) ?? null,
         note: (r.note as string | null) ?? null,
         noteUds: (r.note_uds as string | null) ?? null,

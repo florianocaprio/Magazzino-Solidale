@@ -5377,6 +5377,11 @@ export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
 
 export interface CreditoSolidaleConfigurazioneInput {
   /**
+   * Versione dell'anagrafica confermata; richiesta per quota o motivo quota, obsoleta o assente restituisce 409.
+   * @minimum 1
+   */
+  versioneBeneficiario?: number;
+  /**
    * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
    * @minimum 1
    * @nullable
@@ -5413,6 +5418,7 @@ export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
 } as const;
 
 export interface CreditoSolidaleConfigurazione {
+  versioneBeneficiario?: number;
   /**
    * Politica attiva scelta per il beneficiario, applicabile al suo Centro/Area oppure globale; null usa la precedenza territoriale automatica.
    * @minimum 1
@@ -7181,6 +7187,79 @@ export interface EmporioAbilitazione {
   statoEffettivo?: EmporioStatoEffettivo;
   /** @nullable */
   motivo?: string | null;
+}
+
+export type EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito =
+  (typeof EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito)[keyof typeof EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito];
+
+export const EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito = {
+  centro: "centro",
+  area: "area",
+  globale: "globale",
+} as const;
+
+export type EmporioCreditoAnteprimaPoliticheDisponibiliItem = {
+  id: number;
+  nome: string;
+  ambito: EmporioCreditoAnteprimaPoliticheDisponibiliItemAmbito;
+};
+
+export interface EmporioCreditoAnteprima {
+  beneficiarioId: number;
+  versioneBeneficiario: number;
+  calcoloToken: string;
+  areaNome: string;
+  politicaNome: string;
+  politicaCreditoSolidaleId: number | null;
+  politicheDisponibili: EmporioCreditoAnteprimaPoliticheDisponibiliItem[];
+  totaleSuggerito: number;
+  quotaMensileAssegnata: number;
+  motivoModificaQuota?: string | null;
+  primaQuotaAmmessa: boolean;
+}
+
+export interface EmporioCreditoAttivazioneInput {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versioneBeneficiario: number;
+  /**
+   * @minLength 64
+   * @maxLength 64
+   */
+  calcoloToken: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  motivo: string;
+  /**
+   * @minimum 0
+   * @maximum 99999999
+   */
+  quotaMensileAssegnata?: number | null;
+  /**
+   * Scelta da salvare insieme all'attivazione; null usa il resolver territoriale. Omettere conserva la scelta registrata.
+   * @minimum 1
+   */
+  politicaCreditoSolidaleId?: number | null;
+  /** @maxLength 10000 */
+  motivoModificaQuota?: string | null;
+}
+
+export interface EmporioCreditoAttivazioneResult {
+  beneficiarioId: number;
+  politicaCreditoSolidaleId?: number | null;
+  politicaNome?: string;
+  quotaMensile: number;
+  quotaAccreditata: number;
+  primaQuotaValutata: boolean;
+  periodo: string;
+  movimentoId: number | null;
+  stato: string;
 }
 
 export type EmporioAbilitazioneInputStato =
@@ -9510,6 +9589,25 @@ export interface AllocazioneMezziReport {
   altro: AllocazioneMezziReportAltro;
 }
 
+export type UdsReportBisognoTipo =
+  (typeof UdsReportBisognoTipo)[keyof typeof UdsReportBisognoTipo];
+
+export const UdsReportBisognoTipo = {
+  richiesta: "richiesta",
+  azione: "azione",
+} as const;
+
+export interface UdsReportBisogno {
+  id: number;
+  tipo: UdsReportBisognoTipo;
+  descrizione: string;
+  stato: string;
+  dataPrevista?: string | null;
+  priorita: string;
+  note?: string | null;
+  dataCompletamento?: string | null;
+}
+
 export interface UdsInterventoGiornaliero {
   id: number;
   beneficiarioId: number;
@@ -9519,6 +9617,9 @@ export interface UdsInterventoGiornaliero {
   zonaNome?: string | null;
   dataIntervento: string;
   tipoIntervento: string;
+  stato: InterventoStato;
+  /** Stato corrente dei bisogni alla generazione; include anche piani successivi al periodo dell'incontro. */
+  bisogniPianificati: UdsReportBisogno[];
   descrizione?: string | null;
   note?: string | null;
   noteUds?: string | null;
@@ -9709,6 +9810,13 @@ export interface MensaAbilitazione {
   mensaId: number;
   /** @nullable */
   mensaNome?: string | null;
+  /**
+   * Area stabile del diritto, ricavata dalla Mensa di riferimento
+   * @nullable
+   */
+  areaOperativaId?: number | null;
+  /** @nullable */
+  areaOperativaNome?: string | null;
   dataInizio: string;
   /** @nullable */
   dataFine?: string | null;
@@ -9746,8 +9854,11 @@ export interface MensaAbilitazioneInput {
   /** @nullable */
   dataFine?: string | null;
   mensaPrincipale?: boolean;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
 }
 
 export type MensaStatoInputStato =
@@ -9762,8 +9873,11 @@ export const MensaStatoInputStato = {
 
 export interface MensaStatoInput {
   stato: MensaStatoInputStato;
-  /** @nullable */
-  motivo?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  motivo: string;
   versione: string;
 }
 
@@ -11784,6 +11898,14 @@ export type ListInterventiParams = {
    * Filtra gli interventi in base ai Bisogni Pianificati collegati.
    */
   bisogni?: ListInterventiBisogni;
+  /**
+   * Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+   */
+  tipoBisogno?: ListInterventiTipoBisogno;
+  /**
+   * Zona storica dell'incontro; richiede ambito UDS.
+   */
+  zonaUdsId?: number;
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
   /**
@@ -11844,6 +11966,14 @@ export const ListInterventiBisogni = {
   nessuno: "nessuno",
 } as const;
 
+export type ListInterventiTipoBisogno =
+  (typeof ListInterventiTipoBisogno)[keyof typeof ListInterventiTipoBisogno];
+
+export const ListInterventiTipoBisogno = {
+  richiesta: "richiesta",
+  azione: "azione",
+} as const;
+
 export type ListInterventiOrdina =
   (typeof ListInterventiOrdina)[keyof typeof ListInterventiOrdina];
 
@@ -11880,6 +12010,14 @@ export type ListInterventiPaginaParams = {
    * Filtra gli interventi in base ai Bisogni Pianificati collegati.
    */
   bisogni?: ListInterventiPaginaBisogni;
+  /**
+   * Tipo del bisogno collegato; con bisogni lo stato deve corrispondere sullo stesso bisogno. Incompatibile con nessuno.
+   */
+  tipoBisogno?: ListInterventiPaginaTipoBisogno;
+  /**
+   * Zona storica dell'incontro; richiede ambito UDS.
+   */
+  zonaUdsId?: number;
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
   /**
@@ -11938,6 +12076,14 @@ export const ListInterventiPaginaBisogni = {
   aperti: "aperti",
   scaduti: "scaduti",
   nessuno: "nessuno",
+} as const;
+
+export type ListInterventiPaginaTipoBisogno =
+  (typeof ListInterventiPaginaTipoBisogno)[keyof typeof ListInterventiPaginaTipoBisogno];
+
+export const ListInterventiPaginaTipoBisogno = {
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
 export type ListInterventiPaginaOrdina =
@@ -12163,6 +12309,22 @@ export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
    * Identificativi della pagina corrente, separati da virgola (massimo 100).
    */
   beneficiarioIds: string;
+};
+
+export type GetEmporioCreditoAnteprimaParams = {
+  /**
+   * Politica da provare senza salvare; auto usa il resolver territoriale. Omettere conserva la scelta registrata.
+   * @pattern ^(auto|[1-9][0-9]*)$
+   */
+  politicaCreditoSolidaleId?: string;
+};
+
+export type GetEmporioCreditoAttivazioneEsitoParams = {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  idempotencyKey: string;
 };
 
 export type SearchBeneficiariAccessiEmporioParams = {

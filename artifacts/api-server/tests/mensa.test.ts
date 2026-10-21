@@ -502,6 +502,22 @@ async function verify(
     });
 }
 
+// Stored pre-C2C denied access: historical exception commands remain explicit.
+async function legacyWrongMensaAccess(
+  app: Express,
+  fixture: Fixture,
+  values: Record<string, unknown> = {},
+) {
+  const key = `legacy-access-${rnd()}`;
+  const access = await verify(app, fixture, { ...values, idempotencyKey: key });
+  expect(access.body.esito).toBe("consentito");
+  await db
+    .update(mensaAccessiTable)
+    .set({ esito: "negato", motivoEsito: "MENSA_NON_AUTORIZZATA" })
+    .where(eq(mensaAccessiTable.id, access.body.id));
+  return verify(app, fixture, { ...values, idempotencyKey: key });
+}
+
 beforeAll(async () => {
   await initDbExtensions();
   await ensureAmbienteModuli();
@@ -1344,6 +1360,7 @@ describe("Modulo Mensa", () => {
       expect(
         (
           await session.post("/api/mensa/abilitazioni").send({
+            motivo: "Gestione esplicita nella fixture sintetica",
             beneficiarioId: fixture.beneficiaryId,
             mensaId: fixture.mensaB,
             dataInizio: dataServizioMensa(),
@@ -1613,7 +1630,9 @@ describe("Modulo Mensa", () => {
     async (kind) => {
       const fixture = await createFixture(),
         app = makeApp(fixture);
-      const access = await verify(app, fixture, { mensaId: fixture.mensaB });
+      const access = await legacyWrongMensaAccess(app, fixture, {
+        mensaId: fixture.mensaB,
+      });
       expect(access.body.motivoEsito).toBe("MENSA_NON_AUTORIZZATA");
       if (kind === "beneficiario")
         await db
@@ -2341,6 +2360,7 @@ describe("Modulo Mensa", () => {
     const response = await request(makeApp(fixture))
       .post("/mensa/abilitazioni")
       .send({
+        motivo: "Gestione esplicita nella fixture sintetica",
         beneficiarioId: fixture.beneficiaryId,
         mensaId: fixture.mensaB,
         dataInizio: today,
@@ -2374,6 +2394,7 @@ describe("Modulo Mensa", () => {
     const response = await request(makeApp(fixture))
       .post("/mensa/abilitazioni")
       .send({
+        motivo: "Gestione esplicita nella fixture sintetica",
         beneficiarioId: fixture.beneficiaryId,
         mensaId: fixture.mensaB,
         dataInizio: today,
@@ -2406,6 +2427,7 @@ describe("Modulo Mensa", () => {
     const forbiddenCreate = await request(viewOnly)
       .post("/mensa/abilitazioni")
       .send({
+        motivo: "Gestione esplicita nella fixture sintetica",
         beneficiarioId: fixture.beneficiaryId,
         mensaId: fixture.mensaA,
         dataInizio: dataServizioMensa(),
@@ -2414,6 +2436,7 @@ describe("Modulo Mensa", () => {
     expect(forbiddenCreate.status).toBe(403);
 
     const outsideScope = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: fixture.milanBeneficiaryId,
       mensaId: fixture.mensaMilan,
       dataInizio: dataServizioMensa(),
@@ -2422,6 +2445,7 @@ describe("Modulo Mensa", () => {
     expect(outsideScope.status).toBe(403);
 
     const created = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: fixture.beneficiaryId,
       mensaId: fixture.mensaA,
       dataInizio: dataServizioMensa(),
@@ -2443,6 +2467,7 @@ describe("Modulo Mensa", () => {
     });
 
     const duplicate = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: fixture.beneficiaryId,
       mensaId: fixture.mensaB,
       dataInizio: dataServizioMensa(),
@@ -2464,6 +2489,7 @@ describe("Modulo Mensa", () => {
       const response = await request(makeApp(fixture))
         .post("/mensa/abilitazioni")
         .send({
+          motivo: "Gestione esplicita nella fixture sintetica",
           beneficiarioId: fixture.beneficiaryId,
           mensaId: fixture.mensaB,
           dataInizio: today,
@@ -3299,31 +3325,57 @@ describe("Modulo Mensa", () => {
     });
   });
 
-  it("propone e registra un'eccezione esplicita soltanto tra Mense della stessa area operativa", async () => {
-    const fixture = await createFixture();
-    const app = makeApp(fixture);
-    const denied = await verify(app, fixture, { mensaId: fixture.mensaB });
-    expect(denied.body).toMatchObject({
-      motivoEsito: "MENSA_NON_AUTORIZZATA",
-      eccezionePossibile: true,
+  it("C2C: una principale abilita accesso e pasto ordinari nella seconda Mensa senza eccezioni", async () => {
+    const fixture = await createFixture(),
+      app = makeApp(fixture);
+    const access = await verify(app, fixture, { mensaId: fixture.mensaB });
+    expect(access.status).toBe(201);
+    expect(access.body).toMatchObject({
+      esito: "consentito",
+      motivoEsito: "CONSENTITO",
+      eccezionePossibile: false,
+      beneficiarioId: fixture.beneficiaryId,
     });
-    const allowed = await request(app)
-      .post(`/mensa/accessi/${denied.body.id}/eccezione`)
-      .send({ motivo: "Servizio chiuso nella Mensa principale" });
-    expect(allowed.status).toBe(200);
-    expect(allowed.body.esito).toBe("consentito_eccezione");
-    const [stored] = await db
-      .select()
-      .from(mensaEccezioniTable)
-      .where(eq(mensaEccezioniTable.accessoMensaId, denied.body.id));
-    expect(stored.mensaDestinazioneId).toBe(fixture.mensaB);
+    const meal = await request(app)
+      .post("/mensa/pasti")
+      .send({
+        accessoMensaId: access.body.id,
+        tipoServizio: "pranzo",
+        idempotencyKey: `area-meal-${rnd()}`,
+      });
+    expect(meal.status, meal.text).toBe(201);
+    expect(meal.body.mensaId).toBe(fixture.mensaB);
+    expect(meal.body.eccezioneId).toBeNull();
+    expect(
+      await db
+        .select()
+        .from(mensaEccezioniTable)
+        .where(eq(mensaEccezioniTable.beneficiarioId, fixture.beneficiaryId)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(mensaAbilitazioniTable)
+        .where(
+          eq(mensaAbilitazioniTable.beneficiarioId, fixture.beneficiaryId),
+        ),
+    ).toHaveLength(1);
+    const other = await verify(app, fixture);
+    const duplicate = await request(app)
+      .post("/mensa/pasti")
+      .send({
+        accessoMensaId: other.body.id,
+        tipoServizio: "pranzo",
+        idempotencyKey: `area-dup-${rnd()}`,
+      });
+    expect(duplicate.status).toBe(409);
   });
 
   it("rende la chiusura dominante e blocca eccezioni su accessi precedenti", async () => {
     const fixture = await createFixture();
     const app = makeApp(fixture);
     const today = dataServizioMensa();
-    const deniedBeforeClosure = await verify(app, fixture, {
+    const deniedBeforeClosure = await legacyWrongMensaAccess(app, fixture, {
       mensaId: fixture.mensaB,
       tipoServizio: "pranzo",
     });
@@ -3401,7 +3453,7 @@ describe("Modulo Mensa", () => {
   it("serializza chiusura ed eccezione concorrenti senza eccezioni post-snapshot", async () => {
     const fixture = await createFixture();
     const app = makeApp(fixture);
-    const denied = await verify(app, fixture, {
+    const denied = await legacyWrongMensaAccess(app, fixture, {
       mensaId: fixture.mensaB,
       tipoServizio: "pranzo",
     });
@@ -3575,6 +3627,7 @@ describe("Modulo Mensa", () => {
     const staleUpdate = await request(app)
       .post(`/mensa/abilitazioni/${eligibility.body.id}/stato`)
       .send({
+        motivo: "Gestione esplicita nella fixture sintetica",
         stato: "attiva",
         versione: eligibility.body.versione,
       });
@@ -3668,6 +3721,7 @@ describe("Modulo Mensa", () => {
     const activeEligibilityResponse = await request(app)
       .post(`/mensa/abilitazioni/${fixture.eligibilityId}/stato`)
       .send({
+        motivo: "Gestione esplicita nella fixture sintetica",
         stato: "attiva",
         versione: suspendedEligibility.body.versione,
       });
@@ -3685,6 +3739,7 @@ describe("Modulo Mensa", () => {
         await request(app)
           .post(`/mensa/abilitazioni/${fixture.eligibilityId}/stato`)
           .send({
+            motivo: "Gestione esplicita nella fixture sintetica",
             stato: "attiva",
             versione: revokedEligibility.body.versione,
           })
@@ -4496,10 +4551,9 @@ describe("Modulo Mensa", () => {
       mensaId: fixture.mensaB,
       tipoServizio: "cena",
     });
-    const exceptional = await request(app)
-      .post(`/mensa/accessi/${denied.body.id}/eccezione`)
-      .send({ motivo: "Servizio temporaneamente spostato" });
-    expect(exceptional.status).toBe(200);
+    const exceptional = denied;
+    expect(exceptional.status).toBe(201);
+    expect(exceptional.body.esito).toBe("consentito");
     expect(
       (
         await request(app)
@@ -4729,6 +4783,7 @@ describe("Modulo Mensa", () => {
     ids.beneficiaries.push(beneficiary.id);
     const app = makeApp(fixture);
     const first = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: beneficiary.id,
       mensaId: fixture.mensaA,
       dataInizio: "2027-01-01",
@@ -4736,6 +4791,7 @@ describe("Modulo Mensa", () => {
     });
     expect(first.status).toBe(201);
     const sharedBoundary = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: beneficiary.id,
       mensaId: fixture.mensaB,
       dataInizio: "2027-01-31",
@@ -4743,6 +4799,7 @@ describe("Modulo Mensa", () => {
     });
     expect(sharedBoundary.status).toBe(409);
     const disjoint = await request(app).post("/mensa/abilitazioni").send({
+      motivo: "Gestione esplicita nella fixture sintetica",
       beneficiarioId: beneficiary.id,
       mensaId: fixture.mensaB,
       dataInizio: "2027-02-01",
@@ -4758,10 +4815,18 @@ describe("Modulo Mensa", () => {
     const concurrent = await Promise.all([
       request(app)
         .post("/mensa/abilitazioni")
-        .send({ ...concurrentBody, mensaId: fixture.mensaA }),
+        .send({
+          motivo: "Gestione esplicita nella fixture sintetica",
+          ...concurrentBody,
+          mensaId: fixture.mensaA,
+        }),
       request(app)
         .post("/mensa/abilitazioni")
-        .send({ ...concurrentBody, mensaId: fixture.mensaB }),
+        .send({
+          motivo: "Gestione esplicita nella fixture sintetica",
+          ...concurrentBody,
+          mensaId: fixture.mensaB,
+        }),
     ]);
     expect(concurrent.map((response) => response.status).sort()).toEqual([
       201, 409,
@@ -5433,5 +5498,192 @@ describe("Modulo Mensa", () => {
         .map((movement) => movement.movimentoOrigineId)
         .sort((a, b) => (a ?? 0) - (b ?? 0)),
     ).toEqual([movementA.id, movementB!.id].sort((a, b) => a - b));
+  });
+  it.each(["scan", "manuale"])(
+    "C2C: %s nella seconda sede, principale inattiva e servizio principale chiuso",
+    async (mode) => {
+      const f = await createFixture(),
+        app = makeApp(f);
+      await db
+        .update(menseTable)
+        .set({ attiva: false })
+        .where(eq(menseTable.id, f.mensaA));
+      await db
+        .update(magazziniTable)
+        .set({ stato: "inattivo" })
+        .where(eq(magazziniTable.id, f.warehouseIds[0]));
+      const access = await verify(app, f, {
+        mensaId: f.mensaB,
+        ...(mode === "manuale"
+          ? { modalitaAccesso: "manuale", beneficiarioId: f.beneficiaryId }
+          : {}),
+      });
+      expect(access.body).toMatchObject({
+        esito: "consentito",
+        beneficiarioId: f.beneficiaryId,
+      });
+      const meal = await request(app)
+        .post("/mensa/pasti")
+        .send({
+          accessoMensaId: access.body.id,
+          tipoServizio: "pranzo",
+          idempotencyKey: `c2c-${rnd()}`,
+        });
+      expect(meal.status, meal.text).toBe(201);
+      expect(meal.body.mensaId).toBe(f.mensaB);
+    },
+  );
+  it("C2C: trasferire la persona non trasferisce l'Area del diritto", async () => {
+    const f = await createFixture();
+    await db
+      .update(beneficiariTable)
+      .set({ areaOperativaId: f.milanId })
+      .where(eq(beneficiariTable.id, f.beneficiaryId));
+    const app = makeApp(f, undefined, { areaOperativaId: f.milanId });
+    const denied = await verify(app, f, { mensaId: f.mensaMilan });
+    expect(denied.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "AREA_NON_COMPATIBILE",
+      beneficiarioId: null,
+    });
+  });
+  it.each(["sospesa", "revocata", "futura", "scaduta"])(
+    "C2C: %s blocca entrambe le sedi anche dopo scan",
+    async (state) => {
+      const f = await createFixture(),
+        app = makeApp(f);
+      const scan = await verify(app, f, { mensaId: f.mensaB });
+      expect(scan.body.esito).toBe("consentito");
+      const day = dataServizioMensa();
+      await db
+        .update(mensaAbilitazioniTable)
+        .set(
+          state === "futura"
+            ? { dataInizio: shiftDate(day, 1) }
+            : state === "scaduta"
+              ? { dataFine: shiftDate(day, -1) }
+              : { stato: state },
+        )
+        .where(eq(mensaAbilitazioniTable.id, f.eligibilityId));
+      for (const mensaId of [f.mensaA, f.mensaB])
+        expect((await verify(app, f, { mensaId })).body.esito).toBe("negato");
+      const meal = await request(app)
+        .post("/mensa/pasti")
+        .send({
+          accessoMensaId: scan.body.id,
+          tipoServizio: "pranzo",
+          idempotencyKey: `c2c-stale-${rnd()}`,
+        });
+      expect(meal.status).toBe(409);
+    },
+  );
+  it("C2C: scadenza inclusiva e unicità concorrente fra sedi, replay invariato", async () => {
+    const f = await createFixture(),
+      app = makeApp(f),
+      day = dataServizioMensa();
+    await db
+      .update(mensaAbilitazioniTable)
+      .set({ dataInizio: day, dataFine: day })
+      .where(eq(mensaAbilitazioniTable.id, f.eligibilityId));
+    const accesses = await Promise.all([
+      verify(app, f, { mensaId: f.mensaA }),
+      verify(app, f, { mensaId: f.mensaB }),
+    ]);
+    expect(accesses.map((a) => a.body.esito)).toEqual([
+      "consentito",
+      "consentito",
+    ]);
+    const commands = accesses.map((a) => ({
+      accessoMensaId: a.body.id,
+      tipoServizio: "pranzo",
+      idempotencyKey: `c2c-concurrent-${rnd()}`,
+    }));
+    const meals = await Promise.all(
+      commands.map((body) => request(app).post("/mensa/pasti").send(body)),
+    );
+    expect(meals.map((m) => m.status).sort()).toEqual([201, 409]);
+    const i = meals.findIndex((m) => m.status === 201);
+    const replay = await request(app).post("/mensa/pasti").send(commands[i]);
+    expect(replay.status).toBe(200);
+    expect(replay.body.id).toBe(meals[i].body.id);
+  });
+  it("C2C: lookup contestuale minimo e nessun accesso nell'altra Area", async () => {
+    const f = await createFixture(),
+      session = await realMensaSession(f);
+    const found = await session.get(
+      `/api/mensa/beneficiari/ricerca?search=Mario&mensaId=${f.mensaB}`,
+    );
+    expect(found.status).toBe(200);
+    const candidate = found.body.find(
+      (b: { id: number }) => b.id === f.beneficiaryId,
+    );
+    expect(candidate).toBeDefined();
+    expect(Object.keys(candidate).sort()).toEqual([
+      "areaOperativaId",
+      "attivo",
+      "codice",
+      "cognome",
+      "id",
+      "nome",
+    ]);
+    expect(
+      (
+        await session.get(
+          `/api/mensa/beneficiari/ricerca?search=Mario&mensaId=${f.mensaMilan}`,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await session
+          .post("/api/mensa/accessi/verifica")
+          .send({
+            mensaId: f.mensaMilan,
+            codiceTessera: f.cardCode,
+            idempotencyKey: `c2c-other-${rnd()}`,
+          })
+      ).status,
+    ).toBe(403);
+  });
+  it("C2C: provvisoria autorizzata, motivo obbligatorio e nessun effetto Emporio/credito", async () => {
+    const f = await createFixture(),
+      app = makeApp(f);
+    await db
+      .update(mensaAbilitazioniTable)
+      .set({ stato: "revocata" })
+      .where(eq(mensaAbilitazioniTable.id, f.eligibilityId));
+    await db
+      .update(beneficiariTable)
+      .set({ statoAnagrafica: "provvisoria" })
+      .where(eq(beneficiariTable.id, f.beneficiaryId));
+    const body = {
+      beneficiarioId: f.beneficiaryId,
+      mensaId: f.mensaB,
+      dataInizio: dataServizioMensa(),
+    };
+    expect(
+      (await request(app).post("/mensa/abilitazioni").send(body)).status,
+    ).toBe(400);
+    const created = await request(app)
+      .post("/mensa/abilitazioni")
+      .send({ ...body, motivo: "Diritto valido in tutta l’Area" });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body.areaOperativaId).toBe(f.romeId);
+    const [person] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, f.beneficiaryId));
+    expect(person.statoAnagrafica).toBe("provvisoria");
+    expect(person.creditoSolidaleAbilitato).toBe(false);
+    const [audit] = await db
+      .select()
+      .from(auditConfigurazioniTable)
+      .where(
+        eq(
+          auditConfigurazioniTable.chiave,
+          `mensa-abilitazione:${created.body.id}`,
+        ),
+      );
+    expect(audit.note).toBe("Diritto valido in tutta l’Area");
   });
 });

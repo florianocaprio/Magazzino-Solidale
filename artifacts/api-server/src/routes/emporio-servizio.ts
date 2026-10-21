@@ -1,3 +1,8 @@
+import { anteprimaAttivazioneEmporio, attivaEmporioCredito, esitoAttivazioneEmporio, parseAttivazionePolicy } from "../lib/emporioAttivazione";
+import { auditContextFromRequest } from "../lib/auditEvent";
+import { CreditoSaldoError } from "../lib/creditoSaldo";
+import { DocumentCommandError } from "../lib/documentCommand";
+import { CreditoInteroError } from "../lib/creditoIntero";
 import { operationalCentroId } from "../lib/serviceScope";
 import { Router, type RequestHandler } from "express";
 import {
@@ -336,5 +341,31 @@ router.post(
     res.json(result);
   },
 );
+
+const activationId: RequestHandler = (req,res,next) => {
+  if (!Number.isSafeInteger(Number(req.params.beneficiarioId)) || Number(req.params.beneficiarioId)<=0) {
+    res.status(400).json({error:"Beneficiario non valido."}); return;
+  }
+  next();
+};
+router.get("/emporio/beneficiari/:beneficiarioId/attivazione-credito",activationId,
+  requirePermission("emporio.eligibility.manage"),requirePermission("credito.quota.manage"),async(req,res)=> {
+    res.json(await anteprimaAttivazioneEmporio(Number(req.params.beneficiarioId),req.user!.id,parseAttivazionePolicy(req.query.politicaCreditoSolidaleId)));
+  });
+router.post("/emporio/beneficiari/:beneficiarioId/attivazione-credito",activationId,
+  requirePermission("emporio.eligibility.manage"),requirePermission("credito.quota.manage"),async(req,res)=> {
+    res.json(await attivaEmporioCredito({id:Number(req.params.beneficiarioId),userId:req.user!.id,body:req.body,
+      command:auditContextFromRequest(req)}));
+  });
+router.get("/emporio/beneficiari/:beneficiarioId/attivazione-credito/esito",activationId,
+  requirePermission("emporio.eligibility.manage"),requirePermission("credito.quota.manage"),async(req,res)=> {
+    res.json(await esitoAttivazioneEmporio(Number(req.params.beneficiarioId),req.user!.id,req.query.idempotencyKey));
+  });
+router.use((error: unknown,_req:import("express").Request,res:import("express").Response,next:import("express").NextFunction)=>{
+  if (error instanceof DocumentCommandError || error instanceof CreditoSaldoError || error instanceof CreditoInteroError) {
+    res.status(error instanceof CreditoInteroError ? 400 : error.status).json({error:error.message}); return;
+  }
+  next(error);
+});
 router.use(emporioScopeErrorHandler);
 export default router;

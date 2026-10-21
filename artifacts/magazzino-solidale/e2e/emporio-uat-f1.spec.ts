@@ -82,6 +82,7 @@ async function fixture(count: number, eligible = true, owner = false) {
           "beneficiari.view",
           "beneficiari.manage",
           "credito.view",
+          "credito.quota.manage",
           "emporio.eligibility.manage",
         ]
       : []),
@@ -865,7 +866,7 @@ test("T04/T06/T11/T12/T13/T20: cross-Center name, card, context reset and explic
   ).toBe(f.centers[1]);
   expect(errors).toEqual([]);
 });
-test("T08/T15: beneficiary service panel enables explicitly without credit increment", async ({
+test("T08/T15 C2B: conferma integrata autorizzata riconosce la prima quota", async ({
   page,
 }) => {
   const f = await fixture(1, false, true);
@@ -903,6 +904,7 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
     })
     .fill("Decisione sociale esplicita E2E");
   await enable.click();
+  await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   expect(
     (
@@ -911,7 +913,7 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
         [f.beneficiary],
       )
     ).rows[0].credito_solidale_saldo,
-  ).toBe("100.00");
+  ).toBe("160.00");
 });
 
 test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-link eligibility without logout", async ({
@@ -944,6 +946,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await card
     .getByRole("button", { name: "Abilita all'Emporio", exact: true })
     .click();
+  await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(planning).toBeVisible();
   await page.goBack();
@@ -986,6 +989,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
         exact: true,
       })
       .click();
+    if(state==="attivo")await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
     await expect(
       card.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();

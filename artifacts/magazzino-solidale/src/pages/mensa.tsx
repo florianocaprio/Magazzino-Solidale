@@ -1140,9 +1140,10 @@ function AbilitazioniView() {
   const [mensaId, setMensaId] = useState<number | null>(null);
   const [start, setStart] = useState(todayEuropeRome());
   const [end, setEnd] = useState("");
+  const [eligibilityReason, setEligibilityReason] = useState("");
   const setContextDirty = operationalContext?.setDirty;
   const hasDraft =
-    selected != null && (start !== todayEuropeRome() || end !== "");
+    selected != null && (start !== todayEuropeRome() || end !== "" || eligibilityReason !== "");
   useEffect(() => {
     setContextDirty?.(hasDraft);
     return () => setContextDirty?.(false);
@@ -1208,6 +1209,7 @@ function AbilitazioniView() {
                     setSelected(person);
                     setStart(todayEuropeRome());
                     setEnd("");
+                    setEligibilityReason("");
                   };
                   if (operationalContext) operationalContext.change(change);
                   else change();
@@ -1240,8 +1242,10 @@ function AbilitazioniView() {
                 onChange={(e) => setEnd(e.target.value)}
                 aria-label="Data fine abilitazione"
               />
+              <Input aria-label={t("ciclo2Mensa.reason")} placeholder={t("ciclo2Mensa.reason")} value={eligibilityReason} onChange={(e)=>setEligibilityReason(e.target.value)} maxLength={2000}/>
+              <p className="text-sm text-muted-foreground md:col-span-4">{mensaId != null && t("ciclo2Mensa.areaValidity", {area:operationalContext?.mense.find((m)=>m.id===mensaId)?.areaOperativaNome ?? String(areaId)})} {t("ciclo2Mensa.referenceHelp")}</p>
               <Button
-                disabled={!mensaId || create.isPending || !selected.attivo}
+                disabled={!mensaId || !eligibilityReason.trim() || create.isPending || !selected.attivo}
                 onClick={() =>
                   create.mutate(
                     {
@@ -1251,9 +1255,10 @@ function AbilitazioniView() {
                         dataInizio: start,
                         dataFine: end || null,
                         mensaPrincipale: true,
+                        motivo: eligibilityReason.trim(),
                       },
                     },
-                    { onSuccess: refresh, onError },
+                    { onSuccess: () => { setEligibilityReason(""); void refresh(); }, onError },
                   )
                 }
               >
@@ -1345,18 +1350,13 @@ function AbilitazioniView() {
                               <Button
                                 size="sm"
                                 disabled={status.isPending}
-                                onClick={() =>
-                                  status.mutate(
-                                    {
-                                      id: item.id,
-                                      data: {
-                                        stato: "attiva",
-                                        versione: item.versione,
-                                      },
-                                    },
-                                    { onSuccess: refresh, onError },
-                                  )
-                                }
+                                onClick={() => {
+                                  const motivo = window.prompt(t("ciclo2Mensa.reason"));
+                                  if (motivo?.trim()) status.mutate(
+                                    {id:item.id,data:{stato:"attiva",versione:item.versione,motivo:motivo.trim()}},
+                                    {onSuccess:refresh,onError},
+                                  );
+                                }}
                               >
                                 Riattiva
                               </Button>

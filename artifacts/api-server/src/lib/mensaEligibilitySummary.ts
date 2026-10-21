@@ -26,7 +26,6 @@ export function riepilogoAbilitazioneMensa(
   const shown =
     current ??
     records.find((item) => item.mensaPrincipale) ??
-    records[0] ??
     null;
   if (!shown) {
     return { stato: "non_abilitato" as const };
