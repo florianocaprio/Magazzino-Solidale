@@ -177,8 +177,9 @@ describe("UdsPersonaSheet", () => {
   const selectFormOption = async (
     labelText: string,
     optionText: string,
+    scope: ParentNode = document,
   ): Promise<void> => {
-    const label = Array.from(document.querySelectorAll("label")).find((item) =>
+    const label = Array.from(scope.querySelectorAll("label")).find((item) =>
       item.textContent?.includes(labelText),
     );
     const trigger =
@@ -474,6 +475,40 @@ describe("UdsPersonaSheet", () => {
         dataNascita: "2000-01-01",
         fasciaEtaPresunta: null,
       },
+    });
+  });
+
+  it("completa i dati nella conferma UDS e riprova sullo stesso ID senza chiudere dopo un errore", async () => {
+    const onOpenChange = await renderWithSocialCandidate();
+    const message = "Per aggiungere la persona all'Unità di Strada indica l'Area di provenienza.";
+    mocks.update.mockImplementationOnce((_input, callbacks) => {
+      callbacks.onError({ data: { error: message } });
+    });
+    await openSocialLinkConfirmation();
+    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toBe(message);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await selectFormOption("beneficiarioDettaglio.areaProvenienza", "UE", dialog);
+    await setInputValue("#uds-link-birth", "2000-01-01");
+    const confirm = Array.from(dialog.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "udsAnagrafica.dupConfirmAction",
+    );
+    await act(async () => confirm?.click());
+    expect(mocks.update).toHaveBeenCalledTimes(2);
+    expect(mocks.update.mock.calls[1]?.[0]).toEqual({
+      id: 91,
+      data: { uds: true, versione: 7, zonaUdsId: 10, areaProvenienza: "UE", dataNascita: "2000-01-01", fasciaEtaPresunta: null },
+    });
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("mantiene i dati registrati se la conferma del collegamento resta vuota", async () => {
+    await renderWithSocialCandidate();
+    await openSocialLinkConfirmation();
+    expect(mocks.update.mock.calls[0]?.[0]).toEqual({
+      id: 91, data: { uds: true, versione: 7, zonaUdsId: 10 },
     });
   });
 

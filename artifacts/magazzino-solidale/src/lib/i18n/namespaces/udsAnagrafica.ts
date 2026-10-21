@@ -45,6 +45,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "Confermi di collegare {{nome}} all'Unità di Strada senza creare una nuova anagrafica?",
     dupConfirmAction: "Conferma collegamento",
+    linkMissingDataHint: "Completa solo i dati mancanti necessari per UDS. Lascia vuoti quelli già registrati: saranno conservati, insieme al Centro e ai servizi attivi.",
+    linkKeepRegistered: "Mantieni il dato già registrato",
     dupCheckRequired: "Verifica la persona esistente",
     dupCheckRequiredHint:
       "Controlla i risultati oppure scegli esplicitamente di continuare come nuova persona.",
@@ -135,6 +137,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "¿Confirmas vincular a {{nome}} a la Unidad de Calle sin crear un nuevo registro?",
     dupConfirmAction: "Confirmar vinculación",
+    linkMissingDataHint: "Completa solo los datos que faltan y son necesarios para UDS. Deja vacíos los ya registrados: se conservarán junto con el Centro y los servicios activos.",
+    linkKeepRegistered: "Conservar el dato registrado",
     dupCheckRequired: "Comprueba la persona existente",
     dupCheckRequiredHint:
       "Revisa los resultados o elige explícitamente continuar como nueva persona.",
@@ -225,6 +229,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "Confirm linking {{nome}} to the street unit without creating a new record?",
     dupConfirmAction: "Confirm link",
+    linkMissingDataHint: "Complete only the missing information required for UDS. Leave existing fields blank to keep their registered values, Centre and active services.",
+    linkKeepRegistered: "Keep the registered value",
     dupCheckRequired: "Check the existing person",
     dupCheckRequiredHint:
       "Review the results or explicitly choose to continue as a new person.",
@@ -316,6 +322,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "Confirmez-vous le rattachement de {{nome}} à l'UDS sans créer une nouvelle fiche ?",
     dupConfirmAction: "Confirmer le rattachement",
+    linkMissingDataHint: "Complétez uniquement les informations manquantes nécessaires pour UDS. Laissez les champs déjà enregistrés vides : leurs valeurs, le Centre et les services actifs seront conservés.",
+    linkKeepRegistered: "Conserver la valeur enregistrée",
     dupCheckRequired: "Vérifiez la personne existante",
     dupCheckRequiredHint:
       "Examinez les résultats ou choisissez explicitement de continuer avec une nouvelle personne.",
@@ -408,6 +416,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "Bestätigst du die Verknüpfung von {{nome}} mit dem Straßendienst, ohne einen neuen Datensatz anzulegen?",
     dupConfirmAction: "Verknüpfung bestätigen",
+    linkMissingDataHint: "Ergänzen Sie nur die für UDS fehlenden Angaben. Lassen Sie bereits erfasste Felder leer: Ihre Werte, das Zentrum und die aktiven Dienste bleiben erhalten.",
+    linkKeepRegistered: "Gespeicherten Wert beibehalten",
     dupCheckRequired: "Vorhandene Person prüfen",
     dupCheckRequiredHint:
       "Prüfe die Ergebnisse oder entscheide ausdrücklich, als neue Person fortzufahren.",
@@ -498,6 +508,8 @@ export const udsAnagrafica = {
     dupConfirmDescription:
       "هل تؤكد ربط {{nome}} بوحدة الشارع دون إنشاء سجل جديد؟",
     dupConfirmAction: "تأكيد الربط",
+    linkMissingDataHint: "أكمل فقط البيانات الناقصة المطلوبة لوحدة الشارع. اترك الحقول المسجلة فارغة للاحتفاظ بقيمها والمركز والخدمات النشطة.",
+    linkKeepRegistered: "الاحتفاظ بالقيمة المسجلة",
     dupCheckRequired: "تحقق من الشخص الموجود",
     dupCheckRequiredHint: "راجع النتائج أو اختر بوضوح المتابعة كشخص جديد.",
     duplicateCheckInProgress: "جارٍ التحقق من الأشخاص الموجودين...",

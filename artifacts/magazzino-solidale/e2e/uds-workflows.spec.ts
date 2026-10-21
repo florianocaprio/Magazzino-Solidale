@@ -281,3 +281,67 @@ test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza
     expect((await page.request.put(endpoint, { data: { prefissoAssociazione, includiCodiceArea, segmentoFisso, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo } })).status()).toBe(200);
   }
 });
+
+for (const scenario of ["provenienza mancante", "età mancante", "dati già completi"] as const) {
+  test(`collega a UDS la persona del Centro: ${scenario}, stesso ID e servizi conservati`, async ({ page }, info) => {
+    await login(page);
+    const suffix = `${Date.now()}-${info.project.name}`;
+    const areaResponse = await page.request.post("/api/aree-operative", { data: { nome: `Collegamento UDS ${suffix}` } });
+    expect(areaResponse.status()).toBe(201);
+    const area = await areaResponse.json();
+    const centreResponse = await page.request.post("/api/centri-ascolto", { data: { nome: `Centro UDS ${suffix}`, areaOperativaId: area.id, attivo: true } });
+    expect(centreResponse.status()).toBe(201);
+    const centre = await centreResponse.json();
+    const created = await page.request.post("/api/beneficiari", { data: {
+      nome: "Persona", cognome: `Esistente ${suffix}`, sesso: "F", uds: false,
+      areaOperativaId: area.id, centroAscoltoId: centre.id,
+      ...(scenario !== "età mancante" ? { dataNascita: "1990-01-01" } : {}),
+      ...(scenario !== "provenienza mancante" ? { areaProvenienza: "Extra-UE" } : {}),
+    } });
+    expect(created.status()).toBe(201);
+    const person = await created.json();
+    let creates = 0;
+    page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/api/beneficiari") creates++; });
+    await page.goto("/uds/anagrafica");
+    await page.getByRole("button", { name: "Nuova persona", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Nuova persona UDS", exact: true });
+    await selectOption(page, sheet.getByRole("combobox", { name: "Area Operativa", exact: true }), area.nome);
+    await sheet.getByLabel("Cerca una persona già presente", { exact: true }).fill(person.codice);
+    await sheet.getByRole("button", { name: "Aggiungi a UDS", exact: true }).click();
+    const link = page.getByRole("alertdialog", { name: "Collegare la persona all'UDS?", exact: true });
+    await expect(link).toBeVisible();
+    const confirm = link.getByRole("button", { name: "Conferma collegamento", exact: true });
+    const patchResponse = () => page.waitForResponse(r => r.request().method() === "PATCH" && r.url().endsWith(`/api/beneficiari/${person.id}`));
+    if (scenario !== "dati già completi") {
+      const rejected = patchResponse();
+      await confirm.click();
+      expect((await rejected).status()).toBe(400);
+      await expect(link).toBeVisible();
+      await expect(link.getByRole("alert")).toContainText(scenario === "provenienza mancante" ? "Area di provenienza" : "fascia d'età");
+      expect((await (await page.request.get(`/api/beneficiari/${person.id}`)).json()).uds).toBe(false);
+      if (scenario === "provenienza mancante") {
+        await selectOption(page, link.getByRole("combobox", { name: "Area provenienza", exact: true }), "UE");
+      } else {
+        await selectOption(page, link.getByRole("combobox", { name: "Fascia d'età", exact: true }), "30–64 anni");
+      }
+    }
+    await assertViewportSafe(page);
+    const saved = patchResponse();
+    await confirm.click();
+    expect((await saved).status()).toBe(200);
+    await expect(link).toBeHidden();
+    const final = await (await page.request.get(`/api/beneficiari/${person.id}`)).json();
+    expect(final).toMatchObject({
+      id: person.id, codice: person.codice, uds: true, areaOperativaId: area.id, centroAscoltoId: centre.id,
+      statoAnagrafica: person.statoAnagrafica,
+      dataNascita: scenario === "età mancante" ? null : "1990-01-01",
+      areaProvenienza: scenario === "provenienza mancante" ? "UE" : "Extra-UE",
+      creditoSolidaleAbilitato: person.creditoSolidaleAbilitato, creditoSolidaleSaldo: person.creditoSolidaleSaldo,
+    });
+    if (scenario === "età mancante") expect(final.fasciaEtaPresunta).toBe("30_64");
+    expect(creates).toBe(0);
+    expect(await (await page.request.get(`/api/beneficiari?areaOperativaId=${area.id}`)).json()).toHaveLength(1);
+    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual([]);
+    expect(await (await page.request.get(`/api/credito-solidale/beneficiari/${person.id}/movimenti`)).json()).toEqual([]);
+  });
+}

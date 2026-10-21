@@ -82,6 +82,7 @@ registerBlocco04(i18n);
 const NO_ZONE = "__none__";
 const NO_CENTRO = "__nocentro__";
 const NO_FASCIA_ETA = "__non_determinata__";
+const KEEP_ORIGIN = "__keep_origin__";
 
 function makeSchema(t: (key: string) => string, isGlobal: boolean) {
   return z
@@ -240,6 +241,8 @@ export function UdsPersonaSheet({
   const [linkCandidate, setLinkCandidate] = useState<
     BeneficiarioSimile | UdsLinkCandidateItem | null
   >(null);
+  const [linkError, setLinkError] = useState("");
+  useEffect(() => setLinkError(""), [linkCandidate?.id]);
   const [dupDismissed, setDupDismissed] = useState(false);
   const [existingSearch, setExistingSearch] = useState("");
   const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
@@ -479,6 +482,7 @@ export function UdsPersonaSheet({
         : (user?.zonaUdsId ?? null);
     const areaProvenienza = form.getValues("areaProvenienza")?.trim();
     const dataNascita = form.getValues("dataNascita")?.trim();
+    setLinkError("");
     updateBenef.mutate(
       {
         id: suggestion.id,
@@ -504,9 +508,11 @@ export function UdsPersonaSheet({
           finish(linked, "linked");
         },
         onError: (err) => {
+          const message = extractError(err, t("common.requiredField"));
+          setLinkError(message);
           toast({
             title: t("udsAnagrafica.newTitle"),
-            description: extractError(err, t("common.requiredField")),
+            description: message,
             variant: "destructive",
           });
         },
@@ -1398,7 +1404,7 @@ export function UdsPersonaSheet({
           if (!dialogOpen) setLinkCandidate(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t("udsAnagrafica.dupConfirmTitle")}
@@ -1411,10 +1417,67 @@ export function UdsPersonaSheet({
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {t("udsAnagrafica.linkMissingDataHint")}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="uds-link-origin">
+              {t("beneficiarioDettaglio.areaProvenienza")}
+            </Label>
+            <Select
+              value={form.watch("areaProvenienza") || KEEP_ORIGIN}
+              onValueChange={(value) => form.setValue("areaProvenienza", value === KEEP_ORIGIN ? "" : value)}
+              disabled={updateBenef.isPending}
+            >
+              <SelectTrigger id="uds-link-origin">
+                <SelectValue placeholder={t("udsAnagrafica.linkKeepRegistered")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={KEEP_ORIGIN}>{t("udsAnagrafica.linkKeepRegistered")}</SelectItem>
+                <SelectItem value="UE">UE</SelectItem>
+                <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="uds-link-birth">{t("udsAnagrafica.fDataNascita")}</Label>
+            <Input
+              id="uds-link-birth"
+              type="date"
+              max={todayDateOnly()}
+              value={wDataNascita || ""}
+              onChange={(event) => form.setValue("dataNascita", event.target.value)}
+              disabled={updateBenef.isPending}
+            />
+          </div>
+          {!wDataNascita && (
+            <div className="space-y-2">
+              <Label htmlFor="uds-link-age">{t("udsAnagrafica.fasciaEtaLabel")}</Label>
+              <Select
+                value={wFasciaEtaPresunta || NO_FASCIA_ETA}
+                onValueChange={(value) => form.setValue("fasciaEtaPresunta", value)}
+                disabled={updateBenef.isPending}
+              >
+                <SelectTrigger id="uds-link-age">
+                  <SelectValue placeholder={t("udsAnagrafica.linkKeepRegistered")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FASCIA_ETA}>{t("udsAnagrafica.linkKeepRegistered")}</SelectItem>
+                  {FASCE_ETA_PRESUNTE.map((fascia) => (
+                    <SelectItem key={fascia} value={fascia}>{fasciaEtaLabel(t, fascia)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {linkError && <p role="alert" className="text-sm text-destructive">{linkError}</p>}
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmLinkToUds}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmLinkToUds();
+              }}
               disabled={updateBenef.isPending || !canManage}
             >
               {t("udsAnagrafica.dupConfirmAction")}
