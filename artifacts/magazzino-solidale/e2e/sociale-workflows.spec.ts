@@ -128,7 +128,7 @@ test("BUG05: Emporio con risposta persa e doppio invio, retry sullo stesso benef
   const centre = centres.find((item: { areaOperativaId: number; attivo: boolean }) => item.areaOperativaId === area.id && item.attivo);
   let creates = 0, rights = 0, personId = 0;
   page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname === "/api/beneficiari") creates++; });
-  await page.route("**/api/emporio/beneficiari/*/abilitazione", async (route) => {
+  await page.route("**/api/emporio/beneficiari/*/attivazione-credito", async (route) => {
     if (route.request().method() !== "POST") { await route.continue(); return; }
     rights++;
     const response = await route.fetch();
@@ -149,11 +149,23 @@ test("BUG05: Emporio con risposta persa e doppio invio, retry sullo stesso benef
   await form.getByRole("switch", { name: /abilita all.emporio/i }).click();
   await form.getByRole("textbox", { name: /motivo/i }).fill("Verifica sintetica BUG05");
   await form.locator("form").evaluate((element) => { const form = element as HTMLFormElement; form.requestSubmit(); form.requestSubmit(); });
-  await expect(form).toContainText(/persona già creata/i);
+  const activation = page.getByRole("dialog", { name: "Conferma Emporio e Credito Solidale", exact: true });
+  const confirm = activation.getByRole("button", { name: "Conferma attivazione e quota", exact: true });
+  await expect(confirm).toBeEnabled();
+  const assigned = Number(await activation.getByLabel("Quota mensile assegnata", { exact: true }).inputValue());
+  expect(assigned).toBeGreaterThan(0);
+  await confirm.evaluate((element) => { const button = element as HTMLButtonElement; button.click(); button.click(); });
+  await expect(activation.getByRole("alert")).toContainText(/verifica l'esito/i);
   expect(creates).toBe(1); expect(rights).toBe(1); expect(personId).toBeGreaterThan(0);
-  await form.getByRole("button", { name: /^riprova$/i }).click();
+  await expect(confirm).toHaveCount(0);
+  await activation.getByRole("button", { name: "Verifica esito", exact: true }).click();
+  await expect(activation).toBeHidden();
   await expect(form).toBeHidden();
   expect(creates).toBe(1); expect(rights).toBe(1);
+  const person = await (await page.request.get(`/api/beneficiari/${personId}`)).json();
+  expect(person).toMatchObject({ creditoSolidaleSaldo: assigned, creditoSolidaleMensileAssegnato: assigned });
+  const movements = await (await page.request.get(`/api/credito-solidale/beneficiari/${personId}/movimenti`)).json();
+  expect(movements).toHaveLength(1);
   const right = await (await page.request.get(`/api/emporio/beneficiari/${personId}/abilitazione`)).json();
   expect(right.statoEffettivo).toBe("attivo");
   const cards = await (await page.request.get(`/api/beneficiari/${personId}/tessere`)).json();
