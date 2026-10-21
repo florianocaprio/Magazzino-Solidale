@@ -83,6 +83,7 @@ test("Consegne, Sociale e UDS usano card sotto 1024px", async ({
   });
   await personOption.click();
   await expect(personOption).toBeHidden();
+  await page.getByRole("button", { name: "Applica filtri", exact: true }).click();
   if (compact) {
     await expect(page.getByTestId("uds-interventi-mobile")).toBeVisible();
     await expect(page.getByTestId("uds-interventi-desktop")).toBeHidden();
