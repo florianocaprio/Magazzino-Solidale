@@ -3031,3 +3031,68 @@ Elenco dei file applicativi/di verifica modificati nel blocco:
 - `docs/campagna-bug-2026-10.md`
 
 **C2C / BUG26: PRONTO PER LA UAT DI FLORIANO SULLA 8082**, in base al suo mandato diretto di ricompilazione. Ricaricare la pagina. Prova proposta: dal CdA aprire Modifica anagrafica e abilitare Mensa con motivo, anche su provvisoria; leggere Area e riferimento; servire nella seconda Mensa autorizzata della stessa Area con un solo pasto ordinario per giorno/tipo; verificare sospensione/revoca e diniego altra Area; nel contesto UDS controllare soli stati anche riaprendo la modifica. Usare una seconda persona o un diverso servizio/giorno per distinguere mobilità e divieto di duplicati. **C2C resta aperta fino all’OK umano**. I prompt 04 di certificazione cumulativa e 05 di rilascio finale restano separati e non attivati; questo blocco non li sostituisce né autorizza il merge.
+
+
+## Certificazione finale Ciclo 2 — prompt 04 / C2C — 21 ottobre 2026
+
+Floriano ha provato la 8082 e dichiarato «il punto 03 è chiuso»: **C2C / BUG26 CHIUSO, UAT OK**, candidato `5343464fae00391a31b1f1b815467db0ae3d1014`. L’OK segue C2A e C2B già chiusi e attiva espressamente `04_TEST_Riutilizzabile.txt` per i gate finali e la ricompilazione 8082; **non attiva ##merge, main o Hetzner**.
+
+Candidato iniziale della certificazione `0a903f11bbc0f4a73c19acd1819c00c62ba64fdc`, branch `codex/bugfix-ciclo2-ottobre-2026`: rispetto alla versione 8082 cambiano soltanto le ricevute nel registro. Tracciati tutti i criteri BUG22-01–07, BUG23-01–06, BUG24-01–05, BUG25-01–06, BUG26-01–12 e le precisazioni umane successive (politica selezionabile, salvataggio quota/configurazione congiunto, operatori per Area). Nessuna funzione nuova in questo incarico.
+
+Letti prompt 04, manifest workspace, runner/inventario, workflow CI e `docs/db-migration-ledger.md`; l’assenza locale di SPECIFICA_CICLO_2 già documentata è compensata dai requisiti completi dei prompt e dalle decisioni registrate, senza inventare nuove approvazioni. Inventario corrente: **171 file API in 8 gruppi e 49 suite browser**. I precedenti esiti mirati restano validi sul codice immutato; qui si completa la copertura cumulativa richiesta dalla CI.
+
+Checkout managed isolata `~/.codex/worktrees/ciclo2-certificazione-finale/Magazzino-Solidale`, HEAD detached esatto del candidato; cinque documenti locali estranei conservati nella checkout personale. Gate statici nella checkout pulita: install frozen, codegen con `git diff --exit-code`, typecheck, **841 UI PASS**, build WEB e budget **390,7/400 KiB gzip** PASS; test delle guardie/inventario eseguiti (ricevuta sotto). Nessuna differenza applicativa o del lockfile. Ripetizione codegen dopo Docker prevista prima della consegna, a Vite fermo. Nessuna modifica a schema/migration.
+
+API completo avviato tramite runner canonico, con fresh-db e tutti i gruppi; output privato ignorato `test-results/quality-gates/api/c2c-cert-0a903f1`. Come nel precedente blocco si usa `caffeinate -is` soltanto durante ciascun processo per evitare gli stop del Mac, senza impostazioni permanenti. API e browser rimangono seriali sul lock comune. Stato certificazione: **IN CORSO**, nessun PASS anticipato.
+
+
+### Gate API e statici completi — candidato 0a903f1
+
+`node scripts/quality-gates-run.mjs api`: **FULL campaign PASS**, tutti gli 8 gruppi e fresh-db, evidenze `test-results/quality-gates/api/c2c-cert-0a903f1`. Conteggi: core 79, reporting 83, interventi 21, Mensa 118, Emporio 258, maps 18, FSE 2, general 1558; totale **2137 PASS / 7 SKIP**, zero failure. I 7 skip restano quelli degli originali esterni opzionali non forniti. Controllo fresh database con API CRUD, migrazioni/replay e ledger 63/63 PASS; cleanup automatico di tutti i database/container/rete. Test del runner PostgreSQL **24 PASS**.
+
+Guardie e inventario: `node --test scripts/quality-gates-plan.test.mjs scripts/m63-test-guards.test.mjs`, **29 PASS**. Docker API/WEB da archivio Git della SHA candidata: build PASS e budget WEB **390,7/400 KiB gzip**. Rigenerazione canonica **dopo** entrambe le build Docker, poi `git diff --exit-code`, `git diff --check` e status nella checkout isolata: PASS, albero pulito. Nessun Vite in esecuzione durante codegen. API e browser non sovrapposti.
+
+Preflight personale di sola lettura: periodo Europe/Rome `2026-10`, run mensile già completato, zero destinatari pendenti/errore. Nessun test economico sul database personale. La procedura privata di rilascio è estesa a confrontare anche il fingerprint SHA256 dei contenuti degli uploads prima/restore/dopo, senza pubblicare percorsi o contenuti degli allegati. Il backup finale verrà acquisito dopo i gate, a ridosso dell’aggiornamento.
+
+Browser completo avviato nella medesima checkout pulita: 49 suite da inventario, output privato `test-results/quality-gates/browser/c2c-cert-0a903f1`. Esiti e copertura finale seguiranno, senza dichiarare verdi suite non concluse.
+
+
+### Allineamento della prova FSE+ al flusso C2B approvato
+
+Prima tratta browser: **11 suite PASS, 218 prove PASS / 27 SKIP**. La dodicesima `fse-beneficiari-import.spec.ts` ha 25 PASS e lo stesso scenario KO su cinque viewport: il test precedente attendeva l’abilitazione immediata e saldo zero, mentre C2B richiede la conferma esplicita di politica/quota e accredita la prima quota una volta. La traccia mostra correttamente la nuova finestra di conferma. Nessuna regressione applicativa individuata.
+
+Corretto soltanto `artifacts/magazzino-solidale/e2e/fse-beneficiari-import.spec.ts`, checkpoint **`a839bd0326f4fad288bf3c83334170adcf1d7af7`**: sceglie la politica Area 45 nella conferma, controlla saldo zero prima del POST, attivazione 200 e saldo 45; passa poi alla politica globale 21 e verifica quota 21 con saldo storico ancora 45. Conservati filtro Area/Centro, esclusione politica altra Area, stato completo dell’importato, assenza di comandi nella sola vista e persistenza dopo riapertura. Nessuna variazione di app/API/schema/dipendenze o timeout.
+
+Checkout isolata pulita aggiornata al checkpoint. Ripresa tramite runner canonico della suite corretta e di tutte le 37 successive, evidenze `test-results/quality-gates/browser/c2c-cert-a839bd0`. Riusati soltanto gli 11 esiti verdi precedenti con prodotto/test/configurazione invariati; il KO resta documentato e non conta come esito positivo. API, statici e build precedenti rimangono pertinenti al medesimo codice applicativo; la SHA finale delle immagini sarà aggiornata dopo le verifiche.
+
+
+Seconda tratta: FSE+ beneficiari **30 PASS**, tutti gli scenari su cinque viewport. Arrivata a **45 suite verdi / 760 PASS / 155 SKIP**, inclusi i 20 casi C2C e tutta la catena integrata. La successiva prova `sociale-workflows` rileva un ulteriore test BUG05 ancora agganciato al vecchio POST `/abilitazione`, senza conferma del nuovo dialogo C2B: 1 PASS / 8 SKIP / 1 KO.
+
+Checkpoint **`1f7d25c5e7e8d4dcfe74f5df66c35508fb1b6a6a`** modifica soltanto quella prova: doppio invio del form crea una sola persona, doppio clic conferma produce un solo POST `/attivazione-credito`; risposta effettiva 200 abortita al browser, recupero tramite «Verifica esito» senza nuovo POST; quota/saldo corrispondenti e un solo movimento, diritto attivo e nessuna tessera implicita. Non rimossi controlli di recupero: aggiornati al comando approvato, con verifica del movimento aggiunta. Nessun codice applicativo, contratto, dipendenza o timeout modificato. Ripresa delle ultime quattro suite su `test-results/quality-gates/browser/c2c-cert-1f7d25c`; esiti finali seguono.
+
+
+Prova sociale aggiornata **2 PASS / 8 SKIP**, incluso BUG05 con risposta persa, doppio clic, GET di recupero e unico movimento. Totale 46 suite verdi. La prova layout successiva presenta 5 PASS / 5 KO perché seleziona Area/Persona UDS ma non applica i filtri espliciti introdotti da C2A; la pagina correttamente non carica ancora il registro. Checkpoint **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**: aggiunta la sola pressione «Applica filtri» in `tablet-operational-layouts.spec.ts`, conservando tutti i controlli responsive/overflow. Prodotto invariato. Riprese le ultime tre suite su `test-results/quality-gates/browser/c2c-cert-bb10377`.
+
+
+### Certificazione cumulativa conclusa — candidato bb10377
+
+Inventario completo browser coperto **49/49 suite: 791 PASS / 179 SKIP / 0 failure / 0 flaky**. Non è un singolo comando FULL verde: la campagna iniziale si è fermata sui tre test precedenti ai comportamenti approvati; dopo ciascun allineamento sono state riprovate la suite coinvolta e tutte le successive con il runner canonico. Copertura aggregata esatta senza omissioni o duplicazione di conteggi: ricevuta privata ignorata `test-results/quality-gates/c2c-cert-browser-coverage.json`, riferita ai quattro percorsi di evidenze sopra. I 178 skip di matrice eseguono i cicli mutativi una sola volta o su formati dedicati; lo skip residuo è «I due Excel originali M3B non sono disponibili». Nessuno skip introdotto durante la certificazione. I tre KO iniziali restano registrati e non sono conteggiati fra i PASS.
+
+SHA finale dei controlli **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**. Rispetto al candidato iniziale cambia esclusivamente la verifica in tre file e2e (28 inserimenti, 6 rimozioni); API/UI, OpenAPI e generati, schema/migration, dipendenze e configurazioni sono identici. Riuso valido delle evidenze complete: **2137 API PASS / 7 skip**, **841 UI PASS**, guardie/inventario **29 PASS**, migration runner **24 PASS**, frozen install, build/budget. Tutte le 49 suite browser hanno un esito finale verde sul codice effettivo invariato; i tre file modificati sono stati nuovamente provati con le loro modifiche. Coperti prerequisiti BUG05/21, contesto Mensa, catena sociale integrata, permessi/revoche/risposte perse e criteri dei tre blocchi.
+
+Build Docker esatte di bb10377 PASS: API `sha256:08ff678bc589ae9dd33915dd23300b19d75c772b14dfcb1b18960f1d069cfe94`, WEB `sha256:2ed99bbe9a510620fd606845da0945eff9fddea7e9e55957a4768d3871254718`. Budget **390,7/400 KiB gzip**, entry invariata `index-CeN76en1.js`. Ricontrollo scheduler in sola lettura prima del rilascio: ottobre 2026 già completato, zero destinatari pendenti/errore. Nessuna simulazione sul calendario personale. Rigenerazione finale post-Docker e verifica finale 8082 documentate nella ricevuta seguente.
+
+
+### Ricevuta installazione finale 8082 e consegna
+
+Codegen canonico ripetuto **dopo entrambe le build Docker finali**, a browser/Vite fermi, seguito da `git diff --exit-code`, `git diff --check` e nuovo `pnpm run typecheck`: **PASS**, checkout isolata pulita. Il primo tentativo senza permessi di scrittura nella worktree managed si è arrestato con EPERM; ripetizione completa con permessi corretti conclusa senza differenze o alterazioni dei generati. Nessun artefatto parziale usato dai browser.
+
+Backup finale privato **`/Users/florianocaprio/Backups/Magazzino-Solidale/CICLO2-C2C-CERT-bb103779cd7c-2026-10-21T07-32-13-167Z`**: dump PostgreSQL e uploads con checksum/indici verificati; ripristino reale in DB effimero su rete interna senza porte host, doppio replay canonico **63→63**, identità di 57 tabelle e fingerprint SHA256 del contenuto degli allegati ripristinati. Cleanup del preflight completato. Backup e ricevute non sono inclusi in Git.
+
+Installazione effettiva 8082: **`bb103779cd7c770f0e7614ffb5118e679a8d33a7`**, API `magazzino-bugfix-uat-api:sha-bb103779cd7c`, WEB `magazzino-bugfix-uat-web:sha-bb103779cd7c`. Confrontate le image ID finali sopra e le revision label; verificati gli hash degli asset serviti e i percorsi API/UI dei tre blocchi. Catena Compose reale conservata, override immagini privato persistente nel backup, ricreati esclusivamente API/WEB con `--no-deps --no-build`. PostgreSQL mantiene ID e istante di avvio, i volumi sono invariati. **57 tabelle e fingerprint uploads identici prima/restore/dopo**: nessuna nuova persona, pasto, ricarica, importazione o suite mutativa sul database personale.
+
+HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**; Utenti senza login **401**. Ledger initialized=true, **63/63**, zero pending/mismatch/file mancanti/fuori ordine. Budget **390,7/400 KiB gzip**. Ricevuta privata `/private/tmp/c2c-cert-final-release-result.json`, copia persistente `release-result.json` nel backup.
+
+File modificati in questa certificazione: `artifacts/magazzino-solidale/e2e/fse-beneficiari-import.spec.ts`, `artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts`, `artifacts/magazzino-solidale/e2e/tablet-operational-layouts.spec.ts` e questo registro. Nessun nuovo schema, contratto o comportamento del prodotto. Cinque documenti locali estranei preservati; nessun push, merge, main o Hetzner.
+
+**Prompt 04: PRONTO PER RISCONTRO FINALE SULLA 8082**. Le UAT C2A/C2B/C2C restano chiuse dagli OK di Floriano; questa certificazione non le annulla e non sostituisce l’ultimo riscontro umano. Ricaricare la pagina e verificare accesso, apertura Interventi UDS con «Applica filtri», scheda beneficiario con politica/quota salvate e Area Mensa. Non serve attendere mensilità future, coperte dai test isolati; non è richiesto ripetere tutti i flussi mutativi già approvati. Lo skip relativo agli Excel originali M3B mancanti rimane dichiarato. **Attendere l’OK di Floriano; il prompt 05/##merge non è attivato automaticamente.**
