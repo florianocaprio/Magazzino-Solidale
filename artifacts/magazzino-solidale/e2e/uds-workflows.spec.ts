@@ -325,6 +325,9 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
         await selectOption(page, link.getByRole("combobox", { name: "Fascia d'età", exact: true }), "30–64 anni");
       }
     }
+    await expect.poll(() => link.evaluate((element) =>
+      element.getAnimations().every((animation) => animation.playState !== "running"),
+    )).toBe(true);
     await assertViewportSafe(page);
     const saved = patchResponse();
     await confirm.click();
