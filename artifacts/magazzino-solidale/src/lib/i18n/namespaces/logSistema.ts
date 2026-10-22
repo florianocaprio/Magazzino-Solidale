@@ -40,6 +40,7 @@ const it = {
     USER_CREATED: "Utente creato",
     USER_DISABLED: "Utente disabilitato",
     USER_ROLE_CHANGED: "Ruolo utente modificato",
+    USER_EMAIL_CHANGED: "Email modificata dall'utente",
     ACCOUNT_LOCKED: "Account bloccato",
     ACCOUNT_UNLOCKED: "Account sbloccato",
   },

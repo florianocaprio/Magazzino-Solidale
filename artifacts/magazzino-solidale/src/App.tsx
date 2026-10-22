@@ -41,6 +41,7 @@ import type { MensaView } from "@/pages/mensa";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Setup = lazy(() => import("@/pages/setup"));
+const Profilo = lazy(() => import("@/pages/profilo"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Magazzini = lazy(() => import("@/pages/magazzini"));
 const Prodotti = lazy(() => import("@/pages/prodotti"));
@@ -381,6 +382,7 @@ export function AppRoutes() {
         }
       >
         <Switch>
+          <Route path="/profilo"><Profilo /></Route>
           <Route path="/">
             {() => (
               <AuthorizedHome />

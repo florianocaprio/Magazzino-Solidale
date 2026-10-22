@@ -1,0 +1,51 @@
+export const profile = {
+  it: {
+    title: "Il mio profilo",
+    emailTitle: "Email",
+    saveEmail: "Salva email",
+    saving: "Salvataggio…",
+    emailSaved: "Email aggiornata",
+    emailError: "Impossibile aggiornare l'email. Riprova.",
+  },
+  es: {
+    title: "Mi perfil",
+    emailTitle: "Correo electrónico",
+    saveEmail: "Guardar correo",
+    saving: "Guardando…",
+    emailSaved: "Correo actualizado",
+    emailError: "No se pudo actualizar el correo. Inténtalo de nuevo.",
+  },
+  en: {
+    title: "My profile",
+    emailTitle: "Email",
+    saveEmail: "Save email",
+    saving: "Saving…",
+    emailSaved: "Email updated",
+    emailError: "Unable to update email. Please try again.",
+  },
+  fr: {
+    title: "Mon profil",
+    emailTitle: "Adresse e-mail",
+    saveEmail: "Enregistrer l’e-mail",
+    saving: "Enregistrement…",
+    emailSaved: "Adresse e-mail mise à jour",
+    emailError: "Impossible de mettre à jour l’adresse e-mail. Réessayez.",
+  },
+  de: {
+    title: "Mein Profil",
+    emailTitle: "E-Mail",
+    saveEmail: "E-Mail speichern",
+    saving: "Wird gespeichert…",
+    emailSaved: "E-Mail aktualisiert",
+    emailError:
+      "E-Mail konnte nicht aktualisiert werden. Bitte erneut versuchen.",
+  },
+  ar: {
+    title: "ملفي الشخصي",
+    emailTitle: "البريد الإلكتروني",
+    saveEmail: "حفظ البريد الإلكتروني",
+    saving: "جارٍ الحفظ…",
+    emailSaved: "تم تحديث البريد الإلكتروني",
+    emailError: "تعذر تحديث البريد الإلكتروني. حاول مرة أخرى.",
+  },
+};

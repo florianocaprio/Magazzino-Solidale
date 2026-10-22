@@ -182,7 +182,8 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       // Identity and password recovery remain available before an Area is assigned.
       const accountRequest =
         (req.method === "GET" && req.path === "/auth/me") ||
-        (req.method === "POST" && req.path === "/auth/change-password");
+        (req.method === "POST" && req.path === "/auth/change-password") ||
+        (req.method === "PATCH" && req.path === "/auth/profile");
       if (
         !accountRequest &&
         user.areaOperativaId == null &&

@@ -10511,6 +10511,27 @@ paths:
         "400":
           description: Invalid or expired token
 
+  /auth/profile:
+    patch:
+      operationId: updateMyProfile
+      tags: [auth]
+      summary: Aggiorna esclusivamente l'email dell'utente autenticato.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyProfileInput"
+      responses:
+        "204":
+          description: Email aggiornata
+        "400":
+          description: Email o campi non validi
+        "401":
+          description: Non autenticato
+        "409":
+          description: Email già utilizzata o credenziali cambiate
+
   /auth/change-password:
     post:
       operationId: changePassword
@@ -18686,6 +18707,7 @@ components:
         - USER_DISABLED
         - USER_DELETED
         - USER_ROLE_CHANGED
+        - USER_EMAIL_CHANGED
         - ACCOUNT_LOCKED
         - ACCOUNT_UNLOCKED
 
@@ -23953,6 +23975,17 @@ components:
           type: string
           minLength: 1
       required: [username, password]
+
+    UpdateMyProfileInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 255
+          format: email
 
     ChangePasswordInput:
       type: object
