@@ -1,6 +1,8 @@
 export const profile = {
   it: {
     title: "Il mio profilo",
+    specialUser: "UTENTE SPECIALE",
+    specialUserDescription: "Il tuo profilo include autorizzazioni aggiuntive rispetto alle funzioni standard dei menu assegnati.",
     emailTitle: "Email",
     saveEmail: "Salva email",
     saving: "Salvataggio…",
@@ -9,6 +11,8 @@ export const profile = {
   },
   es: {
     title: "Mi perfil",
+    specialUser: "USUARIO ESPECIAL",
+    specialUserDescription: "Tu perfil incluye permisos adicionales a las funciones estándar de los menús asignados.",
     emailTitle: "Correo electrónico",
     saveEmail: "Guardar correo",
     saving: "Guardando…",
@@ -17,6 +21,8 @@ export const profile = {
   },
   en: {
     title: "My profile",
+    specialUser: "SPECIAL USER",
+    specialUserDescription: "Your profile includes permissions beyond the standard functions of your assigned menus.",
     emailTitle: "Email",
     saveEmail: "Save email",
     saving: "Saving…",
@@ -25,6 +31,8 @@ export const profile = {
   },
   fr: {
     title: "Mon profil",
+    specialUser: "UTILISATEUR SPÉCIAL",
+    specialUserDescription: "Votre profil dispose d’autorisations supplémentaires aux fonctions standard des menus attribués.",
     emailTitle: "Adresse e-mail",
     saveEmail: "Enregistrer l’e-mail",
     saving: "Enregistrement…",
@@ -33,6 +41,8 @@ export const profile = {
   },
   de: {
     title: "Mein Profil",
+    specialUser: "SONDERBENUTZER",
+    specialUserDescription: "Ihr Profil enthält zusätzliche Berechtigungen über die Standardfunktionen der zugewiesenen Menüs hinaus.",
     emailTitle: "E-Mail",
     saveEmail: "E-Mail speichern",
     saving: "Wird gespeichert…",
@@ -42,6 +52,8 @@ export const profile = {
   },
   ar: {
     title: "ملفي الشخصي",
+    specialUser: "مستخدم خاص",
+    specialUserDescription: "يتضمن ملفك صلاحيات إضافية تتجاوز الوظائف القياسية للقوائم المخصصة لك.",
     emailTitle: "البريد الإلكتروني",
     saveEmail: "حفظ البريد الإلكتروني",
     saving: "جارٍ الحفظ…",

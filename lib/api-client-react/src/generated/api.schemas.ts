@@ -10908,6 +10908,8 @@ export interface AuthUser {
   isAdmin: boolean;
   aree: string[];
   permessi: string[];
+  /** Permessi aggiuntivi rispetto ai menu e ai profili standard, calcolati dal server. Non concede nuove autorizzazioni. */
+  permessiSpeciali?: string[];
   mustChangePassword: boolean;
   emailDaAggiornare: boolean;
 }

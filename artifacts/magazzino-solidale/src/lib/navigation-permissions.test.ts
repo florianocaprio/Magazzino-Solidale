@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { isNavItemEnabledByAccess, NAV_ITEMS } from "@/components/layout";
+import { isNavItemEnabledByAccess, navigationGroupForItem, NAV_ITEMS } from "@/components/layout";
 import { canAccessDocumentiOperativiRoute } from "@/App";
 
 const appSource = readFileSync(
@@ -16,6 +16,61 @@ function routeSource(path: string, nextPath: string): string {
 }
 
 describe("permission gate della navigazione operativa", () => {
+  it.each(["sociale", "uds"])(
+    "i permessi condivisi di %s non abilitano il menu o le pagine Emporio",
+    (area) => {
+      const hasArea = (key: string) => key === area;
+      const emporio = NAV_ITEMS.filter((item) => item.groupKey === "emporio");
+      expect(emporio.length).toBeGreaterThan(0);
+      for (const item of emporio) {
+        expect(isNavItemEnabledByAccess(item, hasArea, () => true)).toBe(false);
+      }
+      for (const [path, next, permission] of [
+        ["/emporio/crediti-saldo", "/emporio/accessi", "credito.view"],
+        ["/emporio/accessi", "/emporio/spese", "emporio.access.view"],
+      ]) {
+        expect(routeSource(path, next)).toContain(`<RequireEmporioMenu permission="${permission}">`);
+      }
+    },
+  );
+
+  it("una sola eccezione esplicita espone solo la sottofunzione concessa dentro UDS", () => {
+    const hasArea = (area: string) => area === "uds";
+    const items = NAV_ITEMS.filter((item) => item.groupKey === "emporio" &&
+      isNavItemEnabledByAccess(item, hasArea, () => true, ["credito.view"]));
+    expect(items.map((item) => item.key)).toEqual(["emporioCreditiSaldo"]);
+    expect(navigationGroupForItem(items[0], hasArea)).toBe("uds");
+    expect(isNavItemEnabledByAccess(items[0], hasArea, () => false, ["credito.view"])).toBe(false);
+  });
+
+  it("ogni combinazione di Aree mantiene i workflow dentro menu assegnati", () => {
+    const areas = ["generale", "magazzino", "sociale", "emporio", "mensa", "uds", "logistica", "analisi"];
+    for (let mask = 0; mask < 2 ** areas.length; mask++) {
+      const assigned = areas.filter((_, index) => mask & (1 << index));
+      const hasArea = (key: string) => assigned.includes(key);
+      for (const item of NAV_ITEMS.filter((item) =>
+        !item.public && !item.superAdmin && isNavItemEnabledByAccess(item, hasArea, () => true),
+      )) {
+        expect(assigned, `${assigned}: ${item.key}`).toContain(navigationGroupForItem(item, hasArea));
+      }
+    }
+  });
+
+  it.each([
+    ["consegne", "logistica"],
+    ["turni", "logistica"],
+    ["richiesteMagazzino", "sociale"],
+    ["bolle", "sociale"],
+    ["maps", "sociale"],
+    ["maps", "magazzino"],
+    ["reportLogistica", "magazzino"],
+  ])("mantiene %s nel menu assegnato %s senza duplicarlo", (key, area) => {
+    const item = NAV_ITEMS.find((item) => item.key === key)!;
+    expect(navigationGroupForItem(item, (key) => key === area)).toBe(area);
+    expect(isNavItemEnabledByAccess(item, (key) => key === area, () => true)).toBe(true);
+    expect(navigationGroupForItem(item, () => true)).toBe(item.groupKey);
+  });
+
   it("preserva il gate legacy Trasferimenti prima del redirect alla facciata comune", () => {
     const source = routeSource("/trasferimenti", "/preparazione-consegne");
     expect(source).toContain('<Guard area="magazzino">');

@@ -19,6 +19,7 @@ import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { hasLogisticsReportSource } from "@/lib/logistics-report-access";
 import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 import { canAccessMapsApplication } from "@/lib/maps-access";
+import { hasServiceMenuAccess } from "@/lib/service-menu-access";
 import { createAppQueryClient } from "@/lib/query-client";
 import { canonicalLegacyTrasferimentiSearch } from "@/lib/documenti-operativi-location";
 import { canonicalLegacyLottiSearch } from "@/lib/carico-merce-location";
@@ -143,6 +144,16 @@ function Guard({
   const areas = Array.isArray(area) ? area : [area];
   if (!areas.some((a) => hasArea(a))) return <NotAuthorized />;
   return <>{children}</>;
+}
+
+export function RequireEmporioMenu({ permission, children }: {
+  permission: string;
+  children: React.ReactNode;
+}) {
+  const { user, hasArea } = useAuth();
+  if (!hasServiceMenuAccess("emporio", permission, hasArea, user?.permessiSpeciali))
+    return <NotAuthorized />;
+  return <Guard area={["emporio", "sociale", "uds"]}>{children}</Guard>;
 }
 
 export function canAccessDocumentiOperativiRoute(
@@ -350,7 +361,7 @@ function AuthorizedHome() {
   if (hasArea("generale") && flags.isModuloAttivo("REPORT")) return <Dashboard />;
   const destination = NAV_ITEMS.find((item) => item.url !== "/" && !item.public &&
     (!item.globalAdmin || canManageGlobalAdminResources(user)) &&
-    (item.superAdmin ? user?.isSuperAdmin : isNavItemEnabledByAccess(item, hasArea, hasPermission)) &&
+    (item.superAdmin ? user?.isSuperAdmin : isNavItemEnabledByAccess(item, hasArea, hasPermission, user?.permessiSpeciali)) &&
     isNavItemEnabledByModules(item, flags.isModuloAttivo) &&
     (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, flags.isModuloAttivo)));
   return destination ? <Redirect to={destination.url} replace /> : <NotAuthorized />;
@@ -501,18 +512,18 @@ export function AppRoutes() {
 
           <Route path="/emporio/cassa">
             {() => (
-              <Guard area="emporio">
+              <RequireEmporioMenu permission="emporio.cassa.view">
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequirePermission permission="emporio.cassa.view">
                     <EmporioCassa />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireEmporioMenu>
             )}
           </Route>
           <Route path="/emporio/crediti-saldo">
             {() => (
-              <Guard area={["emporio", "sociale", "uds"]}>
+              <RequireEmporioMenu permission="credito.view">
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequireModulo codice="CREDITO_SOLIDALE">
                     <RequirePermission permission="credito.view">
@@ -520,29 +531,29 @@ export function AppRoutes() {
                     </RequirePermission>
                   </RequireModulo>
                 </RequireModulo>
-              </Guard>
+              </RequireEmporioMenu>
             )}
           </Route>
           <Route path="/emporio/accessi">
             {() => (
-              <Guard area={["emporio", "sociale", "uds"]}>
+              <RequireEmporioMenu permission="emporio.access.view">
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequirePermission permission="emporio.access.view">
                     <EmporioAccessi />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireEmporioMenu>
             )}
           </Route>
           <Route path="/emporio/spese">
             {() => (
-              <Guard area="emporio">
+              <RequireEmporioMenu permission="emporio.sales.view">
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequirePermission permission="emporio.sales.view">
                     <EmporioSpese />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireEmporioMenu>
             )}
           </Route>
 

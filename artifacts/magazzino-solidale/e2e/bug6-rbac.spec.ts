@@ -73,6 +73,18 @@ const profiles = [
     grants: ["logistica.turni.view", "uds.reports.view"],
     areas: ["logistica", "uds"],
   },
+  {
+    name: "BUG6 centro personalizzato",
+    routes: ["/beneficiari", "/consegne", "/turni"],
+    areas: ["generale", "magazzino", "sociale", "logistica", "analisi"],
+    grants: ["beneficiari.view", "consegne.view", "logistica.turni.view", "credito.view", "emporio.access.view", "emporio.access.manage"],
+  },
+  {
+    name: "BUG6 aggiunta esplicita",
+    routes: ["/uds/anagrafica", "/emporio/crediti-saldo"],
+    areas: ["uds"],
+    grants: ["uds.directory.view", "credito.view"],
+  },
 ];
 // Independent expected destinations: ordinary workflow suites must not assume
 // that every authenticated actor has permission to open the Dashboard.
@@ -88,6 +100,8 @@ const expectedHome: Record<string, string> = {
   Volontario: "/consegne",
   "BUG6 readonly": "/prodotti",
   "BUG6 multi": "/turni",
+  "BUG6 centro personalizzato": "/",
+  "BUG6 aggiunta esplicita": "/emporio/crediti-saldo",
 };
 let admin: APIRequestContext;
 let areaId: number;
@@ -350,7 +364,15 @@ for (const profile of profiles)
     const identity = await (await page.request.get("/api/auth/me")).json();
     expect(identity.isAdmin).toBe("admin" in profile);
     expect(identity.isSuperAdmin).toBe(profile.name === "SuperAdmin");
+    expect(identity.permessiSpeciali).toEqual(profile.name === "BUG6 aggiunta esplicita" ? ["credito.view"] : []);
     if (!("admin" in profile)) expect(identity.areaOperativaId).toBe(areaId);
+    if (!("admin" in profile)) {
+      const groups = await page.locator("[data-nav-group-icon]")
+        .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("data-nav-group-icon")));
+      expect(groups.filter((group) => group !== "supporto").every((group) => identity.aree.includes(group))).toBe(true);
+      if (!identity.aree.includes("emporio"))
+        await expect(page.locator('[data-nav-group-icon="emporio"]')).toHaveCount(0);
+    }
     for (const path of profile.routes) {
       const consumptionResponse =
         path === "/mensa/consumi"
@@ -370,6 +392,16 @@ for (const profile of profiles)
     }
     expect(denied).toEqual([]);
     expect(errors).toEqual([]);
+    if (profile.name === "BUG6 aggiunta esplicita") {
+      await page.goto("/profilo");
+      await expect(page.getByRole("main")).toContainText("UTENTE SPECIALE");
+    }
+    if (profile.name === "BUG6 centro personalizzato") {
+      for (const path of ["/emporio/crediti-saldo", "/emporio/accessi"]) {
+        await page.goto(path);
+        await expect(page.getByRole("main")).toContainText(/Usa il menu per accedere alle sezioni/i);
+      }
+    }
     if (profile.name === "Operatore Mensa") {
       const response = await page.request.get("/api/mensa/mense");
       expect(response.status()).toBe(200);

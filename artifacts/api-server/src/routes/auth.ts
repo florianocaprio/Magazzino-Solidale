@@ -18,6 +18,7 @@ import { sendPasswordChangedEmail, sendPasswordResetEmail } from "../lib/emailSe
 import { checkForgotPasswordRateLimit, createPasswordResetLinkForUser, FORGOT_PASSWORD_RESPONSE_MESSAGE, hashPasswordResetToken, invalidateActivePasswordResetTokens, RESET_PASSWORD_CONFIRM_MISMATCH_MESSAGE, RESET_PASSWORD_INVALID_TOKEN_MESSAGE, RESET_PASSWORD_SUCCESS_MESSAGE, validatePasswordForReset } from "../lib/passwordReset";
 import { validatePassword } from "../lib/passwordPolicy";
 import { passwordSessionVersion, revokeUserAccess } from "../lib/userAccess";
+import { specialRolePermissions } from "../lib/roleSpecialPermissions";
 
 const router: IRouter = Router();
 
@@ -310,6 +311,7 @@ function authUserResponse(u: SessionUser): AuthUser {
     isAdmin: u.isAdmin,
     aree: u.aree,
     permessi: u.permessi,
+    permessiSpeciali: specialRolePermissions(u),
     mustChangePassword: u.mustChangePassword,
   };
 }

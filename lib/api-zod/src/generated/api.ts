@@ -23304,6 +23304,12 @@ export const LoginUserResponse = zod.object({
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
   permessi: zod.array(zod.string()),
+  permessiSpeciali: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Permessi aggiuntivi rispetto ai menu e ai profili standard, calcolati dal server. Non concede nuove autorizzazioni.",
+    ),
   mustChangePassword: zod.boolean(),
   emailDaAggiornare: zod.boolean(),
 });
@@ -23347,6 +23353,12 @@ export const GetCurrentUserResponse = zod.object({
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
   permessi: zod.array(zod.string()),
+  permessiSpeciali: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Permessi aggiuntivi rispetto ai menu e ai profili standard, calcolati dal server. Non concede nuove autorizzazioni.",
+    ),
   mustChangePassword: zod.boolean(),
   emailDaAggiornare: zod.boolean(),
 });

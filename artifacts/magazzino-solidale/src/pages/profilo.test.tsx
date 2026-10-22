@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   password: vi.fn(),
   refresh: vi.fn().mockResolvedValue(undefined),
   toast: vi.fn(),
+  specialPermissions: [] as string[],
 }));
 vi.mock("@workspace/api-client-react", () => ({
   useUpdateMyProfile: () => ({ mutate: mocks.email, isPending: false }),
@@ -20,6 +21,7 @@ vi.mock("@/lib/auth", () => ({
       username: "uds",
       email: "old@example.org",
       emailDaAggiornare: false,
+      permessiSpeciali: mocks.specialPermissions,
     },
     refresh: mocks.refresh,
     logout: vi.fn(),
@@ -36,6 +38,7 @@ import Profilo from "./profilo";
 let container: HTMLDivElement, root: Root;
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.specialPermissions = [];
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -64,6 +67,16 @@ async function submit(index: number) {
       ].dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
 }
+it("evidenzia UTENTE SPECIALE solo quando il server segnala permessi aggiuntivi", async () => {
+  expect(container.textContent).not.toContain("profile.specialUser");
+  mocks.specialPermissions = ["credito.view"];
+  await act(async () => root.render(<Profilo />));
+  expect(container.textContent).toContain("profile.specialUser");
+  expect(container.textContent).toContain("profile.specialUserDescription");
+  mocks.specialPermissions = [];
+  await act(async () => root.render(<Profilo />));
+  expect(container.textContent).not.toContain("profile.specialUser");
+});
 it("salva soltanto l'email normalizzata e aggiorna l'identità dopo il successo", async () => {
   await fill("profile-email", "New@Example.org");
   await submit(0);

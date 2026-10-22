@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   loggedIn: true,
   dir: "ltr",
   disabledModules: new Set<string>(),
+  specialPermissions: [] as string[],
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -27,6 +28,7 @@ vi.mock("@/lib/auth", () => ({
       nome: "Utente",
       cognome: "Test",
       ruoloNome: "Ruolo test",
+      permessiSpeciali: mocks.specialPermissions,
     } : null,
     hasArea: (area: string) => mocks.isAdmin || mocks.areas.has(area),
     hasPermission: (permission: string) =>
@@ -64,6 +66,7 @@ vi.mock("@workspace/api-client-react", () => ({
 const translations: Record<string, string> = {
   "nav.groups.generale": "Generale",
   "nav.groups.logistica": "Logistica",
+  "nav.groups.sociale": "Centro di Ascolto",
   "nav.items.dashboard": "Dashboard",
   "nav.items.volontari": "Volontari",
   "nav.items.mezzi": "Mezzi",
@@ -173,6 +176,7 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.loggedIn = true;
     mocks.dir = "ltr";
     mocks.disabledModules = new Set();
+    mocks.specialPermissions = [];
     mocks.capabilitiesHook.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -196,6 +200,52 @@ describe("Sidebar - Mappa Operativa", () => {
   };
 
   const trigger = (label: string) => sidebarGroup(label)!.querySelector<HTMLButtonElement>('[data-slot="sidebar-group-label"]')!;
+
+  it.each([
+    ["Centro personalizzato", ["generale", "magazzino", "sociale", "logistica", "analisi"]],
+    ["UDS con grant condivisi", ["uds"]],
+    ["Volontario", ["logistica"]],
+    ["Magazzino", ["magazzino"]],
+    ["Emporio", ["emporio"]],
+  ])("%s mostra solo i gruppi assegnati anche con grant trasversali", async (_, areas) => {
+    mocks.areas = new Set(areas);
+    mocks.permissions = new Set([
+      "credito.view", "emporio.access.view", "emporio.access.manage",
+      "emporio.cassa.view", "emporio.sales.view", "magazzino.view",
+      "beneficiari.view", "uds.directory.view", "consegne.view",
+      "logistica.turni.view", "maps.operational",
+    ]);
+    mocks.mapsLayerCount = 1;
+    await renderLayout();
+    const groups = Array.from(document.querySelectorAll("[data-nav-group-icon]"))
+      .map((icon) => icon.getAttribute("data-nav-group-icon"))
+      .filter((key) => key !== "supporto");
+    expect(groups.length).toBeGreaterThan(0);
+    expect(groups.every((key) => areas.includes(key!))).toBe(true);
+    if (!areas.includes("emporio")) expect(groups).not.toContain("emporio");
+    if (areas.length === 1 && areas[0] === "logistica") {
+      await expandGroup("Logistica");
+      expect(groupLinks("Logistica").map((link) => link.getAttribute("href")))
+        .toEqual(expect.arrayContaining(["/turni", "/consegne", "/maps"]));
+    }
+  });
+
+  it("l'aggiunta speciale compare dentro UDS, con etichetta, e sparisce alla revoca", async () => {
+    mocks.areas = new Set(["uds"]);
+    mocks.permissions = new Set(["uds.directory.view", "credito.view", "emporio.access.view"]);
+    mocks.specialPermissions = ["credito.view"];
+    mocks.location = "/emporio/crediti-saldo";
+    await renderLayout();
+    expect(container.textContent).toContain("profile.specialUser");
+    expect(container.querySelector('[data-nav-group-icon="emporio"]')).toBeNull();
+    expect(container.querySelector('[data-nav-group-icon="uds"]')?.closest("button")?.getAttribute("data-current")).toBe("true");
+    expect(container.querySelector('a[href="/emporio/crediti-saldo"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/emporio/accessi"]')).toBeNull();
+    mocks.specialPermissions = [];
+    await renderLayout();
+    expect(container.textContent).not.toContain("profile.specialUser");
+    expect(container.querySelector('a[href="/emporio/crediti-saldo"]')).toBeNull();
+  });
 
   it("il nome apre il profilo personale anche senza permessi amministrativi", async () => {
     mocks.areas = new Set(["uds"]);
@@ -395,8 +445,9 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.mapsLayerCount = 1;
     await renderLayout();
 
-    await expandGroup("Logistica");
-    expect(groupLinks("Logistica").at(-1)?.getAttribute("href")).toBe("/maps");
+    await expandGroup("Centro di Ascolto");
+    expect(groupLinks("Centro di Ascolto").at(-1)?.getAttribute("href")).toBe("/maps");
+    expect(sidebarGroup("Logistica")).toBeUndefined();
     expect(document.body.textContent).toContain("Mappa Operativa");
   });
 
