@@ -86,6 +86,8 @@ import { hasLogisticsReportSource } from "@/lib/logistics-report-access";
 import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 import { currentNavigationItem } from "@/lib/navigation-current";
 import { useNavigationGroups } from "@/hooks/use-navigation-groups";
+import { hasServiceMenuAccess } from "@/lib/service-menu-access";
+import { Badge } from "@/components/ui/badge";
 
 export type NavItem = {
   key: string;
@@ -93,6 +95,7 @@ export type NavItem = {
   icon: LucideIcon;
   groupKey: string;
   area?: string | readonly string[];
+  menuArea?: string;
   moduloCodice?: string;
   moduloCodiciAll?: readonly string[];
   moduloCodiciAny?: readonly string[];
@@ -264,7 +267,8 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/emporio/cassa",
     icon: Store,
     groupKey: "emporio",
-    area: "emporio",
+    area: ["emporio", "sociale", "uds"],
+    menuArea: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
     permission: "emporio.cassa.view",
   },
@@ -274,6 +278,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CreditCard,
     groupKey: "emporio",
     area: ["emporio", "sociale", "uds"],
+    menuArea: "emporio",
     moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
     permission: "credito.view",
   },
@@ -291,6 +296,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CalendarClock,
     groupKey: "emporio",
     area: ["emporio", "sociale", "uds"],
+    menuArea: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
     permission: "emporio.access.view",
   },
@@ -299,7 +305,8 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/emporio/spese",
     icon: ReceiptText,
     groupKey: "emporio",
-    area: "emporio",
+    area: ["emporio", "sociale", "uds"],
+    menuArea: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
     permission: "emporio.sales.view",
   },
@@ -714,6 +721,7 @@ function ProfileLink() {
     className="min-w-0 flex-1 rounded-md p-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <p className="truncate text-sm font-medium">{[user?.nome, user?.cognome].filter(Boolean).join(" ")}</p>
     <p className="truncate text-xs text-muted-foreground">{user?.ruoloNome ?? t("common.noRole")}</p>
+    {!!user?.permessiSpeciali?.length && <Badge variant="secondary">{t("profile.specialUser")}</Badge>}
     <p className="text-xs text-primary underline underline-offset-2">{t("profile.title")}</p>
   </Link>;
 }
@@ -749,6 +757,7 @@ export function isNavItemEnabledByAccess(
   item: NavItem,
   hasArea: (area: string) => boolean,
   hasPermission: (permission: string) => boolean,
+  specialPermissions: readonly string[] = [],
 ): boolean {
   const itemAreas = Array.isArray(item.area)
     ? item.area
@@ -757,11 +766,29 @@ export function isNavItemEnabledByAccess(
       : [];
   return (
     itemAreas.some(hasArea) &&
+    (!item.menuArea || hasServiceMenuAccess(item.menuArea, item.permission, hasArea, specialPermissions)) &&
     (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
     (!item.permission || hasPermission(item.permission)) &&
     (!item.anyPermissions || item.anyPermissions.some(hasPermission)) &&
     (!item.allPermissions || item.allPermissions.every(hasPermission))
   );
+}
+
+export function navigationGroupForItem(
+  item: NavItem,
+  hasArea: (area: string) => boolean,
+): string | undefined {
+  if (item.public || item.superAdmin || hasArea(item.groupKey)) {
+    return item.groupKey;
+  }
+  // Shared workflows stay reachable inside an assigned menu, without
+  // implicitly enabling the menu in which they are normally grouped.
+  const areas = Array.isArray(item.area)
+    ? item.area
+    : item.area
+      ? [item.area]
+      : [];
+  return areas.find(hasArea);
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -814,7 +841,7 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      isNavItemEnabledByAccess(item, hasArea, hasPermission) &&
+      isNavItemEnabledByAccess(item, hasArea, hasPermission, user?.permessiSpeciali) &&
       (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, isModuloAttivo)) &&
       isNavItemEnabledByCapabilities(
         item,
@@ -824,7 +851,11 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
         hasArea("magazzino") ||
         isModuloAttivo("CENTRO_ASCOLTO"))
     );
-  }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
+  }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo))
+    .flatMap((item) => {
+      const groupKey = navigationGroupForItem(item, hasArea);
+      return groupKey ? [{ ...item, groupKey }] : [];
+    });
   const currentItem = currentNavigationItem(location, visibleItems);
   const { openGroups, changeGroup } = useNavigationGroups(
     location,

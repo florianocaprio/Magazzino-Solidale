@@ -223,6 +223,7 @@ beforeAll(async () => {
     expect(login.status, profile.nome).toBe(200);
     expect(login.body.isAdmin).toBe(profile.isAdmin);
     expect(login.body.isSuperAdmin).toBe(profile.nome === "SuperAdmin");
+    expect(login.body.permessiSpeciali, profile.nome).toEqual([]);
     agents.set(profile.nome, agent);
   }
   for (let i = 0; i < areaIds.length; i++) {
@@ -574,6 +575,25 @@ describe("BUG6 — identità reali, sessioni normali e catena middleware complet
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
     }
+  });
+
+  it("le aggiunte speciali sono rilette dalla sessione e spariscono alla revoca senza cambiare le Aree", async () => {
+    const role = roles.get("Operatore UDS")!;
+    const user = agent("Operatore UDS");
+    try {
+      await db.update(ruoliTable).set({ permessi: [...role.grants, "credito.view"] }).where(eq(ruoliTable.id, role.id));
+      const response = await user.get("/api/auth/me");
+      expect(response.status).toBe(200);
+      expect(response.body.aree).toEqual(["uds"]);
+      expect(response.body.permessiSpeciali).toEqual(["credito.view"]);
+      expect(response.body.permessi).toEqual([...role.grants, "credito.view"]);
+    } finally {
+      await db.update(ruoliTable).set({ permessi: role.grants }).where(eq(ruoliTable.id, role.id));
+    }
+    const restored = await user.get("/api/auth/me");
+    expect(restored.status).toBe(200);
+    expect(restored.body.permessiSpeciali).toEqual([]);
+    expect(restored.body.aree).toEqual(["uds"]);
   });
 
   it("revoca da un'altra sessione è efficace alla richiesta successiva e al nuovo login", async () => {

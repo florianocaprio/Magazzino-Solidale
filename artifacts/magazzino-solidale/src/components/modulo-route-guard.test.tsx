@@ -9,6 +9,7 @@ const moduleState = vi.hoisted(() => ({
   isSuperAdmin: false,
   areaOperativaId: 1 as number | null,
   configError: false,
+  specialPermissions: [] as string[],
 }));
 
 vi.mock("@/lib/use-moduli", async (importOriginal) => ({
@@ -28,6 +29,7 @@ vi.mock("@/lib/auth", async (importOriginal) => ({
       isAdmin: moduleState.isAdmin,
       isSuperAdmin: moduleState.isSuperAdmin,
       areaOperativaId: moduleState.areaOperativaId,
+      permessiSpeciali: moduleState.specialPermissions,
     },
     hasArea: (area: string) => moduleState.areas.has(area),
     hasPermission: (permission: string) => moduleState.permissions.has(permission),
@@ -45,9 +47,30 @@ import {
   RequireAreaModulo,
   RequireMapsAccess,
   RequireModulo,
+  RequireEmporioMenu,
 } from "@/App";
 
 describe("RequireModulo", () => {
+  it("la pagina Emporio richiede il menu assegnato o l'esatta eccezione, senza allargare l'Area sorgente", () => {
+    const render = () => renderToStaticMarkup(
+      <RequireEmporioMenu permission="credito.view"><span>pagina credito</span></RequireEmporioMenu>,
+    );
+    moduleState.areas = new Set(["sociale"]);
+    moduleState.specialPermissions = [];
+    moduleState.permissions = new Set(["credito.view", "emporio.access.view"]);
+    expect(render()).not.toContain("pagina credito");
+    moduleState.specialPermissions = ["emporio.access.view"];
+    expect(render()).not.toContain("pagina credito");
+    moduleState.specialPermissions = ["credito.view"];
+    expect(render()).toContain("pagina credito");
+    moduleState.areas = new Set(["logistica"]);
+    expect(render()).not.toContain("pagina credito");
+    moduleState.specialPermissions = [];
+    moduleState.areas = new Set(["emporio"]);
+    expect(render()).toContain("pagina credito");
+    moduleState.areas.clear();
+    moduleState.permissions.clear();
+  });
   it.each([
     { area: null, admin: false, expected: "Area Operativa non assegnata", absent: "Configurazione dei servizi non disponibile" },
     { area: 1, admin: false, expected: "Configurazione dei servizi non disponibile", absent: "Area Operativa non assegnata" },

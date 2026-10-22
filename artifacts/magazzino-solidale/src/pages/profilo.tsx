@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import ChangePassword from "./change-password";
 
 export default function Profilo() {
@@ -25,6 +26,12 @@ export default function Profilo() {
           {[user?.nome, user?.cognome].filter(Boolean).join(" ")} ·{" "}
           {user?.username}
         </p>
+        {!!user?.permessiSpeciali?.length && (
+          <div className="mt-3 space-y-2">
+            <Badge variant="secondary">{t("profile.specialUser")}</Badge>
+            <p className="text-sm text-muted-foreground">{t("profile.specialUserDescription")}</p>
+          </div>
+        )}
       </header>
       <Card>
         <CardHeader>

@@ -15,6 +15,7 @@ export function authorizationSignature(
     user.mustChangePassword,
     [...(user.aree ?? [])].sort(),
     [...(user.permessi ?? [])].sort(),
+    [...(user.permessiSpeciali ?? [])].sort(),
   ]);
 }
 
