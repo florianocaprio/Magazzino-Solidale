@@ -102,6 +102,8 @@ let database: {
 const fixture = {
   centres: [] as number[],
   warehouses: [] as number[],
+  mense: [] as number[],
+  mensaWarehouses: [] as number[],
   beneficiaries: [] as number[],
   deliveries: [] as number[],
   bolle: [] as number[],
@@ -186,6 +188,15 @@ test.beforeAll(async ({ playwright, baseURL }) => {
           })
         ).status(),
       ).toBe(204);
+      if (profile.name === "Operatore Mensa") {
+        // The empty Area is deliberately denied; ordinary page checks below
+        // need an actual Mensa, not a race that leaves its request unfinished.
+        const emptyScope = await account.get("/api/mensa/consumi");
+        expect(emptyScope.status()).toBe(403);
+        expect((await emptyScope.json()).error).toBe(
+          "Nessuna Mensa disponibile nell'Area",
+        );
+      }
     } finally {
       await account.dispose();
     }
@@ -227,6 +238,18 @@ test.beforeAll(async ({ playwright, baseURL }) => {
       ],
     );
     fixture.warehouses.push(warehouse.rows[0].id);
+    const mensa = await admin.post("/api/mensa/mense", {
+      data: {
+        codice: `BM-${suffix}-${i}`,
+        nome: `Mensa sintetica ${suffix}-${i}`,
+        areaOperativaId: area,
+        centroAscoltoId: centre.rows[0].id,
+      },
+    });
+    expect(mensa.status()).toBe(201);
+    const createdMensa = await mensa.json();
+    fixture.mense.push(createdMensa.id);
+    fixture.mensaWarehouses.push(createdMensa.magazzinoId);
     const person = await database.query(
       "insert into beneficiari(codice,nome,cognome,area_operativa_id,centro_ascolto_id) values($1,'Persona','Sintetica',$2,$3) returning id",
       [`B6-${suffix}-${i}`, area, centre.rows[0].id],
@@ -267,6 +290,12 @@ test.afterAll(async () => {
     ]);
     await database.query("delete from beneficiari where id = any($1::int[])", [
       fixture.beneficiaries,
+    ]);
+    await database.query("delete from mense where id = any($1::int[])", [
+      fixture.mense,
+    ]);
+    await database.query("delete from magazzini where id = any($1::int[])", [
+      fixture.mensaWarehouses,
     ]);
     await database.query("delete from magazzini where id = any($1::int[])", [
       fixture.warehouses,
@@ -323,14 +352,38 @@ for (const profile of profiles)
     expect(identity.isSuperAdmin).toBe(profile.name === "SuperAdmin");
     if (!("admin" in profile)) expect(identity.areaOperativaId).toBe(areaId);
     for (const path of profile.routes) {
+      const consumptionResponse =
+        path === "/mensa/consumi"
+          ? page.waitForResponse(
+              (response) =>
+                response.request().method() === "GET" &&
+                new URL(response.url()).pathname === "/api/mensa/consumi",
+            )
+          : undefined;
       await page.goto(path);
       await expect(page.getByRole("main")).toBeVisible();
       await expect(page.getByRole("main")).not.toContainText(
         /non hai i permessi|accesso non autorizzato|Usa il menu per accedere alle sezioni/i,
       );
+      if (consumptionResponse)
+        expect((await consumptionResponse).status()).toBe(200);
     }
     expect(denied).toEqual([]);
     expect(errors).toEqual([]);
+    if (profile.name === "Operatore Mensa") {
+      const response = await page.request.get("/api/mensa/mense");
+      expect(response.status()).toBe(200);
+      const visible = (await response.json()).map(
+        (mensa: { id: number }) => mensa.id,
+      );
+      expect(visible).toContain(fixture.mense[0]);
+      expect(visible).not.toContain(fixture.mense[1]);
+      expect(
+        (
+          await page.request.get(`/api/mensa/mense/${fixture.mense[1]}`)
+        ).status(),
+      ).toBe(403);
+    }
     if (profile.name === "Volontario") {
       expect(
         (await page.request.post("/api/consegne", { data: {} })).status(),
@@ -433,9 +486,12 @@ test("Modulo UDS spento: API negata e UI aggiornata automaticamente", async ({
       ).status(),
     ).toBe(200);
     expect((await page.request.get("/api/uds/directory")).status()).toBe(403);
-    await expect(page.getByRole("main")).toContainText("Modulo non attivo per questo ambiente", {
-      timeout: 35_000,
-    });
+    await expect(page.getByRole("main")).toContainText(
+      "Modulo non attivo per questo ambiente",
+      {
+        timeout: 35_000,
+      },
+    );
   } finally {
     expect(
       (
@@ -473,5 +529,7 @@ test("Configurazione indisponibile: nessun dato privato resta nella pagina", asy
   ).toHaveCount(0);
   await page.unroute("**/api/configurazione-ambiente");
   await page.getByRole("button", { name: "Riprova", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Scarica bolla trasporto" }).first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Scarica bolla trasporto" }).first(),
+  ).toBeVisible();
 });
