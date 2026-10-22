@@ -48,7 +48,7 @@ Tutte le righe includono accesso diretto, chiamate accessorie, moduli spenti e d
 
 ## Ambiente AIM e verifiche
 
-La versione rilasciata dal precedente incarico era a80e8c0. Nessuna evidenza della presente campagna può dedurre i ruoli persistiti dai seed. Ricognizione AIM/utente `marcof`: NON ESEGUITA al momento della prima stesura. Non modificare account reali, password, moduli o dati produttivi. Risultati e comandi di sviluppo seguiranno nello stesso documento, con PASS/FAIL/NON ESEGUITO distinti.
+La versione rilasciata dal precedente incarico era a80e8c0. Nessuna evidenza della presente campagna può dedurre i ruoli persistiti dai seed. Ricognizione AIM/utente `marcof`: NON ESEGUITA al momento della prima stesura; **completata in sola lettura durante `##test`**, con risultati nella sezione conclusiva dedicata. Non modificare account reali, password, moduli o dati produttivi. Gli esiti storici e quelli successivi restano distinti.
 
 ## Implementazione e confini
 
@@ -192,6 +192,7 @@ Per le prove AIM mancanti occorre un collegamento in sola lettura funzionante. N
 Radice: `/Users/florianocaprio/Projects/Magazzino-Solidale`. Il seguente manifest esclude documenti locali estranei, file ambientali, credenziali, screenshot, log, ricevute private e risultati ignorati. I file sotto `generated/` derivano esclusivamente dal comando OpenAPI indicato sopra.
 
 ```text
+.dockerignore
 artifacts/api-server/src/cli/rbac-roles.ts
 artifacts/api-server/src/lib/areas.ts
 artifacts/api-server/src/lib/configurazioneAmbiente.ts
@@ -213,6 +214,7 @@ artifacts/api-server/src/routes/agea.ts
 artifacts/api-server/src/routes/aree.ts
 artifacts/api-server/src/routes/carichi.ts
 artifacts/api-server/src/routes/carico-pratiche.ts
+artifacts/api-server/src/routes/consegne.ts
 artifacts/api-server/src/routes/dashboard.ts
 artifacts/api-server/src/routes/fornitori.ts
 artifacts/api-server/src/routes/fse-importazioni.ts
@@ -231,12 +233,34 @@ artifacts/api-server/tests/bug6-rbac-contract.test.ts
 artifacts/api-server/tests/bug6-rbac-persistence.test.ts
 artifacts/api-server/tests/bug6-rbac-session.test.ts
 artifacts/api-server/tests/fase5-super-admin.test.ts
+artifacts/api-server/tests/m67-bug6-standard-workflows.test.ts
 artifacts/api-server/tests/moduli-route-combinati.test.ts
 artifacts/api-server/tests/report-allocazione-mezzi.test.ts
 artifacts/api-server/tests/scoping-direct.test.ts
 artifacts/api-server/tests/turni-seeded-rbac.test.ts
 artifacts/api-server/tests/uds-hardening.test.ts
 artifacts/magazzino-solidale/e2e/bug6-rbac.spec.ts
+artifacts/magazzino-solidale/e2e/credito-automatico-f1.spec.ts
+artifacts/magazzino-solidale/e2e/emporio-rettifiche-m62c.spec.ts
+artifacts/magazzino-solidale/e2e/emporio-security-m62a.spec.ts
+artifacts/magazzino-solidale/e2e/emporio-uat-f1.spec.ts
+artifacts/magazzino-solidale/e2e/m4b1-prenotazioni.spec.ts
+artifacts/magazzino-solidale/e2e/m5b-r2-revoca.spec.ts
+artifacts/magazzino-solidale/e2e/m5c1-centro-richiesta.spec.ts
+artifacts/magazzino-solidale/e2e/m5c1-r2-formal.spec.ts
+artifacts/magazzino-solidale/e2e/m63-interventi.spec.ts
+artifacts/magazzino-solidale/e2e/m67-p4-final-residuals.spec.ts
+artifacts/magazzino-solidale/e2e/m67-p4-mensa-context.spec.ts
+artifacts/magazzino-solidale/e2e/m67-p4-residuals.spec.ts
+artifacts/magazzino-solidale/e2e/m67-p4-social-chain.spec.ts
+artifacts/magazzino-solidale/e2e/m67-p4-uds-session.spec.ts
+artifacts/magazzino-solidale/e2e/m67-review-supply.spec.ts
+artifacts/magazzino-solidale/e2e/m67a-access.spec.ts
+artifacts/magazzino-solidale/e2e/m67b-paths.spec.ts
+artifacts/magazzino-solidale/e2e/m67d-integrated.spec.ts
+artifacts/magazzino-solidale/e2e/mensa-magazzino-correttivo.spec.ts
+artifacts/magazzino-solidale/e2e/reporting-m66.spec.ts
+artifacts/magazzino-solidale/e2e/richieste-magazzino-m5b.spec.ts
 artifacts/magazzino-solidale/src/App.tsx
 artifacts/magazzino-solidale/src/components/barcode-scanner-button.test.tsx
 artifacts/magazzino-solidale/src/components/barcode-scanner-button.tsx
@@ -244,11 +268,13 @@ artifacts/magazzino-solidale/src/components/beneficiari-provvisori.test.tsx
 artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx
 artifacts/magazzino-solidale/src/components/carico-merce-tabs.test.tsx
 artifacts/magazzino-solidale/src/components/carico-merce-tabs.tsx
+artifacts/magazzino-solidale/src/components/consegna-bolla-download.tsx
 artifacts/magazzino-solidale/src/components/documento-operativo.tsx
 artifacts/magazzino-solidale/src/components/emporio-permission-parity.test.tsx
 artifacts/magazzino-solidale/src/components/layout-maps-navigation.test.tsx
 artifacts/magazzino-solidale/src/components/layout.tsx
 artifacts/magazzino-solidale/src/components/mensa-postazione.test.tsx
+artifacts/magazzino-solidale/src/components/modulo-route-guard.test.tsx
 artifacts/magazzino-solidale/src/components/prodotti-m1a.test.tsx
 artifacts/magazzino-solidale/src/components/ruoli-area-permissions.test.tsx
 artifacts/magazzino-solidale/src/hooks/use-consegna-scan.test.tsx
@@ -257,6 +283,8 @@ artifacts/magazzino-solidale/src/lib/auth-cache.ts
 artifacts/magazzino-solidale/src/lib/auth-session.test.tsx
 artifacts/magazzino-solidale/src/lib/auth.tsx
 artifacts/magazzino-solidale/src/lib/bug6-rbac.test.ts
+artifacts/magazzino-solidale/src/lib/consegna-bolla-download.test.ts
+artifacts/magazzino-solidale/src/lib/consegna-bolla-download.ts
 artifacts/magazzino-solidale/src/lib/logistica-cache.ts
 artifacts/magazzino-solidale/src/lib/logistics-report-access.ts
 artifacts/magazzino-solidale/src/lib/maps-access.ts
@@ -347,6 +375,8 @@ Rivisto il dry-run `BUG6_RBAC_1` sul solo database locale esplicitamente verific
 
 La sola preparazione della 8082 non costituisce la validazione manuale di Floriano né un rilascio produttivo. Le verifiche AIM/`marcof` restano NON ESEGUITE; le limitazioni documentate nella fase precedente non sono trasformate in esiti positivi.
 
+Dopo la correzione del messaggio relativo all'Area mancante, ricompilate e avviate entrambe le immagini dal commit applicativo **`9229b8d`**, etichettate `magazzino-bug6-uat-api:sha-9229b8d` e `magazzino-bug6-uat-web:sha-9229b8d`. Override persistente `release-images-9229b8d.json` nella stessa cartella privata Backups. Nuovo confronto delle impronte delle variabili applicative e dei mount: invariati. Login, health e readiness: HTTP 200. Dopo il riavvio nuovo dry-run senza proposte e verifica esatta del piano precedente: nessuna variazione necessaria, quindi grant/ID dei cinque ruoli conservati. Build Docker API/frontend e build frontend nativa PASS; budget finale 393,1 KiB gzip / 400 KiB.
+
 ### Compatibilità della regressione browser con l'ingresso autorizzato
 
 La prima campagna completa si è fermata su un'aspettativa storica della fixture Credito: dopo il login pretendeva `/` anche per un ruolo senza Generale, mentre il nuovo comportamento richiesto porta a `/prodotti`. Le altre 39 prove della stessa suite erano passate; questa esecuzione resta FAIL. Aggiornate soltanto le attese di fine login delle fixture con account dedicati nelle suite Credito/Emporio, M4/M5/M6 e Mensa: devono uscire da `/login`, poi dimostrare l'accesso al vero workflow. La fixture condivisa SuperAdmin conserva l'attesa Dashboard. Nessuna asserzione su operazioni, saldi, stock, perimetri o dinieghi è stata rimossa.
@@ -358,3 +388,58 @@ Seconda continuazione: BUG6 aggiornato **75/75 PASS**; Credito, percorsi critici
 Aggiunta `artifacts/api-server/tests/m67-bug6-standard-workflows.test.ts` al gruppo Core canonico: cinque workflow con login reale, `isAdmin=false/isSuperAdmin=false` e configurazione esatta dei profili standard, senza grant extra. Verifica incontro UDS e rettifica/report/prepare senza Analisi; intervento sociale creato/avviato/concluso e storico; pratica di carico registrata/chiusa con stock effettivo; Fornitore/ordine/invio/ricezione Logistica senza area Magazzino; richiesta Mensa → documento Magazzino → preparazione/spedizione/ricezione e stock, con preparazione negata al ruolo Mensa. Le fixture sono sintetiche nel DB `127.0.0.1:59671/m67a_dev`, attestato dal runner e poi distrutto; nessun `req.user` simulato.
 
 Prima esecuzione delle nuove prove: tre fixture/aspettative nuove errate (origine DONAZIONE in maiuscolo, risposta conclusione annidata, righe obbligatorie del Trasferimento), corrette senza cambiare il codice API. Seconda esecuzione **84/84 Core PASS** (`test-results/quality-gates/api/bug6-standard-workflows-r2`), incluse le cinque nuove prove; API finali uniche 2.164 PASS, sette condizionali esterni non eseguiti. Questo totale combina la campagna FULL precedente e il gruppo Core aggiornato, non dichiara una seconda campagna FULL unica.
+
+Aggiunto il sesto workflow con profilo standard Emporio esatto: accesso, apertura sessione, carrello, sospensione/ripresa, preparazione e chiusura; verifica stock 12→11 e saldo 100→98, con forzatura e storno negati. Terza esecuzione Core **85/85 PASS**, senza ulteriori correzioni alle fixture (`bug6-standard-workflows-r3`): totale API finale unico **2.165 PASS**, sette condizionali esterni non eseguiti. Le sette tipologie operative non amministrative hanno account reali nella suite di sessione; i salvataggi aggiuntivi dei sei workflow sopra completano le prove del Volontario, per cui la mutazione è intenzionalmente vietata.
+
+La regressione M5B ha inoltre individuato l'attesa ormai impropria di una query del documento dopo il blocco globale per Area assente. Mantenuti tutti i 403 diretti e le verifiche su contenuti/cache/URL; `AppRoutes` rimuove ora i parametri del collegamento protetto quando manca l'Area. La prova controlla il messaggio territoriale, l'assenza di scheda, dati e download e che la navigazione bloccata non invii nemmeno letture dei documenti protetti. Nessuna aspettativa territoriale o mutativa rimossa.
+
+`bug6-final-expanded`: Core **85 PASS** e General **1.581 PASS / 7 condizionali non eseguiti**, compresi bootstrap, ledger e cleanup. Il report UDS del profilo standard deve ora contenere esattamente l'incontro salvato (non soltanto rispondere HTTP 200). La nuova terza prova di persistenza modifica il secondo ruolo dopo il dry-run: `apply` fallisce e anche l'aggiornamento del primo ruolo viene annullato dalla transazione, preservando la personalizzazione. Totale API unico aggiornato **2.166 PASS**, sette condizionali esterni non eseguiti.
+
+M5B revoca aggiornata: **5/5 PASS** sui cinque viewport. Anche M67-A revoca conferma i 403 e l'assenza dei dati in cache; aggiornata soltanto la precedente attesa “sessione scaduta” al messaggio esplicito dell'Area mancante. M67-A completo **30/30 PASS**. Le esecuzioni precedenti con attese obsolete restano FAIL nelle ricevute; non vengono sommate ai risultati finali.
+
+### Ricognizione AIM in sola lettura completata durante `##test`
+
+Il nuovo tentativo SSH è riuscito. API e web effettivamente in esecuzione riportano l'etichetta di revisione `a80e8c0a21a1e7d2a2cdc43a0f190647cfb76a41`; ID immagini osservati rispettivamente `cab2b8fdc88a…` e `3055bfaf4b43…`. Nessun aggiornamento o riavvio remoto. Consultati esclusivamente ruoli, conteggi di assegnazione, catalogo moduli e metadati minimi dell'account richiesto, con `BEGIN READ ONLY` e `ROLLBACK`; nessuna anagrafica assistenziale, password, token o credenziale letta/esposta nel report.
+
+| ID ruolo AIM | Nome reale | Aree funzionali persistite | Grant | Assegnazioni / attive |
+| --- | --- | --- | ---: | ---: |
+| 1 | SuperAdmin | tutte le nove aree funzionali | 108 | 1 / 1 |
+| 2 | Amministratore | tutte le nove aree funzionali | 108 | 1 / 1 |
+| 3 | Operatore | generale, sociale | 33 | 0 / 0 |
+| 4 | Volontario | generale, logistica | 0 | 0 / 0 |
+| 5 | Operatore Logistica | logistica | 13 | 0 / 0 |
+| 6 | Operatore Magazzino | magazzino | 24 | 0 / 0 |
+| 7 | Operatore UDS | uds | 20 | 1 / 1 |
+| 8 | Emporio | generale, magazzino, emporio | 7 | 0 / 0 |
+| 9 | Operatore Mensa | mensa | 14 | 0 / 0 |
+
+Account `marcof`: ID 3, attivo, `isAdmin=false/isSuperAdmin=false`, ruolo effettivo 7, Area Operativa 1 Roma attiva, Centro/Zona nulli. `uds.reports.view` presente e area funzionale Analisi assente. UDS e REPORT attivi; tutte le 28 righe dei moduli risultano abilitate nella versione precedente. Il caso reale corrisponde quindi al gate Analisi corretto sul branch, senza dover promuovere o cambiare il profilo dell'utente.
+
+Il ruolo UDS reale ha 20 grant, non i dieci del modello standard: comprende anche capacità esplicite sensibili/FSE/credito. È una configurazione da preservare, non un modello da riscrivere perché porta lo stesso nome. Nessun ruolo, assegnazione o flag remoto è stato modificato; nessuna bonifica applicata su AIM. Le differenze dei seed non vengono presentate come fotografia del DB. La ricevuta JSON minima resta privata in `/private/tmp/bug6-aim-readonly.json`, fuori da Git. **Ricognizione metadati AIM PASS; collaudo funzionale BUG6 su AIM NON ESEGUITO**, poiché il codice BUG6 resta sul branch e sulla sola 8082 autorizzata.
+
+## Esito automatico conclusivo `##test` — 22 ottobre 2026
+
+| Controllo | Esito finale |
+| --- | --- |
+| Installazione `CI=true pnpm install --frozen-lockfile` | PASS, lockfile e dipendenze di progetto invariati |
+| `pnpm run typecheck` | PASS |
+| Codegen OpenAPI canonico | PASS; estensione additiva, nessuna modifica allo schema DB |
+| API Core | 85 PASS |
+| API Reporting / Interventi / Mensa | 83 / 21 / 118 PASS |
+| API Emporio / MAPS / FSE snapshot | 258 / 18 / 2 PASS |
+| API General | 1.581 PASS, 7 condizionali su file reali esterni NON ESEGUITI |
+| API, totale finale unico | **2.166 PASS**, 7 condizionali NON ESEGUITI |
+| Unit test UI | **132 file, 861 PASS** |
+| Browser, tutte le 50 specifiche dell'inventario | **881 PASS**, 179 SKIP previsti dalle suite, zero FAIL/flaky nei risultati conclusivi |
+| Build frontend nativa / budget | PASS, **393,1 KiB gzip / 400 KiB** |
+| Bootstrap nuovo, replay ledger e cleanup DB temporanei | PASS |
+| Bonifica: idempotenza, ripristino, conflitto dopo dry-run | PASS; aggiornamento precedente annullato insieme al ruolo in conflitto |
+| AIM: ricognizione reale di versione, ruoli, moduli e `marcof` | PASS in sola lettura; nessuna modifica remota |
+
+L'ultima esecuzione Core `test-results/quality-gates/api/bug6-final-mensa` include anche il ciclo Mensa standard completo: abilitazione → tessera → scansione → primo pasto registrato e rilettura del dato; la deroga al secondo pasto è negata. Le prove dei sei workflow non utilizzano bypass amministrativi. Il report UDS contiene esattamente l'incontro appena salvato.
+
+Ricevute API: campagna FULL iniziale `bug6-final-r1` per bootstrap e gruppi invariati; `bug6-final-expanded` per General aggiornato e conflitto transazionale; `bug6-final-mensa` per Core conclusivo. I numeri finali contano ogni caso una volta, sostituendo i risultati dei gruppi rieseguiti. I sette condizionali richiedono file esterni reali non forniti al runner; gli equivalenti sintetici restano coperti. Non vengono dichiarati passati.
+
+Ricevute browser: `bug6-final-full`, `bug6-final-continuation` e continuazioni `-r2`, `-r3`, `-r4` sotto `test-results/quality-gates/browser`. La campagna è **incrementale**, non una singola esecuzione FULL verde: ogni specifica ha un risultato conclusivo PASS dopo le correzioni pertinenti. L'aggregato ignorato `bug6-final-summary.json` collega ciascuna delle 50 specifiche alla sua ricevuta conclusiva; nessuna specifica ha tutti i casi saltati. I 179 SKIP sono dichiarati dai test per non ripetere lifecycle mutanti su ogni viewport o per eseguire casi dedicati a desktop/tablet. Le esecuzioni precedenti fallite rimangono documentate e non contribuiscono ai PASS.
+
+Copertura della matrice: login UI e API reali per nove ruoli standard e custom; destinazione iniziale esplicita; sei workflow operativi con profili standard esatti; Volontario in sola lettura e PDF reale sui cinque viewport; amministrazione globale/territoriale e SuperAdmin distinti; sorgenti report, selezioni minime e seconda Area; grant/revoca e cambio scope con cache e bozze eliminate; moduli spenti, configurazione indisponibile e recupero; seed conservativo e bonifica controllata. La validazione manuale di Floriano e l'eventuale fase successiva `##merge` restano separate.

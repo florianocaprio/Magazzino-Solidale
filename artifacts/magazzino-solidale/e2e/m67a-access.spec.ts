@@ -181,7 +181,7 @@ test("M67-03 warehouse page revalidates cached rows after same-session territory
     page.getByRole("cell", { name: product, exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole("alert")).toContainText(
-    "Accesso negato o sessione scaduta. I dati precedenti non sono consultabili.",
+    "Accesso non più autorizzato: Area Operativa non assegnata.",
   );
 });
 

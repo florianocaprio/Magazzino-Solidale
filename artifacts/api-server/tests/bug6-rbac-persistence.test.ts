@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, pool, ruoliTable } from "@workspace/db";
 import { seedRoles, STANDARD_ROLE_PROFILES } from "../src/lib/seedRoles";
 import { LEGACY_ROLE_PROFILES } from "../src/lib/legacyRoleProfiles";
@@ -18,6 +18,76 @@ afterAll(async () => {
 });
 
 describe("BUG6 — persistenza e bonifica esplicita sul DB usa e getta", () => {
+  it("CLI: un ruolo cambiato dopo il dry-run annulla l'intera transazione senza sovrascrivere la personalizzazione", async () => {
+    const originals = await db
+      .select()
+      .from(ruoliTable)
+      .where(inArray(ruoliTable.nome, ["Emporio", "Volontario"]));
+    expect(originals).toHaveLength(2);
+    const folder = mkdtempSync(join(tmpdir(), "bug6-conflict-"));
+    const receipt = join(folder, "plan.json");
+    const target = new URL(process.env.DATABASE_URL!);
+    const cli = (mode: string) =>
+      execFileSync(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          resolve("src/cli/rbac-roles.ts"),
+          mode,
+          "--host",
+          target.hostname,
+          "--database",
+          target.pathname.slice(1),
+          "--file",
+          receipt,
+        ],
+        { encoding: "utf8", timeout: 30_000, stdio: "pipe" },
+      );
+    try {
+      for (const original of originals) {
+        const legacy = LEGACY_ROLE_PROFILES.find(
+          (role) => role.nome === original.nome,
+        )!;
+        await db
+          .update(ruoliTable)
+          .set({ aree: legacy.aree, permessi: legacy.permessi })
+          .where(eq(ruoliTable.id, original.id));
+      }
+      cli("dry-run");
+      const plan = JSON.parse(readFileSync(receipt, "utf8"));
+      const changes = plan.changes.filter((change: { id: number }) =>
+        originals.some((role) => role.id === change.id),
+      );
+      expect(changes).toHaveLength(2);
+      // Drift the last proposal: the preceding update must also roll back.
+      const changed = changes.at(-1);
+      const customized = [...changed.before.permessi, "custom.after-dry-run"];
+      await db
+        .update(ruoliTable)
+        .set({ permessi: customized })
+        .where(eq(ruoliTable.id, changed.id));
+      expect(() => cli("apply")).toThrow(/changed after the dry-run/);
+      for (const change of changes) {
+        const [actual] = await db
+          .select()
+          .from(ruoliTable)
+          .where(eq(ruoliTable.id, change.id));
+        expect(actual.aree).toEqual(change.before.aree);
+        expect(actual.permessi).toEqual(
+          change.id === changed.id ? customized : change.before.permessi,
+        );
+      }
+    } finally {
+      for (const original of originals)
+        await db
+          .update(ruoliTable)
+          .set({ aree: original.aree, permessi: original.permessi })
+          .where(eq(ruoliTable.id, original.id));
+      rmSync(folder, { recursive: true, force: true });
+    }
+  }, 120_000);
+
   it("due riavvii non ripristinano una revoca o le aree personalizzate di un ruolo standard", async () => {
     const [original] = await db
       .select()

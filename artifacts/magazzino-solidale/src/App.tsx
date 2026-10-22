@@ -358,7 +358,13 @@ function AuthorizedHome() {
 export function AppRoutes() {
   const { user } = useAuth();
   const flags = useConfigurazioneAmbienteFlags();
-  if (user && !user.isAdmin && !user.isSuperAdmin && user.areaOperativaId == null)
+  const [location, navigate] = useLocation();
+  const missingArea = Boolean(user && !user.isAdmin && !user.isSuperAdmin && user.areaOperativaId == null);
+  useEffect(() => {
+    if (missingArea && window.location.search)
+      navigate(window.location.pathname, { replace: true });
+  }, [missingArea, location, navigate]);
+  if (missingArea)
     return <div role="alert" className="space-y-3 p-6"><p>Accesso non più autorizzato: Area Operativa non assegnata. Contatta un amministratore per ripristinare l'assegnazione.</p></div>;
   if (flags.isLoading) return <div role="status" className="p-6">Caricamento configurazione dei servizi…</div>;
   if (flags.isError) return <div role="alert" className="space-y-3 p-6"><p>Configurazione dei servizi non disponibile. Nessuna funzione è autorizzata finché la verifica non riesce.</p><button type="button" onClick={() => void flags.refetch()}>Riprova</button></div>;

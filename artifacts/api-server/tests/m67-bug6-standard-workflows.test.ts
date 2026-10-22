@@ -38,6 +38,8 @@ async function fixture() {
     "LOGISTICA",
     "FORNITORI",
     "APPROVVIGIONAMENTI",
+    "EMPORIO_SOLIDALE",
+    "CREDITO_SOLIDALE",
   ])
     await updateModuloAmbiente(code, true, null);
   return f;
@@ -118,11 +120,15 @@ it("BUG6 UDS standard: salva e rettifica l'incontro, report/prepare senza Analis
   expect(
     body(await agent.get(`/api/uds/interventi/${created.id}`)).descrizione,
   ).toBe(changed.descrizione);
-  body(await agent.get("/api/report/uds").query({ da: today, a: today }));
+  const period = { da: created.dataIntervento, a: created.dataIntervento };
+  const report = body(await agent.get("/api/report/uds").query(period));
+  expect(
+    report.kpi.find((kpi: { key: string }) => kpi.key === "interventi").value,
+  ).toBe(1);
   body(
     await agent
       .post("/api/report/prepare")
-      .query({ section: "uds", da: today, a: today }),
+      .query({ section: "uds", ...period }),
   );
   expect((await agent.get("/api/report/emporio")).status).toBe(403);
   expect((await agent.post("/api/bolle").send({})).status).toBe(403);
@@ -312,4 +318,138 @@ it("BUG6 Mensa e Magazzino standard: richiesta, documento, preparazione, spedizi
   expect(received.stato).toBe("completato");
   expect(await stock(f)).toBe(9);
   expect(await stock(f, f.canteens[0].magazzinoId)).toBe(3);
+  const beneficiary = await person(f);
+  body(
+    await canteen.post("/api/mensa/abilitazioni").send({
+      beneficiarioId: beneficiary,
+      mensaId: f.canteens[0].id,
+      dataInizio: today,
+      motivo: "Abilitazione sintetica BUG6",
+    }),
+    201,
+  );
+  const card = body(
+    await canteen
+      .post("/api/mensa/tessere")
+      .send({ beneficiarioId: beneficiary }),
+    201,
+  );
+  const access = body(
+    await canteen.post("/api/mensa/accessi/verifica").send({
+      mensaId: f.canteens[0].id,
+      codiceTessera: card.codice,
+      tipoServizio: "pranzo",
+      idempotencyKey: randomUUID(),
+    }),
+    201,
+  );
+  const meal = body(
+    await canteen.post("/api/mensa/pasti").send({
+      accessoMensaId: access.id,
+      tipoServizio: "pranzo",
+      idempotencyKey: randomUUID(),
+    }),
+    201,
+  );
+  expect(
+    body(
+      await canteen
+        .get("/api/mensa/pasti")
+        .query({ mensaId: f.canteens[0].id }),
+    ),
+  ).toEqual(expect.arrayContaining([expect.objectContaining({ id: meal.id })]));
+  expect(
+    (
+      await canteen.post("/api/mensa/pasti").send({
+        accessoMensaId: access.id,
+        tipoServizio: "pranzo",
+        idempotencyKey: randomUUID(),
+        override: true,
+        motivoOverride: "Deroga vietata al profilo standard",
+      })
+    ).status,
+  ).toBe(403);
+});
+
+it("BUG6 Emporio standard: accesso, carrello, sospensione/ripresa e chiusura con saldo, senza forzatura o storno", async () => {
+  const f = await fixture(),
+    agent = await actor(f, "Emporio");
+  const beneficiary = await person(f);
+  await pool.query(
+    "update magazzini set tipo_magazzino='emporio' where id=$1",
+    [f.origin],
+  );
+  await pool.query(
+    "update prodotti set abilitato_emporio=true,credito_solidale_valore=2 where id=$1",
+    [f.product],
+  );
+  await pool.query(
+    "update beneficiari set credito_solidale_abilitato=true,credito_solidale_stato='attivo',credito_solidale_saldo=100,credito_solidale_mensile_assegnato=100,magazzino_emporio_preferito_id=$1 where id=$2",
+    [f.origin, beneficiary],
+  );
+  await pool.query(
+    "insert into emporio_abilitazioni(beneficiario_id,area_operativa_id,stato,operatore_id,motivo) values($1,$2,'attivo',$3,'Prerequisito sintetico BUG6')",
+    [beneficiary, f.area, f.users.requester.id],
+  );
+  const access = body(
+    await agent.post("/api/accessi-emporio").send({
+      beneficiarioId: beneficiary,
+      magazzinoEmporioId: f.origin,
+      dataOraInizio: new Date().toISOString(),
+    }),
+    201,
+  );
+  const session = body(
+    await agent
+      .post(`/api/cassa-emporio/accessi/${access.id}/apri-sessione`)
+      .send({}),
+    201,
+  );
+  const path = `/api/cassa-emporio/sessioni/${session.id}`;
+  body(
+    await agent
+      .post(`${path}/righe`)
+      .send({ versione: session.versione, prodottoId: f.product, quantita: 1 }),
+    201,
+  );
+  for (const [action, expected] of [
+    ["sospendi", "sospesa"],
+    ["riprendi", "aperta"],
+    ["pronta-per-chiusura", "pronta_per_chiusura"],
+  ]) {
+    const current = body(await agent.get(path));
+    expect(
+      body(
+        await agent
+          .post(`${path}/${action}`)
+          .send({ versione: current.versione }),
+      ).statoSessione,
+    ).toBe(expected);
+  }
+  const current = body(await agent.get(path));
+  const closed = body(
+    await agent.post(`${path}/chiudi`).send({ versione: current.versione }),
+  );
+  expect(closed.sessione.statoSessione).toBe("chiusa");
+  expect(await stock(f)).toBe(11);
+  expect(
+    Number(
+      (
+        await pool.query(
+          "select credito_solidale_saldo saldo from beneficiari where id=$1",
+          [beneficiary],
+        )
+      ).rows[0].saldo,
+    ),
+  ).toBe(98);
+  expect(
+    (await agent.post("/api/cassa-emporio/accessi/forza").send({})).status,
+  ).toBe(403);
+  expect(
+    (
+      await agent
+        .post(`/api/spese-emporio/${closed.spesa.id}/storna`)
+        .send({ motivo: "Vietato" })
+    ).status,
+  ).toBe(403);
 });
