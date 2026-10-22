@@ -1,6 +1,6 @@
 # BUG 6.0 — Ruoli, permessi e moduli
 
-**Stato conclusivo:** fase automatica `##test` completata; **8082 ricompilata e pronta per la validazione manuale finale**. Codice applicativo `ba131c3` sul solo branch `codex/bug6-rbac-ruoli-moduli`. Nessun merge, push o deploy remoto. I limiti delle prove e le ricevute incrementali sono riportati nelle sezioni conclusive; i risultati iniziali restano come cronologia.
+**Stato corrente:** fase `##test` completata e **OK manuale finale di Floriano ricevuto**, incluso il download della Bolla per il Volontario sulla 8082. Avviata la fase `##merge` espressamente autorizzata. Codice applicativo validato `ba131c3`, branch `codex/bug6-rbac-ruoli-moduli`. Le sezioni precedenti conservano la cronologia; lo stato dell'integrazione è riportato in chiusura.
 
 ## Mandato e base
 
@@ -460,3 +460,13 @@ Ricompilate e avviate **entrambe** le immagini finali `magazzino-bug6-uat-api:sh
 Prova manuale principale: usare sulla **8082** un account con ruolo **Volontario** e Area assegnata; aprire una consegna della sua Area con Bolla già emessa e premere **“Scarica bolla trasporto”**. Il PDF deve essere scaricabile; comandi di modifica di Bolla, prodotti, quantità e consegna devono restare indisponibili. Verificare inoltre Turni e Mappa in consultazione, la separazione dall'altra Area e i normali workflow degli altri profili della matrice. Una consegna senza Bolla emessa non propone il download.
 
 **Pronto per l'OK manuale finale.** Restano NON ESEGUITI i sette condizionali su file esterni e il collaudo funzionale BUG6 su AIM (ancora a80e8c0, intenzionalmente non aggiornato). La ricognizione AIM in sola lettura è invece conclusa. Nessuna fase `##merge`, pubblicazione Git o distribuzione remota eseguita.
+
+## Fase `##merge` — OK finale e preflight Git
+
+Floriano ha confermato: «Ho provato sulla 8082, funziona tutto anche il download della bolla per il volontario. Ti do l’OK finale: procedi con la fase ##merge del BUG6». La validazione manuale finale è quindi **PASS**, distinta dai risultati automatici riportati sopra.
+
+Dopo `git fetch origin`, `origin/main` è ancora `a80e8c0a21a1e7d2a2cdc43a0f190647cfb76a41`: nessun avanzamento concorrente, divergenza `0/6` rispetto al candidato `72c2e1c`. Il codice applicativo non è cambiato rispetto a `ba131c3`; il commit successivo aggiorna soltanto questo audit. Non occorrono risoluzioni di conflitti o nuove UAT per un'integrazione testualmente e funzionalmente invariata.
+
+Il workflow GitHub corrente avvia sei job di qualità su PR e su push a main (static/frontend/Docker, API con DB nuovo, quattro partizioni browser). Non contiene trigger di distribuzione. Main non ha una branch protection configurata; si usa comunque una PR e si attende l'esito effettivo dei sei job prima dell'integrazione. Nessun hook Git personalizzato configurato. `scripts/post-merge.sh` non viene eseguito: contiene `db push`, non necessario né appropriato per questo intervento senza modifiche allo schema DB.
+
+Le evidenze locali del candidato vengono riusate; la CI verifica nuovamente il risultato completo su Linux. Nessun file `.env`, credenziale, immagine, video, log o risultato locale dei test è incluso nel diff. Restano esclusi i cinque documenti locali estranei elencati all'inizio del mandato. Nessuna ulteriore modifica ai ruoli persistiti, agli utenti, ai dati o ai moduli è necessaria per il merge. Le modifiche OpenAPI sono additive; i client sono stati rigenerati con il comando canonico e la CI ne verifica la riproducibilità.
