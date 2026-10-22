@@ -17,6 +17,9 @@ export interface ModuloFunzionale {
   ordine: number;
   attivoDefault: boolean;
   attivo: boolean;
+  disponibile?: boolean;
+  configuratoAttivo?: boolean;
+  dipendenze?: string[];
   dataCreazione: Date;
   dataAggiornamento: Date;
   /** @nullable */

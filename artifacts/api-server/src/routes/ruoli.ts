@@ -34,9 +34,12 @@ const fmt = (r: typeof ruoliTable.$inferSelect) => ({
   dataCreazione: r.dataCreazione.toISOString(),
 });
 
+function unsupportedKeys(permessi: string[] | undefined, existing: string[] = []): string[] {
+  return (permessi ?? []).filter((permission) => !permissionKeys.has(permission) && !existing.includes(permission));
+}
 function sanitizePermessi(permessi: string[] | undefined): string[] {
-  if (!permessi) return [];
-  return permessi.filter((permission) => permissionKeys.has(permission));
+  // Unknown persisted keys remain round-trippable; new unknown keys are rejected.
+  return [...(permessi ?? [])];
 }
 
 function isSuperAdminRoleName(nome?: string | null): boolean {
@@ -81,6 +84,9 @@ router.post("/ruoli", async (req, res): Promise<void> => {
     return;
   }
   const { nome, descrizione, aree, permessi, isAdmin } = parsed.data;
+  if (unsupportedKeys(permessi).length || (aree ?? []).some((area) => !ALL_AREA_KEYS.includes(area) || (area === "amministrazione" && !isAdmin))) {
+    res.status(400).json({ error: "Aree o permessi sconosciuti/non assegnabili: controllare la configurazione" }); return;
+  }
   const creatingSuperAdminRole = isSuperAdminRoleName(nome);
   if (creatingSuperAdminRole && !req.user?.isSuperAdmin) {
     res.status(403).json({ error: "Operazione riservata ai Super Admin" });
@@ -147,6 +153,10 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Ruolo non trovato" });
     return;
   }
+  if (unsupportedKeys(body.permessi, current.permessi ?? []).length || (body.aree ?? []).some((area) =>
+    !ALL_AREA_KEYS.includes(area) && !(current.aree ?? []).includes(area))) {
+    res.status(400).json({ error: "Nuove chiavi sconosciute: nessun permesso è stato scartato o salvato" }); return;
+  }
   const isProtectedSuperAdminRole = isSuperAdminRoleName(current.nome);
   const nextNameIsSuperAdmin =
     body.nome !== undefined && isSuperAdminRoleName(body.nome);
@@ -177,12 +187,8 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   const updates: Partial<typeof ruoliTable.$inferInsert> = {};
   if (isProtectedSuperAdminRole) {
     updates.nome = SUPER_ADMIN_ROLE_NAME;
-    updates.aree = ALL_AREA_KEYS;
-    updates.permessi = adminPermissionsWithExplicitOriginal(
-      body.permessi !== undefined
-        ? sanitizePermessi(body.permessi)
-        : (current.permessi ?? []),
-    );
+    updates.aree = [...current.aree];
+    updates.permessi = body.permessi !== undefined ? [...body.permessi] : [...current.permessi];
     updates.isAdmin = true;
   } else if (body.nome !== undefined) {
     updates.nome = body.nome;
@@ -191,9 +197,9 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
     updates.descrizione = body.descrizione ?? null;
   const nextIsAdmin = body.isAdmin ?? current.isAdmin;
   if (!isProtectedSuperAdminRole && body.aree !== undefined)
-    updates.aree = sanitizeRoleAreas(body.aree, nextIsAdmin);
+    updates.aree = body.aree.filter((area) => nextIsAdmin || area !== "amministrazione");
   else if (!isProtectedSuperAdminRole && body.isAdmin === false)
-    updates.aree = sanitizeRoleAreas(current.aree, false);
+    updates.aree = current.aree.filter((area) => area !== "amministrazione");
   if (!isProtectedSuperAdminRole && body.permessi !== undefined)
     updates.permessi = sanitizePermessi(body.permessi);
   if (!isProtectedSuperAdminRole && body.isAdmin !== undefined)

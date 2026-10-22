@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+import { UNAVAILABLE_MODULES, MODULE_DEPENDENCIES } from "./modulePolicy";
 import { and, eq } from "drizzle-orm";
 import {
   ambienteModuliTable,
@@ -32,6 +33,8 @@ async function findModuloAmbiente(codice: string) {
 export async function isModuloAttivo(codice: string): Promise<boolean> {
   const normalized = normalizeModuloCodice(codice);
   if (!normalized) return false;
+  if (UNAVAILABLE_MODULES.has(normalized)) return false;
+  if (!(await Promise.all((MODULE_DEPENDENCIES[normalized] ?? []).map(isModuloAttivo))).every(Boolean)) return false;
 
   let row = await findModuloAmbiente(normalized);
   if (!row) {

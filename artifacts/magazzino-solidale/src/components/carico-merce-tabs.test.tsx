@@ -20,13 +20,17 @@ const fixture = vi.hoisted(() => ({
     },
   ],
 }));
+vi.mock("@/lib/use-moduli", () => ({ useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }) }));
 vi.mock("@workspace/api-client-react", () => ({
   useListAreeOperative: () => ({
     data: [{ id: 1, nome: "Area", attivo: true }],
   }),
   useListMagazzini: () => ({ data: [] }),
+useListMagazziniOperativi: () => ({ data: [] }),
   useListProdotti: () => ({ data: [] }),
+useListProdottiOperativi: () => ({ data: [] }),
   useListFornitori: () => ({ data: [] }),
+useListFornitoriOperativi: () => ({ data: [] }),
   useListLotti: () => ({ data: fixture.lots }),
   useListLottiLogici: () => ({ data: [] }),
   getListLottiLogiciQueryKey: () => ["lotti-logici"],

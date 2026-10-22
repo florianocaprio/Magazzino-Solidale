@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScanLine, CameraOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 
 const FORMATS = [
   BarcodeFormat.CODE_128,
@@ -68,6 +69,8 @@ export function BarcodeScannerButton({
   variant = "outline",
 }: BarcodeScannerButtonProps) {
   const { t } = useTranslation();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const enabled = isModuloAttivo("BARCODE");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The dialog portal may mount after the opening render. Start only when
@@ -82,7 +85,7 @@ export function BarcodeScannerButton({
   }, [onScan]);
 
   useEffect(() => {
-    if (!open || !video) return;
+    if (!enabled || !open || !video) return;
     let cancelled = false;
     let accepted = false;
     setError(null);
@@ -141,7 +144,7 @@ export function BarcodeScannerButton({
         stream.getTracks().forEach((track) => track.stop());
       video.srcObject = null;
     };
-  }, [open, video, t]);
+  }, [enabled, open, video, t]);
 
   return (
     <>
@@ -150,7 +153,7 @@ export function BarcodeScannerButton({
         type="button"
         variant={variant}
         size={withLabel ? "default" : "icon"}
-        disabled={disabled}
+        disabled={disabled || !enabled}
         onClick={() => {
           setError(null);
           setOpen(true);
@@ -163,7 +166,7 @@ export function BarcodeScannerButton({
         {withLabel && (label ?? t("barcodeScanner.button"))}
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open && enabled} onOpenChange={setOpen}>
         <DialogContent
           className="sm:max-w-md"
           onCloseAutoFocus={(event) => {

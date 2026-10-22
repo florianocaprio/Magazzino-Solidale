@@ -95,7 +95,7 @@ export default function SuperAdminModuli() {
   });
 
   const setModulo = (modulo: ModuloFunzionale, attivo: boolean) => {
-    if (modulo.core) return;
+    if (modulo.core || modulo.disponibile === false) return;
     if (!attivo) {
       setToDisable(modulo);
       return;
@@ -179,7 +179,7 @@ export default function SuperAdminModuli() {
                           {modulo.core ? t("superAdmin.modules.core") : t("superAdmin.modules.optional")}
                         </Badge>
                       </TableCell>
-                      <TableCell>{statusBadge(modulo.attivo, t)}</TableCell>
+                      <TableCell>{modulo.disponibile === false ? <Badge variant="outline">Non disponibile</Badge> : statusBadge(modulo.attivo, t)}{(modulo.dipendenze?.length ?? 0) > 0 && <p className="text-xs text-muted-foreground">Richiede: {modulo.dipendenze?.join(", ")}</p>}</TableCell>
                       <TableCell>{modulo.ordine}</TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex flex-col items-end gap-1">
@@ -188,8 +188,8 @@ export default function SuperAdminModuli() {
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                             <Switch
-                              checked={modulo.attivo}
-                              disabled={modulo.core || isPending}
+                              checked={modulo.disponibile === false ? false : (modulo.configuratoAttivo ?? modulo.attivo)}
+                              disabled={modulo.core || modulo.disponibile === false || isPending}
                               onCheckedChange={(checked) => setModulo(modulo, checked)}
                               aria-label={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
                               title={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}

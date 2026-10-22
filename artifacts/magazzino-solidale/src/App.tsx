@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { MENSA_REQUEST_READ_PERMISSIONS } from "@/lib/mensa-request-access";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -10,12 +10,14 @@ import Login from "@/pages/login";
 import ChangePassword from "@/pages/change-password";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
-import { AppLayout } from "@/components/layout";
+import { AppLayout, NAV_ITEMS, isNavItemEnabledByAccess, isNavItemEnabledByModules } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useIdleLogout } from "@/lib/use-idle-logout";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import { hasLogisticsReportSource } from "@/lib/logistics-report-access";
+import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 import { canAccessMapsApplication } from "@/lib/maps-access";
 import { createAppQueryClient } from "@/lib/query-client";
 import { canonicalLegacyTrasferimentiSearch } from "@/lib/documenti-operativi-location";
@@ -310,6 +312,7 @@ function ReportingRoute({
   areas,
   modules = [],
   anyModules = [],
+  permissions = [],
   permission,
 }: {
   section: React.ComponentProps<typeof ReportingDashboardPage>["section"];
@@ -317,11 +320,14 @@ function ReportingRoute({
   modules?: string[];
   anyModules?: string[];
   permission?: string;
+  permissions?: string[];
 }) {
   const { hasArea, hasPermission } = useAuth();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   if (areas && !areas.some(hasArea)) return <NotAuthorized />;
   if (permission && !hasPermission(permission)) return <NotAuthorized />;
+  if (!permissions.every(hasPermission)) return <NotAuthorized />;
+  if (section === "magazzino-logistica" && !hasLogisticsReportSource(hasArea, hasPermission, isModuloAttivo)) return <NotAuthorized />;
   const disabledModule =
     modules.find((code) => !isModuloAttivo(code)) ??
     (anyModules.length > 0 && !anyModules.some(isModuloAttivo)
@@ -336,7 +342,23 @@ function ReportingRoute({
   return <ReportingDashboardPage section={section} />;
 }
 
+function AuthorizedHome() {
+  const { user, hasArea, hasPermission } = useAuth();
+  const flags = useConfigurazioneAmbienteFlags();
+  if (flags.isLoading) return <Loader2 className="m-auto h-6 w-6 animate-spin" />;
+  if (hasArea("generale") && flags.isModuloAttivo("REPORT")) return <Dashboard />;
+  const destination = NAV_ITEMS.find((item) => item.url !== "/" && !item.public &&
+    (!item.globalAdmin || canManageGlobalAdminResources(user)) &&
+    (item.superAdmin ? user?.isSuperAdmin : isNavItemEnabledByAccess(item, hasArea, hasPermission)) &&
+    isNavItemEnabledByModules(item, flags.isModuloAttivo) &&
+    (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, flags.isModuloAttivo)));
+  return destination ? <Redirect to={destination.url} replace /> : <NotAuthorized />;
+}
+
 function AppRoutes() {
+  const flags = useConfigurazioneAmbienteFlags();
+  if (flags.isLoading) return <div role="status" className="p-6">Caricamento configurazione dei servizi…</div>;
+  if (flags.isError) return <div role="alert" className="space-y-3 p-6"><p>Configurazione dei servizi non disponibile. Nessuna funzione è autorizzata finché la verifica non riesce.</p><button type="button" onClick={() => void flags.refetch()}>Riprova</button></div>;
   return (
     <AppLayout>
       <Suspense
@@ -352,9 +374,7 @@ function AppRoutes() {
         <Switch>
           <Route path="/">
             {() => (
-              <Guard area="generale">
-                <Dashboard />
-              </Guard>
+              <AuthorizedHome />
             )}
           </Route>
 
@@ -481,7 +501,7 @@ function AppRoutes() {
           </Route>
           <Route path="/emporio/crediti-saldo">
             {() => (
-              <Guard area="emporio">
+              <Guard area={["emporio", "sociale", "uds"]}>
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequireModulo codice="CREDITO_SOLIDALE">
                     <RequirePermission permission="credito.view">
@@ -494,7 +514,7 @@ function AppRoutes() {
           </Route>
           <Route path="/emporio/accessi">
             {() => (
-              <Guard area="emporio">
+              <Guard area={["emporio", "sociale", "uds"]}>
                 <RequireModulo codice="EMPORIO_SOLIDALE">
                   <RequirePermission permission="emporio.access.view">
                     <EmporioAccessi />
@@ -582,7 +602,7 @@ function AppRoutes() {
           </Route>
           <Route path="/consegne">
             {() => (
-              <Guard area="sociale">
+              <Guard area={["sociale", "logistica"]}>
                 <RequireModulo codice="CENTRO_ASCOLTO">
                   <RequireModulo codice="CONSEGNE">
                     <RequirePermission permission="consegne.view">
@@ -602,7 +622,7 @@ function AppRoutes() {
           </Route>
           <Route path="/turni">
             {() => (
-              <Guard area="sociale">
+              <Guard area={["sociale", "logistica"]}>
                 <RequireModulo codice="CENTRO_ASCOLTO">
                   <RequirePermission permission="logistica.turni.view">
                     <Turni />
@@ -686,7 +706,7 @@ function AppRoutes() {
           </Route>
           <Route path="/uds/report-giornaliero">
             {() => (
-              <Guard area="analisi">
+              <Guard area="uds">
                 <RequireModulo codice="UDS">
                   <RequireModulo codice="REPORT">
                     <RequirePermission permission="uds.reports.view">
@@ -700,55 +720,55 @@ function AppRoutes() {
 
           <Route path="/volontari">
             {() => (
-              <Guard area="logistica">
+              <Guard area="logistica"><RequireModulo codice="LOGISTICA">
                 <RequireModulo codice="VOLONTARI">
                   <RequirePermission permission="logistica.volontari.view">
                     <Volontari />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireModulo></Guard>
             )}
           </Route>
           <Route path="/mezzi">
             {() => (
-              <Guard area="logistica">
+              <Guard area="logistica"><RequireModulo codice="LOGISTICA">
                 <RequireModulo codice="MEZZI">
                   <RequirePermission permission="logistica.mezzi.view">
                     <Mezzi />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireModulo></Guard>
             )}
           </Route>
           <Route path="/approvazioni-logistica">
             {() => (
-              <Guard area="logistica">
+              <Guard area="logistica"><RequireModulo codice="LOGISTICA">
                 <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
                   <RequirePermission permission="logistica.approvazioni.view">
                     <ApprovazioniLogistica />
                   </RequirePermission>
                 </RequireAnyModulo>
-              </Guard>
+              </RequireModulo></Guard>
             )}
           </Route>
           <Route path="/fornitori">
             {() => (
-              <Guard area="logistica">
+              <Guard area="logistica"><RequireModulo codice="LOGISTICA">
                 <RequireModulo codice="FORNITORI">
-                  <Fornitori />
+                  <RequirePermission permission="fornitori.view"><Fornitori /></RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireModulo></Guard>
             )}
           </Route>
           <Route path="/approvvigionamenti">
             {() => (
-              <Guard area="logistica">
+              <Guard area="logistica"><RequireModulo codice="LOGISTICA">
                 <RequireModulo codice="APPROVVIGIONAMENTI">
                   <RequirePermission permission="approvvigionamenti.view">
                     <Approvvigionamenti />
                   </RequirePermission>
                 </RequireModulo>
-              </Guard>
+              </RequireModulo></Guard>
             )}
           </Route>
 
@@ -776,10 +796,11 @@ function AppRoutes() {
           </Route>
           <Route path="/report/centro-ascolto">
             {() => (
-              <Guard area="analisi">
+              <Guard area="sociale">
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="centro-ascolto"
+                    permissions={["beneficiari.view", "sociale.interventi.view"]}
                     areas={["sociale"]}
                     modules={["CENTRO_ASCOLTO"]}
                   />
@@ -789,10 +810,11 @@ function AppRoutes() {
           </Route>
           <Route path="/report/emporio">
             {() => (
-              <Guard area="analisi">
+              <Guard area="emporio">
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="emporio"
+                    permissions={["emporio.sales.view", "credito.view"]}
                     areas={["emporio"]}
                     modules={["EMPORIO_SOLIDALE"]}
                   />
@@ -802,7 +824,7 @@ function AppRoutes() {
           </Route>
           <Route path="/report/mensa">
             {() => (
-              <Guard area="analisi">
+              <Guard area="mensa">
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="mensa"
@@ -816,7 +838,7 @@ function AppRoutes() {
           </Route>
           <Route path="/report/uds">
             {() => (
-              <Guard area="analisi">
+              <Guard area="uds">
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="uds"
@@ -830,7 +852,7 @@ function AppRoutes() {
           </Route>
           <Route path="/report/magazzino-logistica">
             {() => (
-              <Guard area="analisi">
+              <Guard area={["magazzino", "logistica"]}>
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="magazzino-logistica"
@@ -840,6 +862,7 @@ function AppRoutes() {
                       "LOTTI",
                       "TRASFERIMENTI",
                       "MEZZI",
+      "VOLONTARI",
                       "FORNITORI",
                       "APPROVVIGIONAMENTI",
                     ]}
@@ -871,7 +894,7 @@ function AppRoutes() {
           </Route>
           <Route path="/report-uds">
             {() => (
-              <Guard area="analisi">
+              <Guard area="uds">
                 <RequireModulo codice="REPORT">
                   <ReportingRoute
                     section="uds"

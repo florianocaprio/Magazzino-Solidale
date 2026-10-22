@@ -7,6 +7,7 @@ import {
   useUpdateRuolo,
   useDeleteRuolo,
   getListRuoliQueryKey,
+  getGetCurrentUserQueryKey,
   type Ruolo,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -66,6 +67,8 @@ import {
   areaCheckboxState,
   existingRoleSelection,
   permissionsForArea,
+  ordinaryPermissionsForArea,
+  roleConfigurationWarnings,
 } from "@/lib/area-permissions";
 
 const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
@@ -92,13 +95,16 @@ export default function Ruoli() {
   const [aree, setAree] = useState<string[]>([]);
   const [permessi, setPermessi] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [changeSummary, setChangeSummary] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const areaLabels = Object.fromEntries(
     catalogoAree.map((area) => [area.key, area.label]),
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getListRuoliQueryKey() });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: getListRuoliQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -108,6 +114,7 @@ export default function Ruoli() {
     setPermessi([]);
     setIsAdmin(false);
     setFormError(null);
+    setChangeSummary(null);
     setIsFormOpen(true);
   };
 
@@ -124,6 +131,7 @@ export default function Ruoli() {
     setPermessi(selection.permessi);
     setIsAdmin(r.isAdmin);
     setFormError(null);
+    setChangeSummary(null);
     setIsFormOpen(true);
   };
 
@@ -134,6 +142,9 @@ export default function Ruoli() {
       checked,
       catalogoAree,
     );
+    const removed = permessi.filter((key) => !selection.permessi.includes(key));
+    const added = selection.permessi.filter((key) => !permessi.includes(key));
+    setChangeSummary(checked ? `Aggiunti ${added.length} permessi ordinari. Le capacità aggiuntive restano da selezionare esplicitamente.` : `Rimossi ${removed.length} ordinari esclusivi: ${removed.join(", ") || "nessuno"}. Conservati i permessi condivisi e le capacità aggiuntive.`);
     setAree(selection.aree);
     setPermessi(selection.permessi);
   };
@@ -143,8 +154,9 @@ export default function Ruoli() {
   };
 
   const toggleAllAreaPermissions = (key: string, checked: boolean) => {
+    setChangeSummary(checked ? "Completata la dotazione ordinaria del gruppo; nessuna capacità aggiuntiva assegnata." : "Rimossi gli ordinari esclusivi del gruppo. Conservati i condivisi necessari agli altri servizi e le capacità aggiuntive esplicite.");
     setPermessi((prev) =>
-      applyAllAreaPermissions(prev, key, checked, catalogoAree),
+      applyAllAreaPermissions(prev, key, checked, catalogoAree, aree),
     );
   };
 
@@ -152,8 +164,9 @@ export default function Ruoli() {
     e.preventDefault();
     setFormError(null);
     const data = {
-      nome: nome.trim(),
-      descrizione: descrizione.trim() || undefined,
+      nome: editing && nome === editing.nome ? editing.nome : nome.trim(),
+      descrizione: editing && descrizione === (editing.descrizione ?? "")
+        ? (editing.descrizione ?? undefined) : (descrizione.trim() || undefined),
       aree,
       permessi,
       isAdmin,
@@ -303,6 +316,9 @@ export default function Ruoli() {
                             <Pencil className="mr-2 h-4 w-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
+                          <DropdownMenuItem disabled={r.isAdmin} onClick={() => {
+                            openEdit(r); setEditing(null); setNome(`${r.nome} - copia`); setIsAdmin(false);
+                          }}>Crea ruolo personalizzato da questo</DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             disabled={r.nome === SUPER_ADMIN_ROLE_NAME}
@@ -380,7 +396,7 @@ export default function Ruoli() {
                     {catalogoAree
                       .filter((a) => a.key !== "amministrazione")
                       .map((a) => {
-                        const areaPermissions = permissionsForArea(
+                        const areaPermissions = ordinaryPermissionsForArea(
                           catalogoAree,
                           a.key,
                         );
@@ -398,7 +414,7 @@ export default function Ruoli() {
                                 catalogoAree,
                               )}
                               onCheckedChange={() =>
-                                toggleArea(a.key, !aree.includes(a.key))
+                                toggleArea(a.key, areaCheckboxState(a.key, aree, permessi, catalogoAree) !== true)
                               }
                             />
                             <Label
@@ -426,7 +442,7 @@ export default function Ruoli() {
                     <p className="text-xs text-muted-foreground">
                       {t(
                         "ruoli.permissionsHint",
-                        "La selezione dell'Area propone i permessi associati; puoi personalizzarli singolarmente.",
+                        "La selezione di un servizio propone solo la dotazione ordinaria. Le capacità aggiuntive richiedono una scelta esplicita.",
                       )}
                     </p>
                     {aree.some(
@@ -438,7 +454,7 @@ export default function Ruoli() {
                           const area = catalogoAree.find(
                             (candidate) => candidate.key === areaKey,
                           );
-                          const areaPermissions = permissionsForArea(
+                          const areaPermissions = ordinaryPermissionsForArea(
                             catalogoAree,
                             areaKey,
                           );
@@ -463,7 +479,7 @@ export default function Ruoli() {
                                     toggleAllAreaPermissions(areaKey, true)
                                   }
                                 >
-                                  {t("ruoli.allPermissions", "Tutti")}
+                                  {t("ruoli.allOrdinaryPermissions", "Tutti ordinari")}
                                 </Button>
                                 <Button
                                   type="button"
@@ -475,7 +491,7 @@ export default function Ruoli() {
                                     toggleAllAreaPermissions(areaKey, false)
                                   }
                                 >
-                                  {t("ruoli.noPermissions", "Nessuno")}
+                                  {t("ruoli.noOrdinaryPermissions", "Nessun ordinario")}
                                 </Button>
                               </div>
                             </div>
@@ -484,31 +500,36 @@ export default function Ruoli() {
                       </div>
                     )}
                     <div className="space-y-2 rounded-md border p-3">
-                      {catalogoPermessi.map((permission) => (
-                        <div
-                          key={permission.key}
-                          className="flex items-center gap-2"
-                        >
-                          <Checkbox
-                            id={`permission-${permission.key}`}
-                            checked={permessi.includes(permission.key)}
-                            onCheckedChange={(checked) =>
-                              togglePermesso(permission.key, checked === true)
-                            }
-                          />
-                          <Label
-                            htmlFor={`permission-${permission.key}`}
-                            className="cursor-pointer font-normal"
-                          >
-                            {permission.label}
-                          </Label>
-                        </div>
-                      ))}
+                      {catalogoAree.filter((area) => area.key !== "amministrazione").map((area) => {
+                        const owned = permissionsForArea(catalogoAree, area.key);
+                        const ordinary = new Set(ordinaryPermissionsForArea(catalogoAree, area.key));
+                        const previous = new Set(catalogoAree.slice(0, catalogoAree.indexOf(area)).flatMap((other) => permissionsForArea(catalogoAree, other.key)));
+                        const items = catalogoPermessi.filter((permission) => owned.includes(permission.key) && !previous.has(permission.key)).sort((a, b) => a.key.localeCompare(b.key));
+                        if (!items.length) return null;
+                        const renderPermission = (permission: typeof items[number]) => <div key={permission.key} className="flex items-center gap-2">
+                          <Checkbox id={`permission-${permission.key}`} checked={permessi.includes(permission.key)} onCheckedChange={(checked) => togglePermesso(permission.key, checked === true)} />
+                          <Label htmlFor={`permission-${permission.key}`} className="cursor-pointer font-normal">{permission.label}</Label>
+                        </div>;
+                        return <section key={area.key} className="space-y-2 border-b pb-3 last:border-0">
+                          <h3 className="font-medium">{area.label}</h3>
+                          {items.filter((permission) => ordinary.has(permission.key)).map(renderPermission)}
+                          {items.some((permission) => !ordinary.has(permission.key)) && <details className="space-y-2">
+                            <summary className="cursor-pointer text-sm text-muted-foreground">Capacità aggiuntive</summary>
+                            {items.filter((permission) => !ordinary.has(permission.key)).map(renderPermission)}
+                          </details>}
+                        </section>;
+                      })}
+                      {catalogoPermessi.filter((permission) => !catalogoAree.some((area) => permissionsForArea(catalogoAree, area.key).includes(permission.key))).map((permission) => <div key={permission.key} className="flex items-center gap-2">
+                        <Checkbox id={`permission-${permission.key}`} checked={permessi.includes(permission.key)} onCheckedChange={(checked) => togglePermesso(permission.key, checked === true)} />
+                        <Label htmlFor={`permission-${permission.key}`}>{permission.label} · capacità aggiuntiva</Label>
+                      </div>)}
                     </div>
                   </div>
                 )}
               </div>
             )}
+            {changeSummary && <p role="status" className="rounded-md border p-3 text-sm">{changeSummary}</p>}
+            {!isAdmin && roleConfigurationWarnings({ aree, permessi }, catalogoAree).map((warning) => <p key={warning} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{warning}</p>)}
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
             )}

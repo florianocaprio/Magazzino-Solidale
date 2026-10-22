@@ -65,7 +65,9 @@ export function useModuloFlags() {
   const query = useGetConfigurazioneAmbientePubblica({
     query: {
       queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(),
-      staleTime: 60_000,
+      staleTime: 30_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: "always",
     },
   });
   const activeCodes = new Set(query.data?.moduliAttivi ?? []);
@@ -75,7 +77,7 @@ export function useModuloFlags() {
     ...query,
     emporioAbilitato: hasConfig ? activeCodes.has("EMPORIO_SOLIDALE") : false,
     mensaAbilitato: hasConfig ? activeCodes.has("MENSA") : false,
-    unitaStradaAbilitata: hasConfig ? activeCodes.has("UDS") : true,
+    unitaStradaAbilitata: hasConfig ? activeCodes.has("UDS") : false,
   };
 }
 
@@ -83,7 +85,9 @@ export function useConfigurazioneAmbienteFlags() {
   const query = useGetConfigurazioneAmbientePubblica({
     query: {
       queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(),
-      staleTime: 60_000,
+      staleTime: 30_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: "always",
     },
   });
 
@@ -91,7 +95,7 @@ export function useConfigurazioneAmbienteFlags() {
   const hasConfig = !!query.data && !query.isError;
   const isModuloAttivo = (codice?: string | null): boolean => {
     if (!codice) return true;
-    if (!hasConfig) return true;
+    if (!hasConfig) return false;
     return activeCodes.has(codice);
   };
   const areAllModuliAttiviForEnvironment = (codici: readonly string[]) =>

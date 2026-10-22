@@ -89,6 +89,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useListMagazzini: () => ({
     data: [{ id: 1, nome: "Emporio A", tipoMagazzino: "emporio" }],
   }),
+useListMagazziniOperativi: () => ({
+    data: [{ id: 1, nome: "Emporio A", tipoMagazzino: "emporio" }],
+  }),
   useListEmporiOperativi: () => ({
     data: [{ id: 1, nome: "Emporio A", areaOperativaId: 1 }],
   }),

@@ -13,7 +13,7 @@ import {
   useListAreeOperative,
   useListCreditoSolidaleBeneficiarioMovimenti,
   useListCreditoSolidaleMovimenti,
-  useListMagazzini,
+  useListMagazziniOperativi,
   useStornaCreditoSolidaleMovimento,
   type CreditoSolidaleBeneficiario,
   type CreditoSolidaleMovimento,
@@ -204,7 +204,7 @@ function EmporioCreditiSaldo() {
     isLoading = beneficiariQuery.isLoading;
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativa } = useListAreeOperative();
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "emporio" });
   const empori = useMemo(
     () =>
       (magazzini ?? []).filter(

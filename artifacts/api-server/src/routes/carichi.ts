@@ -27,11 +27,11 @@ import {
 import { auditContextFromRequest } from "../lib/auditEvent";
 import { InventoryDecimal } from "../lib/inventoryDecimal";
 import { canonicalInventoryFactor } from "../lib/inventoryQuantityDimensions";
-import { requireModulo } from "../lib/featureFlags";
+import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
-router.use("/carichi", requireModulo("LOTTI"));
+router.use("/carichi", requireAllModuli(["CARICHI", "LOTTI"]));
 
 function caricoJson(result: WarehouseLoadResult) {
   const { requestHash: _requestHash, ...publicCarico } = result.carico;

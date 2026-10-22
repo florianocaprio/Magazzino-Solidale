@@ -47,7 +47,7 @@ describe("catalogo esplicito Area -> permessi", () => {
       "credito.monthly.execute",
     );
     expect(AREA_PERMISSION_MAP.emporio).toContain("credito.monthly.execute");
-    expect(AREA_PERMISSION_MAP.logistica).not.toContain("maps.operational");
+    expect(AREA_PERMISSION_MAP.logistica).toEqual(expect.arrayContaining(["maps.operational", "consegne.view"]));
     expect(AREA_PERMISSION_MAP.analisi).toEqual(
       expect.arrayContaining([
         "mensa.reports.view",

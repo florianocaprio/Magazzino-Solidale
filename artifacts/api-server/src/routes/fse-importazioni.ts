@@ -32,11 +32,11 @@ import {
   reviseFseImportRow,
   totalStockPieces,
 } from "../lib/fsePracticeImportService";
-import { requireModulo } from "../lib/featureFlags";
+import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
-router.use("/fse-importazioni", requireModulo("LOTTI"));
+router.use("/fse-importazioni", requireAllModuli(["CARICHI", "LOTTI"]));
 
 const binaryBody = express.raw({ type: () => true, limit: AGEA_MAX_BYTES });
 

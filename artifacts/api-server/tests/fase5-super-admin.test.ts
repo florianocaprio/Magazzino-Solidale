@@ -525,15 +525,16 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     }
   });
 
-  it("requireModulo lascia passare il modulo attivo e blocca quello disabilitato", async () => {
+  it("un componente futuro resta indisponibile anche tentando di attivarlo", async () => {
     await updateModuloAmbiente("PREDITTIVO", false, superUser.id);
 
     const denied = await request(superServer).get("/test-predittivo");
     expect(denied.status).toBe(403);
 
-    await updateModuloAmbiente("PREDITTIVO", true, superUser.id);
+    const activation = await updateModuloAmbiente("PREDITTIVO", true, superUser.id);
+    expect(activation).toMatchObject({ status: 400 });
     const allowed = await request(superServer).get("/test-predittivo");
-    expect(allowed.status).toBe(204);
+    expect(allowed.status).toBe(403);
   });
 
   it("requireModulo blocca in sicurezza un codice modulo inesistente", async () => {

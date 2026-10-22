@@ -1,3 +1,4 @@
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { ProducerLotOriginBadge } from "./producer-lot-origin-badge";
 import { formatMagazzinoQuantity } from "@/lib/magazzino-quantity";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import {
   useCloseLottoLogico,
   useCreateLottoLogico,
   useListAreeOperative,
-  useListFornitori,
+  useListFornitoriOperativi,
   useListLotti,
   useListLottiLogici,
   useListMagazzini,
@@ -243,12 +244,13 @@ export function CaricoMerceTabs({
   active: "carichi" | "raccolte" | "lotti";
 }) {
   const { t } = useTranslation();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   return (
     <nav
       aria-label={t("uxCaricoLotti.tabs")}
       className="flex flex-wrap gap-2 border-b px-4 pt-4 md:px-6"
     >
-      {(["carichi", "raccolte", "lotti"] as const).map((tab) => (
+      {(["carichi", "raccolte", "lotti"] as const).filter((tab) => tab === "lotti" || isModuloAttivo("CARICHI")).map((tab) => (
         <Button
           key={tab}
           asChild
@@ -763,7 +765,7 @@ export function LottiFisiciTab() {
   const { data: areas = [] } = useListAreeOperative();
   const { data: warehouses = [] } = useListMagazzini();
   const { data: products = [] } = useListProdotti();
-  const { data: suppliers = [] } = useListFornitori();
+  const { data: suppliers = [] } = useListFornitoriOperativi({ contesto: "magazzino" });
   const [area, setArea] = useState("");
   const legacySearch = new URLSearchParams(window.location.search);
   const [warehouse, setWarehouse] = useState(

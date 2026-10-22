@@ -138,6 +138,8 @@ vi.mock("@workspace/api-client-react", () => ({
     data: [{ id: 7, nome: "Centro Roma", attivo: true }],
   }),
   useListMagazzini: () => ({ data: [] }),
+useListMagazziniOperativi: () => ({ data: [] }),
+  getListMagazziniOperativiQueryKey: (params: unknown) => ["/api/operativita/magazzini", params],
   getGetEmporioAbilitazioneQueryKey: (id: number) => [
     "/api/emporio/beneficiari",
     id,

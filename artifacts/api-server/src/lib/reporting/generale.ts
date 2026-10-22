@@ -47,8 +47,8 @@ async function activeSources(filters: ReportFilters): Promise<ActiveSources> {
       canRead("sociale") &&
       (filters.callerIsAdmin ||
         filters.callerPermissions.includes("bolle.view")),
-    sociale: sociale && canRead("sociale"),
-    emporio: emporio && canRead("emporio"),
+    sociale: sociale && canRead("sociale") && (filters.callerIsAdmin || (filters.callerPermissions.includes("sociale.interventi.view") && filters.callerPermissions.includes("beneficiari.view"))),
+    emporio: emporio && canRead("emporio") && (filters.callerIsAdmin || (filters.callerPermissions.includes("emporio.sales.view") && filters.callerPermissions.includes("credito.view"))),
     mensa: mensa && canReadMensa && filters.callerMensaIds?.length !== 0,
     uds: uds && canReadUds,
   };

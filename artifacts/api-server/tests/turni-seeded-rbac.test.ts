@@ -76,11 +76,11 @@ describe("RBAC Turni sui ruoli seed reali", () => {
     ).toBe(400);
   });
 
-  it("C nega il permesso Turni quando manca l'Area Sociale", async () => {
+  it("C consente Turni alla Logistica col permesso esplicito senza Area Sociale", async () => {
     const logistica = roles.get(LOGISTICA_ROLE_NAME)!;
     expect(logistica.aree).not.toContain("sociale");
     expect(logistica.permessi).toContain("logistica.turni.view");
-    expect((await request(appFor(logistica)).get("/turni")).status).toBe(403);
+    expect((await request(appFor(logistica)).get("/turni")).status).toBe(200);
   });
 
   it("D nega l'Area Sociale quando manca il permesso Turni", async () => {
@@ -97,7 +97,7 @@ describe("RBAC Turni sui ruoli seed reali", () => {
     ).toBe(403);
   });
 
-  it("E consente Admin e SuperAdmin e non concede Turni al Volontario", async () => {
+  it("E consente Admin/SuperAdmin e sola consultazione Turni al Volontario", async () => {
     expect(
       (await request(appFor(roles.get(ADMIN_ROLE_NAME)!)).get("/turni")).status,
     ).toBe(200);
@@ -112,6 +112,7 @@ describe("RBAC Turni sui ruoli seed reali", () => {
         "logistica.turni.manage",
       ]),
     );
-    expect((await request(appFor(volontario)).get("/turni")).status).toBe(403);
+    expect((await request(appFor(volontario)).get("/turni")).status).toBe(200);
+    expect((await request(appFor(volontario)).put("/turni").send({})).status).toBe(403);
   });
 });

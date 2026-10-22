@@ -48,13 +48,19 @@ vi.mock("@workspace/api-client-react", () => ({
   getListBeneficiariQueryKey: () => ["people"],
   getGetInterventoQueryKey: () => ["intervention"],
   getListMagazziniQueryKey: () => ["warehouses"],
+getListMagazziniOperativiQueryKey: () => ["warehouses"],
   getListProdottiQueryKey: () => ["products"],
+getListProdottiOperativiQueryKey: () => ["products"],
   useGetIntervento: () => ({ data: undefined }),
   useListBeneficiari: () => ({ data: [] }),
   useListMagazzini: () => ({
     data: [{ id: 4, nome: "Magazzino", areaOperativaId: 1, stato: "attivo" }],
   }),
+useListMagazziniOperativi: () => ({
+    data: [{ id: 4, nome: "Magazzino", areaOperativaId: 1, stato: "attivo" }],
+  }),
   useListProdotti: () => ({ data: [] }),
+useListProdottiOperativi: () => ({ data: [] }),
   useListRichiesteMagazzino: (params: any, options?: any) => {
     mock.list(params);
     return useQuery({

@@ -196,6 +196,7 @@ import type {
   ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
+  FornitoreOperativo,
   FornitoreUpdate,
   FornitoriBulkInput,
   FseAutomaticSourceInput,
@@ -228,6 +229,8 @@ import type {
   FseResolutionInput,
   FseVersionInput,
   GetBollaBeneficiarioConsegnaParams,
+  GetCaricoVolontariOperativo200Item,
+  GetCaricoVolontariOperativoParams,
   GetConsegnaBeneficiarioDaCodice200,
   GetConsegnaBeneficiarioDaCodiceParams,
   GetCreditoSolidaleRicaricaMensileStato200,
@@ -254,6 +257,7 @@ import type {
   GetReportMensaIntegratoParams,
   GetReportPacchiParams,
   GetReportUdsIntegratoParams,
+  GetStampaOperativaParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
   GetVolontarioDossier200,
@@ -301,6 +305,7 @@ import type {
   ListDocumentiOperativiParams,
   ListEccezioniMensaParams,
   ListEntiDestinatariParams,
+  ListFornitoriOperativiParams,
   ListFornitoriParams,
   ListFseAdministrativeObservationsParams,
   ListFseAdministrativeSourcesParams,
@@ -326,12 +331,16 @@ import type {
   ListLottiProduttore200,
   ListLottiProduttoreParams,
   ListMagazziniMensaParams,
+  ListMagazziniOperativiParams,
   ListMensaAbilitazioniParams,
   ListMenseParams,
+  ListMezziOperativiParams,
   ListMovimentiParams,
   ListPastiMensaParams,
+  ListProdottiOperativiParams,
   ListProdottiParams,
   ListRichiesteMagazzinoParams,
+  ListRuoliVolontariOperativiParams,
   ListScarichiParams,
   ListSessioniCassaEmporioParams,
   ListSpeseEmporioParams,
@@ -344,6 +353,7 @@ import type {
   ListUdsDirectoryParams,
   ListUdsLinkCandidatesParams,
   ListUtentiParams,
+  ListVolontariOperativiParams,
   ListVolontariParams,
   ListZoneUdsParams,
   LoginInput,
@@ -359,6 +369,7 @@ import type {
   LottoUpdate,
   Magazzino,
   MagazzinoInput,
+  MagazzinoOperativo,
   MagazzinoUpdate,
   MancatoTrasportoInput,
   MapsCapabilities,
@@ -403,6 +414,7 @@ import type {
   MezziBulkInput,
   Mezzo,
   MezzoInput,
+  MezzoOperativo,
   MezzoUpdate,
   ModuloFunzionale,
   ModuloFunzionaleUpdate,
@@ -422,6 +434,7 @@ import type {
   ProdottiBulkInput,
   Prodotto,
   ProdottoInput,
+  ProdottoOperativo,
   ProdottoUpdate,
   ReadinessStatus,
   RefreshCreditoSolidaleBeneficiario410,
@@ -465,6 +478,7 @@ import type {
   RuoloUpdate,
   RuoloVolontario,
   RuoloVolontarioInput,
+  RuoloVolontarioOperativo,
   RuoloVolontarioUpdate,
   Scarico,
   ScaricoInput,
@@ -538,6 +552,7 @@ import type {
   VolontarioInput,
   VolontarioInsuranceVersionInput,
   VolontarioKnownConflictResponse,
+  VolontarioOperativo,
   VolontarioPermanentConversionInput,
   VolontarioPermanentConversionPreviewResponse,
   VolontarioRemoveInput,
@@ -561,6 +576,827 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetCaricoVolontariOperativoUrl = (
+  params: GetCaricoVolontariOperativoParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/carico-volontari?${stringifiedParams}`
+    : `/api/operativita/carico-volontari`;
+};
+
+/**
+ * @summary Carico per volontario nella stessa data e fascia canonica
+ */
+export const getCaricoVolontariOperativo = async (
+  params: GetCaricoVolontariOperativoParams,
+  options?: RequestInit,
+): Promise<GetCaricoVolontariOperativo200Item[]> => {
+  return customFetch<GetCaricoVolontariOperativo200Item[]>(
+    getGetCaricoVolontariOperativoUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCaricoVolontariOperativoQueryKey = (
+  params?: GetCaricoVolontariOperativoParams,
+) => {
+  return [
+    `/api/operativita/carico-volontari`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCaricoVolontariOperativoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCaricoVolontariOperativo>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetCaricoVolontariOperativoParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCaricoVolontariOperativo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCaricoVolontariOperativoQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCaricoVolontariOperativo>>
+  > = ({ signal }) =>
+    getCaricoVolontariOperativo(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCaricoVolontariOperativo>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCaricoVolontariOperativoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCaricoVolontariOperativo>>
+>;
+export type GetCaricoVolontariOperativoQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Carico per volontario nella stessa data e fascia canonica
+ */
+
+export function useGetCaricoVolontariOperativo<
+  TData = Awaited<ReturnType<typeof getCaricoVolontariOperativo>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetCaricoVolontariOperativoParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCaricoVolontariOperativo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCaricoVolontariOperativoQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListMagazziniOperativiUrl = (
+  params: ListMagazziniOperativiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/magazzini?${stringifiedParams}`
+    : `/api/operativita/magazzini`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listMagazziniOperativi = async (
+  params: ListMagazziniOperativiParams,
+  options?: RequestInit,
+): Promise<MagazzinoOperativo[]> => {
+  return customFetch<MagazzinoOperativo[]>(
+    getListMagazziniOperativiUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListMagazziniOperativiQueryKey = (
+  params?: ListMagazziniOperativiParams,
+) => {
+  return [`/api/operativita/magazzini`, ...(params ? [params] : [])] as const;
+};
+
+export const getListMagazziniOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMagazziniOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListMagazziniOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMagazziniOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListMagazziniOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMagazziniOperativi>>
+  > = ({ signal }) =>
+    listMagazziniOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMagazziniOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMagazziniOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMagazziniOperativi>>
+>;
+export type ListMagazziniOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListMagazziniOperativi<
+  TData = Awaited<ReturnType<typeof listMagazziniOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListMagazziniOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMagazziniOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMagazziniOperativiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListFornitoriOperativiUrl = (
+  params: ListFornitoriOperativiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/fornitori?${stringifiedParams}`
+    : `/api/operativita/fornitori`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listFornitoriOperativi = async (
+  params: ListFornitoriOperativiParams,
+  options?: RequestInit,
+): Promise<FornitoreOperativo[]> => {
+  return customFetch<FornitoreOperativo[]>(
+    getListFornitoriOperativiUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListFornitoriOperativiQueryKey = (
+  params?: ListFornitoriOperativiParams,
+) => {
+  return [`/api/operativita/fornitori`, ...(params ? [params] : [])] as const;
+};
+
+export const getListFornitoriOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFornitoriOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListFornitoriOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFornitoriOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListFornitoriOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFornitoriOperativi>>
+  > = ({ signal }) =>
+    listFornitoriOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFornitoriOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFornitoriOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFornitoriOperativi>>
+>;
+export type ListFornitoriOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListFornitoriOperativi<
+  TData = Awaited<ReturnType<typeof listFornitoriOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListFornitoriOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFornitoriOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFornitoriOperativiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListProdottiOperativiUrl = (
+  params: ListProdottiOperativiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/prodotti?${stringifiedParams}`
+    : `/api/operativita/prodotti`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listProdottiOperativi = async (
+  params: ListProdottiOperativiParams,
+  options?: RequestInit,
+): Promise<ProdottoOperativo[]> => {
+  return customFetch<ProdottoOperativo[]>(getListProdottiOperativiUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProdottiOperativiQueryKey = (
+  params?: ListProdottiOperativiParams,
+) => {
+  return [`/api/operativita/prodotti`, ...(params ? [params] : [])] as const;
+};
+
+export const getListProdottiOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProdottiOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListProdottiOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProdottiOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProdottiOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProdottiOperativi>>
+  > = ({ signal }) =>
+    listProdottiOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProdottiOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProdottiOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProdottiOperativi>>
+>;
+export type ListProdottiOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListProdottiOperativi<
+  TData = Awaited<ReturnType<typeof listProdottiOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListProdottiOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProdottiOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProdottiOperativiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListVolontariOperativiUrl = (
+  params: ListVolontariOperativiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/volontari?${stringifiedParams}`
+    : `/api/operativita/volontari`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listVolontariOperativi = async (
+  params: ListVolontariOperativiParams,
+  options?: RequestInit,
+): Promise<VolontarioOperativo[]> => {
+  return customFetch<VolontarioOperativo[]>(
+    getListVolontariOperativiUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListVolontariOperativiQueryKey = (
+  params?: ListVolontariOperativiParams,
+) => {
+  return [`/api/operativita/volontari`, ...(params ? [params] : [])] as const;
+};
+
+export const getListVolontariOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVolontariOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListVolontariOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVolontariOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListVolontariOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVolontariOperativi>>
+  > = ({ signal }) =>
+    listVolontariOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVolontariOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVolontariOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVolontariOperativi>>
+>;
+export type ListVolontariOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListVolontariOperativi<
+  TData = Awaited<ReturnType<typeof listVolontariOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListVolontariOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVolontariOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVolontariOperativiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListMezziOperativiUrl = (params: ListMezziOperativiParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/mezzi?${stringifiedParams}`
+    : `/api/operativita/mezzi`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listMezziOperativi = async (
+  params: ListMezziOperativiParams,
+  options?: RequestInit,
+): Promise<MezzoOperativo[]> => {
+  return customFetch<MezzoOperativo[]>(getListMezziOperativiUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMezziOperativiQueryKey = (
+  params?: ListMezziOperativiParams,
+) => {
+  return [`/api/operativita/mezzi`, ...(params ? [params] : [])] as const;
+};
+
+export const getListMezziOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMezziOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListMezziOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMezziOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListMezziOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMezziOperativi>>
+  > = ({ signal }) => listMezziOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMezziOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMezziOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMezziOperativi>>
+>;
+export type ListMezziOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListMezziOperativi<
+  TData = Awaited<ReturnType<typeof listMezziOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListMezziOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMezziOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMezziOperativiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListRuoliVolontariOperativiUrl = (
+  params: ListRuoliVolontariOperativiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/ruoli-volontari?${stringifiedParams}`
+    : `/api/operativita/ruoli-volontari`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const listRuoliVolontariOperativi = async (
+  params: ListRuoliVolontariOperativiParams,
+  options?: RequestInit,
+): Promise<RuoloVolontarioOperativo[]> => {
+  return customFetch<RuoloVolontarioOperativo[]>(
+    getListRuoliVolontariOperativiUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListRuoliVolontariOperativiQueryKey = (
+  params?: ListRuoliVolontariOperativiParams,
+) => {
+  return [
+    `/api/operativita/ruoli-volontari`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListRuoliVolontariOperativiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listRuoliVolontariOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListRuoliVolontariOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRuoliVolontariOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListRuoliVolontariOperativiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listRuoliVolontariOperativi>>
+  > = ({ signal }) =>
+    listRuoliVolontariOperativi(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listRuoliVolontariOperativi>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListRuoliVolontariOperativiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listRuoliVolontariOperativi>>
+>;
+export type ListRuoliVolontariOperativiQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useListRuoliVolontariOperativi<
+  TData = Awaited<ReturnType<typeof listRuoliVolontariOperativi>>,
+  TError = ErrorType<void>,
+>(
+  params: ListRuoliVolontariOperativiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRuoliVolontariOperativi>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRuoliVolontariOperativiQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetStampaOperativaUrl = (params: GetStampaOperativaParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/operativita/stampa?${stringifiedParams}`
+    : `/api/operativita/stampa`;
+};
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+export const getStampaOperativa = async (
+  params: GetStampaOperativaParams,
+  options?: RequestInit,
+): Promise<ImpostazioniStampa> => {
+  return customFetch<ImpostazioniStampa>(getGetStampaOperativaUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStampaOperativaQueryKey = (
+  params?: GetStampaOperativaParams,
+) => {
+  return [`/api/operativita/stampa`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetStampaOperativaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStampaOperativa>>,
+  TError = ErrorType<void>,
+>(
+  params: GetStampaOperativaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStampaOperativa>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStampaOperativaQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStampaOperativa>>
+  > = ({ signal }) => getStampaOperativa(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStampaOperativa>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStampaOperativaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStampaOperativa>>
+>;
+export type GetStampaOperativaQueryError = ErrorType<void>;
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export function useGetStampaOperativa<
+  TData = Awaited<ReturnType<typeof getStampaOperativa>>,
+  TError = ErrorType<void>,
+>(
+  params: GetStampaOperativaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStampaOperativa>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStampaOperativaQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getListRichiesteMagazzinoUrl = (
   params?: ListRichiesteMagazzinoParams,

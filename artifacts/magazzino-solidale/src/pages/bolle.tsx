@@ -17,13 +17,13 @@ import {
   useUpdateBolla,
   useListBeneficiari,
   useListCentriAscolto,
-  useListMagazzini,
+  useListMagazziniOperativi,
   useListGiacenze,
   useListLotti,
   useListProdotti,
-  useListVolontari,
+  useListVolontariOperativi,
   useListMezzi,
-  useGetImpostazioniStampa,
+  useGetStampaOperativa,
   useListDocumentiOperativi,
   useGetDocumentoOperativo,
   useGetDocumentoOperativoRichiesta,
@@ -61,7 +61,7 @@ import {
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
   getGetConsegnaQueryKey,
-  getListVolontariQueryKey,
+  getListVolontariOperativiQueryKey,
   type ConversioneConsegnaInputFasciaOraria,
   type BollaDettaglio as BollaDettaglioDto,
   type Trasferimento,
@@ -396,9 +396,9 @@ export default function Bolle() {
       queryKey: getListCentriAscoltoQueryKey(),
     },
   });
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "documenti" });
   const { data: areeOperative } = useListAreeOperative();
-  const { data: impostazioni } = useGetImpostazioniStampa();
+  const { data: impostazioni } = useGetStampaOperativa({ contesto: "documenti" });
   const consegnaBolla = useConsegnaBolla();
   const { toast } = useToast();
   const { t } = useTranslation();

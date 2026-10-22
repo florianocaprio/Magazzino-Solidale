@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { UNAVAILABLE_MODULES, MODULE_DEPENDENCIES } from "./modulePolicy";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { ambienteModuliTable, auditConfigurazioniTable, configurazioneAmbienteTable, db, moduliFunzionaliTable, utentiTable } from "@workspace/db";
 import { logger } from "./logger";
@@ -29,27 +30,27 @@ export const CATALOGO_MODULI: ModuloSeed[] = [
   { codice: "MAGAZZINO", nome: "Motore inventario", descrizione: "Infrastruttura logistica condivisa da Magazzino Solidale, Emporio e Mensa.", categoria: "magazzino", core: true, ordine: 30, attivoDefault: true },
   { codice: "PRODOTTI", nome: "Prodotti", descrizione: "Catalogo prodotti e anagrafiche merce.", categoria: "magazzino", core: true, ordine: 40, attivoDefault: true },
   { codice: "GIACENZE", nome: "Giacenze", descrizione: "Disponibilità e stock per magazzino.", categoria: "magazzino", core: true, ordine: 50, attivoDefault: true },
-  { codice: "LOTTI", nome: "Lotti", descrizione: "Lotti, scadenze e tracciabilità FEFO.", categoria: "magazzino", core: false, ordine: 60, attivoDefault: true },
-  { codice: "CARICHI", nome: "Carichi", descrizione: "Carico merce e movimenti in ingresso.", categoria: "magazzino", core: false, ordine: 70, attivoDefault: true },
+  { codice: "LOTTI", nome: "Lotti", descrizione: "Lotti fisici, scadenze e tracciabilità FEFO. Motore richiesto dai Carichi.", categoria: "magazzino", core: false, ordine: 60, attivoDefault: true },
+  { codice: "CARICHI", nome: "Carichi", descrizione: "Pratiche, righe, raccolte e import FSE+/AGEA. Richiede Lotti.", categoria: "magazzino", core: false, ordine: 70, attivoDefault: true },
   { codice: "SCARICHI", nome: "Scarichi", descrizione: "Scarichi e documenti di uscita merce.", categoria: "magazzino", core: false, ordine: 80, attivoDefault: true },
   { codice: "TRASFERIMENTI", nome: "Trasferimenti", descrizione: "Trasferimenti interni tra magazzini.", categoria: "magazzino", core: false, ordine: 90, attivoDefault: true },
-  { codice: "FORNITORI", nome: "Fornitori", descrizione: "Fornitori, donatori e tipologie.", categoria: "logistica", core: false, ordine: 100, attivoDefault: true },
+  { codice: "FORNITORI", nome: "Fornitori", descrizione: "Archivio fornitori/donatori e tipologie. Le selezioni minime di Carichi e Ordini appartengono ai rispettivi servizi.", categoria: "logistica", core: false, ordine: 100, attivoDefault: true },
   { codice: "APPROVVIGIONAMENTI", nome: "Approvvigionamenti", descrizione: "Ordini e richieste di approvvigionamento.", categoria: "logistica", core: false, ordine: 110, attivoDefault: true },
   { codice: "BENEFICIARI", nome: "Anagrafica beneficiari condivisa", descrizione: "Capability anagrafica trasversale usata dai servizi Centro di Ascolto, UDS, Emporio e Mensa.", categoria: "tecnica", core: true, ordine: 120, attivoDefault: true },
   { codice: "INTERVENTI", nome: "Motore interventi", descrizione: "Capability condivisa dai workflow Centro di Ascolto e UDS.", categoria: "tecnica", core: true, ordine: 130, attivoDefault: true },
   { codice: "BOLLE", nome: "Bolle", descrizione: "Bolle e documenti di consegna.", categoria: "sociale", core: false, ordine: 140, attivoDefault: true },
   { codice: "CONSEGNE", nome: "Consegne", descrizione: "Pianificazione e completamento consegne.", categoria: "sociale", core: false, ordine: 150, attivoDefault: true },
-  { codice: "LOGISTICA", nome: "Logistica", descrizione: "Area logistica e coordinamento operativo.", categoria: "logistica", core: false, ordine: 160, attivoDefault: true },
-  { codice: "MEZZI", nome: "Mezzi", descrizione: "Parco mezzi e approvazioni.", categoria: "logistica", core: false, ordine: 170, attivoDefault: true },
-  { codice: "VOLONTARI", nome: "Volontari", descrizione: "Anagrafica volontari e ruoli.", categoria: "logistica", core: false, ordine: 180, attivoDefault: true },
+  { codice: "LOGISTICA", nome: "Logistica", descrizione: "Gestione degli archivi Volontari/Mezzi e approvazioni. Le selezioni minime degli altri servizi restano indipendenti.", categoria: "logistica", core: false, ordine: 160, attivoDefault: true },
+  { codice: "MEZZI", nome: "Mezzi", descrizione: "Archivio mezzi e approvazioni. Le selezioni minime di Turni, Consegne e Documenti restano nei rispettivi servizi.", categoria: "logistica", core: false, ordine: 170, attivoDefault: true },
+  { codice: "VOLONTARI", nome: "Volontari", descrizione: "Archivio volontari e ruoli. Le selezioni minime della pianificazione e dei documenti restano nei rispettivi servizi.", categoria: "logistica", core: false, ordine: 180, attivoDefault: true },
   { codice: "UDS", nome: "Unità di Strada", descrizione: "Anagrafica, interventi e report Unità di Strada.", categoria: "servizi", core: false, ordine: 50, attivoDefault: true },
   { codice: "EMPORIO_SOLIDALE", nome: "Emporio Solidale", descrizione: "Accessi, cassa e operatività Emporio.", categoria: "servizi", core: false, ordine: 30, attivoDefault: true },
   { codice: "CREDITO_SOLIDALE", nome: "Credito Solidale", descrizione: "Credito, saldi, ricariche e movimenti.", categoria: "emporio", core: false, ordine: 210, attivoDefault: true },
   { codice: "MENSA", nome: "Mensa", descrizione: "Accessi, pasti, abilitazioni e rifornimenti delle mense.", categoria: "servizi", core: false, ordine: 40, attivoDefault: true },
   { codice: "REPORT", nome: "Report", descrizione: "Report operativi base.", categoria: "analisi", core: false, ordine: 220, attivoDefault: true },
-  { codice: "REPORT_AVANZATI", nome: "Report avanzati", descrizione: "Analisi avanzate e viste specialistiche.", categoria: "analisi", core: false, ordine: 230, attivoDefault: true },
-  { codice: "PREDITTIVO", nome: "Predittivo", descrizione: "Funzionalità predittive future.", categoria: "analisi", core: false, ordine: 240, attivoDefault: true },
-  { codice: "BARCODE", nome: "Barcode", descrizione: "Scanner, codici a barre e PDF etichette.", categoria: "magazzino", core: false, ordine: 250, attivoDefault: true },
+  { codice: "REPORT_AVANZATI", nome: "Report avanzati (non disponibile)", descrizione: "Componente futura: non disponibile. I report correnti usano Report e i servizi sorgente.", categoria: "analisi", core: false, ordine: 230, attivoDefault: false },
+  { codice: "PREDITTIVO", nome: "Predittivo (non disponibile)", descrizione: "Funzionalità predittive future.", categoria: "analisi", core: false, ordine: 240, attivoDefault: false },
+  { codice: "BARCODE", nome: "Barcode", descrizione: "Scanner fotocamera e PDF etichette prodotti. I codici identificativi e le tessere restano nei rispettivi servizi.", categoria: "magazzino", core: false, ordine: 250, attivoDefault: true },
 ];
 
 export type ConfigurazioneAmbienteDto = {
@@ -87,6 +88,9 @@ export type ModuloFunzionaleDto = {
   ordine: number;
   attivoDefault: boolean;
   attivo: boolean;
+  disponibile?: boolean;
+  configuratoAttivo?: boolean;
+  dipendenze?: string[];
   dataCreazione: string;
   dataAggiornamento: string;
   ambienteModuloId: number | null;
@@ -136,7 +140,10 @@ function fmtModulo(row: { m: typeof moduliFunzionaliTable.$inferSelect; am: type
     core: row.m.core,
     ordine: row.m.ordine,
     attivoDefault: row.m.attivoDefault,
-    attivo: row.m.core || (row.am?.attivo ?? row.m.attivoDefault),
+    attivo: !UNAVAILABLE_MODULES.has(row.m.codice) && (row.m.core || (row.am?.attivo ?? row.m.attivoDefault)),
+    disponibile: !UNAVAILABLE_MODULES.has(row.m.codice),
+    configuratoAttivo: row.m.core || (row.am?.attivo ?? row.m.attivoDefault),
+    dipendenze: [...(MODULE_DEPENDENCIES[row.m.codice] ?? [])],
     dataCreazione: row.m.dataCreazione.toISOString(),
     dataAggiornamento: row.m.dataAggiornamento.toISOString(),
     ambienteModuloId: row.am?.id ?? null,
@@ -192,29 +199,9 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
   const normalizedInitialEmail = initialEmail && isValidUserEmail(initialEmail) ? normalizeEmail(initialEmail) : null;
   const [existing] = await db.select({ id: utentiTable.id, email: utentiTable.email }).from(utentiTable).where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
 
-  if (existing) {
-    const updates: Partial<typeof utentiTable.$inferInsert> = {
-      ruoloId: superAdminRoleId,
-      isSuperAdmin: true,
-      centroAscoltoId: null,
-      areaOperativaId: null,
-      zonaUdsId: null,
-    };
-    if (normalizedInitialEmail && !existing.email) {
-      const [emailOwner] = await db
-        .select({ id: utentiTable.id })
-        .from(utentiTable)
-        .where(and(eq(utentiTable.email, normalizedInitialEmail), ne(utentiTable.id, existing.id)));
-      if (!emailOwner) {
-        updates.email = normalizedInitialEmail;
-        updates.emailDaAggiornare = false;
-      }
-    }
-    // Never reset credentials or activation flags during application startup.
-    // Operators may have rotated or intentionally disabled this technical user.
-    await db.update(utentiTable).set(updates).where(eq(utentiTable.id, existing.id));
-    return;
-  }
+  // Bootstrap creates a missing technical account; it never rewrites an
+  // existing person's role, territory, flags, email or credentials on restart.
+  if (existing) return;
 
   const initialPassword = process.env[SUPER_ADMIN_INITIAL_PASSWORD_ENV]?.trim();
   if (!initialPassword) {
@@ -276,7 +263,8 @@ export async function listModuliFunzionali(): Promise<ModuloFunzionaleDto[]> {
     .from(moduliFunzionaliTable)
     .leftJoin(ambienteModuliTable, and(eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id), eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id)))
     .orderBy(asc(moduliFunzionaliTable.ordine), asc(moduliFunzionaliTable.codice));
-  return rows.map(fmtModulo);
+  const modules = rows.map(fmtModulo);
+  return modules.map((module) => ({ ...module, attivo: module.attivo && (module.dipendenze ?? []).every((code) => modules.some((dependency) => dependency.codice === code && dependency.attivo)) }));
 }
 
 export async function getConfigurazioneAmbientePubblica(): Promise<ConfigurazioneAmbientePubblicaDto> {
@@ -304,6 +292,7 @@ export async function updateModuloAmbiente(codice: string, attivo: boolean, abil
   const normalized = codice.trim().toUpperCase();
   const [modulo] = await db.select().from(moduliFunzionaliTable).where(eq(moduliFunzionaliTable.codice, normalized));
   if (!modulo) return { error: "Modulo funzionale non trovato", status: 404 };
+  if (attivo && UNAVAILABLE_MODULES.has(normalized)) return { error: "Funzionalità non ancora disponibile", status: 400 };
   if (modulo.core && !attivo) {
     return {
       error: "I moduli core non possono essere disabilitati",
@@ -331,12 +320,7 @@ export async function updateModuloAmbiente(codice: string, attivo: boolean, abil
       },
     });
 
-  const [row] = await db
-    .select({ m: moduliFunzionaliTable, am: ambienteModuliTable })
-    .from(moduliFunzionaliTable)
-    .leftJoin(ambienteModuliTable, and(eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id), eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id)))
-    .where(eq(moduliFunzionaliTable.id, modulo.id));
-  return fmtModulo(row);
+  return (await listModuliFunzionali()).find((entry) => entry.codice === normalized)!;
 }
 
 export async function listAuditConfigurazioni(limit = 100) {

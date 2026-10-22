@@ -48,6 +48,315 @@ tags:
   - name: richieste-magazzino
 
 paths:
+  /operativita/carico-volontari:
+    get:
+      operationId: getCaricoVolontariOperativo
+      tags:
+      - volontari
+      summary: Carico per volontario nella stessa data e fascia canonica
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - consegne
+          - turni
+      - name: data
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Data del turno (YYYY-MM-DD)
+      - name: excludeConsegnaId
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: fascia
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - 09-13
+          - 14-18
+          - 18-20
+      responses:
+        '200':
+          description: Carico per volontario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    volontarioId:
+                      type: integer
+                    count:
+                      type: integer
+                  required:
+                  - volontarioId
+                  - count
+  /operativita/magazzini:
+    get:
+      operationId: listMagazziniOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: &id001
+          - consegne
+          - turni
+          - magazzino
+          - approvvigionamenti
+          - documenti
+          - richieste
+          - beneficiari
+          - emporio
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MagazzinoOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/fornitori:
+    get:
+      operationId: listFornitoriOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FornitoreOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/prodotti:
+    get:
+      operationId: listProdottiOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProdottoOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/volontari:
+    get:
+      operationId: listVolontariOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: dataRiferimento
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: stato
+        in: query
+        schema:
+          type: string
+          enum:
+          - attivi
+          - non_attivi
+          - tutti
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolontarioOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/mezzi:
+    get:
+      operationId: listMezziOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MezzoOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/ruoli-volontari:
+    get:
+      operationId: listRuoliVolontariOperativi
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RuoloVolontarioOperativo'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
+  /operativita/stampa:
+    get:
+      operationId: getStampaOperativa
+      tags:
+      - Operativita
+      summary: Lettura minima per un workflow autorizzato
+      parameters:
+      - name: contesto
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: *id001
+      - name: areaOperativaId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: centroAscoltoId
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Dati operativi nel territorio corrente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpostazioniStampa'
+        '403':
+          description: Servizio, permesso, modulo o territorio non autorizzato
   /richieste-magazzino:
     get:
       operationId: listRichiesteMagazzino
@@ -11530,6 +11839,238 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/BeneficiariFseError" }
   schemas:
+    MagazzinoOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+          minLength: 1
+        areaOperativaId:
+          type: integer
+        centroAscoltoId:
+          type:
+          - integer
+          - 'null'
+        stato:
+          type: string
+        tipoMagazzino:
+          type: string
+          enum:
+          - logistico
+          - emporio
+          - misto
+          - mensa
+      required:
+      - id
+      - nome
+      - areaOperativaId
+      - centroAscoltoId
+      - stato
+      - tipoMagazzino
+    FornitoreOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        tipo:
+          type: string
+        areaOperativaId:
+          type:
+          - integer
+          - 'null'
+        attivo:
+          type: boolean
+      required:
+      - id
+      - nome
+      - tipo
+      - areaOperativaId
+      - attivo
+    ProdottoOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        lottoFisicoObbligatorio:
+          type: boolean
+        id:
+          type: integer
+        nome:
+          type: string
+        codice:
+          type: string
+        unitaMisura:
+          type: string
+        attivo:
+          type: boolean
+      required:
+      - lottoFisicoObbligatorio
+      - id
+      - nome
+      - codice
+      - unitaMisura
+      - attivo
+    VolontarioOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        cognome:
+          type: string
+        matricola:
+          type:
+          - string
+          - 'null'
+        areaOperativaId:
+          type:
+          - integer
+          - 'null'
+        centroAscoltoId:
+          type:
+          - integer
+          - 'null'
+        centroAscoltoNome:
+          type:
+          - string
+          - 'null'
+        tipoVolontario:
+          type: string
+          enum:
+          - PERMANENTE
+          - TEMPORANEO
+        ruolo:
+          type: string
+        ruoloVolontarioId:
+          type:
+          - integer
+          - 'null'
+        patente:
+          type: boolean
+        mezzoPersonale:
+          type: boolean
+        maxConsegneTurno:
+          type: integer
+          minimum: 0
+        attivo:
+          type: boolean
+          description: Abilitazione amministrativa/manuale; non equivale allo stato operativo.
+        statoApprovazione:
+          type: string
+          enum:
+          - in_attesa
+          - approvato
+          - respinto
+        operativo:
+          type: boolean
+        motivoNonOperativo:
+          type:
+          - string
+          - 'null'
+      required:
+      - id
+      - nome
+      - cognome
+      - matricola
+      - areaOperativaId
+      - centroAscoltoId
+      - centroAscoltoNome
+      - tipoVolontario
+      - ruolo
+      - ruoloVolontarioId
+      - patente
+      - mezzoPersonale
+      - maxConsegneTurno
+      - attivo
+      - statoApprovazione
+      - operativo
+      - motivoNonOperativo
+    MezzoOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        tipo:
+          type: string
+        targa:
+          type:
+          - string
+          - 'null'
+        volontarioId:
+          type:
+          - integer
+          - 'null'
+        centroAscoltoId:
+          type:
+          - integer
+          - 'null'
+        areaOperativaId:
+          type:
+          - integer
+          - 'null'
+        effectiveCentroId:
+          type:
+          - integer
+          - 'null'
+        stato:
+          type: string
+          enum:
+          - disponibile
+          - non_disponibile
+          - manutenzione
+          - respinto
+          - ritirato
+        statoApprovazione:
+          type: string
+          enum:
+          - in_attesa
+          - approvato
+          - respinto
+        scadenzaAssicurazione:
+          type:
+          - string
+          - 'null'
+        scadenzaRevisione:
+          type:
+          - string
+          - 'null'
+      required:
+      - id
+      - codice
+      - tipo
+      - targa
+      - volontarioId
+      - centroAscoltoId
+      - areaOperativaId
+      - effectiveCentroId
+      - stato
+      - statoApprovazione
+      - scadenzaAssicurazione
+      - scadenzaRevisione
+    RuoloVolontarioOperativo:
+      type: object
+      description: Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        attivo:
+          type: boolean
+      required:
+      - id
+      - nome
+      - attivo
     RichiestaMagazzinoOrigine:
       type: object
       required: [id, codice, percorso]
@@ -18016,6 +18557,14 @@ components:
           type: boolean
         attivo:
           type: boolean
+        disponibile:
+          type: boolean
+        configuratoAttivo:
+          type: boolean
+        dipendenze:
+          type: array
+          items:
+            type: string
         dataCreazione:
           type: string
           format: date-time
@@ -23273,6 +23822,11 @@ components:
         permessi:
           type: array
           description: Permessi operativi suggeriti dalla UX quando l'Area viene selezionata
+          items:
+            type: string
+        permessiOrdinari:
+          type: array
+          description: Dotazione ordinaria del servizio, senza capacità aggiuntive sensibili
           items:
             type: string
       required: [key, label, permessi]

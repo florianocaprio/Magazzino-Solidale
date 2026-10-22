@@ -4,7 +4,7 @@ import {
   useCreateProdotto,
   useUpdateProdotto,
   useDeleteProdotto,
-  useListFornitori,
+  useListFornitoriOperativi,
   useBulkProdotti,
   getListProdottiQueryKey,
 } from "@workspace/api-client-react";
@@ -81,7 +81,7 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
+import { EMPORIO_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -172,8 +172,9 @@ export default function Prodotti() {
   const updateProdotto = useUpdateProdotto();
   const deleteProdotto = useDeleteProdotto();
   const bulkProdotti = useBulkProdotti();
-  const { data: fornitori } = useListFornitori();
+  const { data: fornitori } = useListFornitoriOperativi({ contesto: "magazzino" });
   const { emporioAbilitato } = useModuloFlags();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   const unchangedCredit = prodotti?.find(
@@ -395,7 +396,7 @@ export default function Prodotti() {
             type="button"
             variant="outline"
             className="gap-2"
-            disabled={(prodotti ?? []).length === 0}
+            disabled={!isModuloAttivo("BARCODE") || (prodotti ?? []).length === 0}
             onClick={() =>
               generateProdottiBarcodePdf(
                 (prodotti ?? []).map((p) => ({

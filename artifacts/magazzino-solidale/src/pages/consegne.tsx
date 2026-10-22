@@ -19,19 +19,19 @@ import {
   useListBeneficiari,
   useGetBeneficiario,
   getGetBeneficiarioQueryKey,
-  useListMagazzini,
-  useListVolontari,
-  useListMezzi,
-  useGetVolontariCarico,
-  getGetVolontariCaricoQueryKey,
+  useListMagazziniOperativi,
+  useListVolontariOperativi,
+  useListMezziOperativi,
+  useGetCaricoVolontariOperativo,
+  getGetCaricoVolontariOperativoQueryKey,
   useListCentriAscolto,
   useListAreeOperative,
   getListAreeOperativeQueryKey,
   getListConsegneQueryKey,
   useCreateTurnoVolontarioPending,
   useCreateTurnoMezzoPending,
-  useListRuoliVolontari,
-  getListVolontariQueryKey,
+  useListRuoliVolontariOperativi,
+  getListVolontariOperativiQueryKey,
   getListMezziQueryKey,
   type Consegna,
   type Volontario,
@@ -355,11 +355,11 @@ export default function Consegne() {
     ...(createCentroId !== "all"
       ? { centroAscoltoId: parseInt(createCentroId) }
       : {}),
-  });
-  const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
-  const { data: magazzini } = useListMagazzini();
-  const { data: mezzi } = useListMezzi();
-  const { data: ruoliVolontari } = useListRuoliVolontari();
+  }, { query: { queryKey: ["/api/beneficiari", "consegne", createCentroId], enabled: canManage } });
+  const { data: allBeneficiari } = useListBeneficiari({ attivo: true }, { query: { queryKey: ["/api/beneficiari", { attivo: true }], enabled: canManage } });
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "consegne" });
+  const { data: mezzi } = useListMezziOperativi({ contesto: "consegne" });
+  const { data: ruoliVolontari } = useListRuoliVolontariOperativi({ contesto: "consegne" });
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativaList } = useListAreeOperative({
     query: {
@@ -445,7 +445,7 @@ export default function Consegne() {
     note: "",
   });
 
-  const { data: bolle } = useListBolle();
+  const { data: bolle } = useListBolle(undefined, { query: { queryKey: ["/api/bolle"], enabled: canManage && hasPermission("bolle.view") } });
 
   const createConsegna = useCreateConsegna();
   const pianificaDaBolla = usePianificaConsegnaDaBolla();
@@ -599,13 +599,13 @@ export default function Consegne() {
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
-  const volontariOperativiParams = {
+  const volontariOperativiParams = { contesto: "consegne" as const,
     dataRiferimento: dataPrevistaWatch,
     stato: "attivi" as const,
   };
-  const { data: volontari } = useListVolontari(volontariOperativiParams, {
+  const { data: volontari } = useListVolontariOperativi(volontariOperativiParams, {
     query: {
-      queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      queryKey: getListVolontariOperativiQueryKey(volontariOperativiParams),
       enabled: /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? ""),
     },
   });
@@ -618,13 +618,13 @@ export default function Consegne() {
           ? "18-20"
           : null;
   const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
-  const caricoParams = {
+  const caricoParams = { contesto: "consegne" as const,
     data: dataPrevistaWatch,
     fascia: (fasciaCanonica ?? "09-13") as "09-13" | "14-18" | "18-20",
   };
-  const { data: caricoTurno } = useGetVolontariCarico(caricoParams, {
+  const { data: caricoTurno } = useGetCaricoVolontariOperativo(caricoParams, {
     query: {
-      queryKey: getGetVolontariCaricoQueryKey(caricoParams),
+      queryKey: getGetCaricoVolontariOperativoQueryKey(caricoParams),
       enabled: validData && fasciaCanonica != null,
     },
   });
@@ -877,7 +877,7 @@ export default function Consegne() {
             ...prev.filter((v) => v.id !== created.id),
           ]);
           queryClient.invalidateQueries({
-            queryKey: getListVolontariQueryKey(),
+            queryKey: getListVolontariOperativiQueryKey(),
           });
           toast({
             description: t("turni.pendingVolCreated", {

@@ -37,7 +37,7 @@ import {
 import { CurrentCommandActorError } from "../lib/currentCommandActor";
 import { requireCurrentM5bActor } from "../lib/m5bRequestAccess";
 import type { InventoryTransaction } from "../lib/scaricoInventory";
-import { requireModulo } from "../lib/featureFlags";
+import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -97,7 +97,7 @@ const xlsxBody: RequestHandler = express.raw({
   limit: AGEA_MAX_BYTES,
 });
 
-router.use("/agea", requireModulo("LOTTI"));
+router.use("/agea", requireAllModuli(["CARICHI", "LOTTI"]));
 
 function idParam(value: unknown): number | null {
   const id = Number(value);

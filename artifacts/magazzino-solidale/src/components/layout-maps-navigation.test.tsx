@@ -70,6 +70,7 @@ const translations: Record<string, string> = {
   "nav.items.approvazioniLogistica": "Approva nuovi inserimenti",
   "nav.items.fornitori": "Fornitori",
   "nav.items.approvvigionamenti": "Approvvigionamenti",
+  "nav.items.reportLogistica": "Report operativi",
   "nav.items.maps": "Mappa Operativa",
 };
 
@@ -346,6 +347,7 @@ describe("Sidebar - Mappa Operativa", () => {
       "Approva nuovi inserimenti",
       "Fornitori",
       "Approvvigionamenti",
+      "Report operativi",
       "Mappa Operativa",
     ]);
     expect(links.at(-1)?.getAttribute("href")).toBe("/maps");

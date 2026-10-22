@@ -1,6 +1,6 @@
 import { canAccessVolunteer, volunteerAreaFilter, volunteerCallerArea, volunteerContextFilter, validateVolunteerArea } from "../lib/volontariArea";
 import { hasVolontarioHistory } from "../lib/volontarioRemoval";
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import { randomUUID } from "node:crypto";
 import { db } from "@workspace/db";
 import {
@@ -683,10 +683,7 @@ router.post(
 
 // Carico per volontario nello slot canonico data+fascia. Conta solo le consegne
 // ancora operative; le bolle non costituiscono una seconda unità di carico.
-router.get(
-  "/volontari/carico",
-  requirePermission("logistica.volontari.view"),
-  async (req, res) => {
+export const getVolontariCarico: RequestHandler = async (req, res) => {
     const { data, fascia, excludeConsegnaId } = req.query as Record<
       string,
       string
@@ -744,8 +741,9 @@ router.get(
         .filter(([volontarioId]) => visibileSet.has(volontarioId))
         .map(([volontarioId, count]) => ({ volontarioId, count })),
     );
-  },
-);
+  };
+
+router.get("/volontari/carico", requirePermission("logistica.volontari.view"), getVolontariCarico);
 
 router.get(
   "/volontari/:id/matricole",

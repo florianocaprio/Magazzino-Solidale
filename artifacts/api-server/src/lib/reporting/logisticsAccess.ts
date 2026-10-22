@@ -15,7 +15,7 @@ type Actor = Pick<
 
 /** Source grants, not a new reporting privilege. Territory remains in filters. */
 export async function logisticsSources(actor: Actor) {
-  const [warehouse, lots, transfers, supplies, means, volunteers] =
+  const [warehouse, lots, transfers, supplies, means, volunteers, logistics] =
     await Promise.all(
       [
         "MAGAZZINO_SOLIDALE",
@@ -24,6 +24,7 @@ export async function logisticsSources(actor: Actor) {
         "APPROVVIGIONAMENTI",
         "MEZZI",
         "VOLONTARI",
+        "LOGISTICA",
       ].map(isReportModuleActive),
     );
   const sourceArea =
@@ -48,8 +49,8 @@ export async function logisticsSources(actor: Actor) {
     // Generic transfer reads use magazzino.view, not a synthetic transfers.view grant.
     transfers: stock && transfers,
     supplies:
-      source("approvvigionamenti", "approvvigionamenti.view") && supplies,
-    means: source("mezzi", "logistica.mezzi.view") && means,
+      source("approvvigionamenti", "approvvigionamenti.view") && supplies && logistics,
+    means: source("mezzi", "logistica.mezzi.view") && means && logistics,
     requests:
       sourceArea &&
       warehouse &&
@@ -62,6 +63,6 @@ export async function logisticsSources(actor: Actor) {
           centroAscoltoId: actor.centroAscoltoId,
           zonaUdsId: actor.zonaUdsId,
         })),
-    volunteers: source("volontari", "logistica.volontari.view") && volunteers,
+    volunteers: source("volontari", "logistica.volontari.view") && volunteers && logistics,
   };
 }

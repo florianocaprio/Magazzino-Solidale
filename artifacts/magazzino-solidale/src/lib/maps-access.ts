@@ -21,7 +21,7 @@ export function canAccessMapsApplication(
 ): boolean {
   if (isMapsApplicationAdministrator(user)) return true;
   return hasPermission("maps.operational")
-    && (hasArea("sociale") || hasArea("magazzino"));
+    && (hasArea("sociale") || hasArea("magazzino") || (hasArea("logistica") && hasPermission("consegne.view")));
 }
 
 export function canShowMapsNavigation(

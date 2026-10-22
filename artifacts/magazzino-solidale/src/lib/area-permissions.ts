@@ -1,6 +1,7 @@
 export type AreaPermissionDefinition = {
   key: string;
   permessi?: readonly string[];
+  permessiOrdinari?: readonly string[];
 };
 
 export type RoleAccessSelection = {
@@ -21,6 +22,21 @@ export function permissionsForArea(
   return unique(catalog.find((area) => area.key === areaKey)?.permessi ?? []);
 }
 
+export function ordinaryPermissionsForArea(catalog: readonly AreaPermissionDefinition[], areaKey: string): string[] {
+  const area = catalog.find((item) => item.key === areaKey);
+  return unique(area?.permessiOrdinari ?? area?.permessi ?? []);
+}
+
+export function roleConfigurationWarnings(selection: RoleAccessSelection, catalog: readonly AreaPermissionDefinition[]): string[] {
+  const available = new Set(selection.aree.flatMap((key) => permissionsForArea(catalog, key)));
+  const orphaned = selection.permessi.filter((key) => !available.has(key));
+  const warnings = orphaned.length ? [`Permessi senza un servizio associato o non riconosciuti (conservati): ${orphaned.join(", ")}`] : [];
+  for (const [action, view] of [["fornitori.manage", "fornitori.view"], ["magazzino.stock.receive", "magazzino.view"], ["logistica.turni.manage", "logistica.turni.view"], ["consegne.manage", "consegne.view"]]) {
+    if (selection.permessi.includes(action) && !selection.permessi.includes(view)) warnings.push(`${action} richiede anche ${view} per il workflow completo.`);
+  }
+  return warnings;
+}
+
 export function existingRoleSelection(
   selection: RoleAccessSelection,
 ): RoleAccessSelection {
@@ -38,7 +54,7 @@ export function applyAreaSelection(
   checked: boolean,
   catalog: readonly AreaPermissionDefinition[],
 ): RoleAccessSelection {
-  const areaPermissions = new Set(permissionsForArea(catalog, areaKey));
+  const areaPermissions = new Set(ordinaryPermissionsForArea(catalog, areaKey));
 
   if (checked) {
     return {
@@ -49,7 +65,7 @@ export function applyAreaSelection(
 
   const remainingAreas = selection.aree.filter((area) => area !== areaKey);
   const permissionsRequiredElsewhere = new Set(
-    remainingAreas.flatMap((area) => permissionsForArea(catalog, area)),
+    remainingAreas.flatMap((area) => ordinaryPermissionsForArea(catalog, area)),
   );
 
   return {
@@ -77,11 +93,13 @@ export function applyAllAreaPermissions(
   areaKey: string,
   checked: boolean,
   catalog: readonly AreaPermissionDefinition[],
+  selectedAreas: readonly string[] = [],
 ): string[] {
-  const areaPermissions = permissionsForArea(catalog, areaKey);
+  const areaPermissions = ordinaryPermissionsForArea(catalog, areaKey);
   if (checked) return unique([...permissions, ...areaPermissions]);
   const areaPermissionSet = new Set(areaPermissions);
-  return permissions.filter((permission) => !areaPermissionSet.has(permission));
+  const shared = new Set(selectedAreas.filter((area) => area !== areaKey).flatMap((area) => ordinaryPermissionsForArea(catalog, area)));
+  return permissions.filter((permission) => !areaPermissionSet.has(permission) || shared.has(permission));
 }
 
 export function areaCheckboxState(
@@ -91,7 +109,7 @@ export function areaCheckboxState(
   catalog: readonly AreaPermissionDefinition[],
 ): AreaCheckboxState {
   if (!selectedAreas.includes(areaKey)) return false;
-  const areaPermissions = permissionsForArea(catalog, areaKey);
+  const areaPermissions = ordinaryPermissionsForArea(catalog, areaKey);
   if (areaPermissions.length === 0) return true;
   return areaPermissions.every((permission) =>
     selectedPermissions.includes(permission),

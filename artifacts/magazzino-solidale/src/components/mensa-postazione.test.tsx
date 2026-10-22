@@ -6,6 +6,7 @@ const verifyMutate = vi.fn();
 const mealMutate = vi.fn();
 const temporaryMutate = vi.fn();
 
+vi.mock("@/lib/use-moduli", () => ({ useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }) }));
 vi.mock("@workspace/api-client-react", () => ({
   getListMenseQueryKey: (params: unknown) => ["/api/mensa/mense", params],
   getSearchMensaBeneficiariQueryKey: () => ["mensa-beneficiari"],
