@@ -1,5 +1,7 @@
 # BUG 6.0 — Ruoli, permessi e moduli
 
+**Stato conclusivo:** fase automatica `##test` completata; **8082 ricompilata e pronta per la validazione manuale finale**. Codice applicativo `ba131c3` sul solo branch `codex/bug6-rbac-ruoli-moduli`. Nessun merge, push o deploy remoto. I limiti delle prove e le ricevute incrementali sono riportati nelle sezioni conclusive; i risultati iniziali restano come cronologia.
+
 ## Mandato e base
 
 Sviluppo sul solo branch `codex/bug6-rbac-ruoli-moduli`, base remota verificata `a80e8c0a21a1e7d2a2cdc43a0f190647cfb76a41`; conservata la ricevuta documentale successiva `267500e`. Cinque documenti locali estranei non inclusi. Fonte prioritaria: richiesta incollata da Floriano, integrata dal prompt BUG6 sul Desktop. Nessun merge/main/deploy autorizzato. La validazione integrata `##test` resta distinta; i risultati di sviluppo non la sostituiscono.
@@ -443,3 +445,18 @@ Ricevute API: campagna FULL iniziale `bug6-final-r1` per bootstrap e gruppi inva
 Ricevute browser: `bug6-final-full`, `bug6-final-continuation` e continuazioni `-r2`, `-r3`, `-r4` sotto `test-results/quality-gates/browser`. La campagna è **incrementale**, non una singola esecuzione FULL verde: ogni specifica ha un risultato conclusivo PASS dopo le correzioni pertinenti. L'aggregato ignorato `bug6-final-summary.json` collega ciascuna delle 50 specifiche alla sua ricevuta conclusiva; nessuna specifica ha tutti i casi saltati. I 179 SKIP sono dichiarati dai test per non ripetere lifecycle mutanti su ogni viewport o per eseguire casi dedicati a desktop/tablet. Le esecuzioni precedenti fallite rimangono documentate e non contribuiscono ai PASS.
 
 Copertura della matrice: login UI e API reali per nove ruoli standard e custom; destinazione iniziale esplicita; sei workflow operativi con profili standard esatti; Volontario in sola lettura e PDF reale sui cinque viewport; amministrazione globale/territoriale e SuperAdmin distinti; sorgenti report, selezioni minime e seconda Area; grant/revoca e cambio scope con cache e bozze eliminate; moduli spenti, configurazione indisponibile e recupero; seed conservativo e bonifica controllata. La validazione manuale di Floriano e l'eventuale fase successiva `##merge` restano separate.
+
+## Consegna della 8082 per validazione manuale
+
+Ricompilate e avviate **entrambe** le immagini finali `magazzino-bug6-uat-api:sha-ba131c3` e `magazzino-bug6-uat-web:sha-ba131c3`, dal codice applicativo verificato `ba131c3`. Override privato persistente `release-images-ba131c3.json` nella cartella Backups indicata sopra. I controlli finali confermano:
+
+- API sana, frontend in esecuzione; `/login`, `/api/healthz` e `/api/readyz` HTTP 200.
+- L'indice ottenuto da `http://localhost:8082/` è identico al file dell'immagine web finale in esecuzione: verificata la porta effettivamente servita, non soltanto il completamento della build.
+- Impronte delle variabili applicative e mount identici allo stato precedente; database e volumi persistenti conservati.
+- Dry-run dopo l'ultimo riavvio: zero proposte, 13 ruoli conservati. Verifica esatta del piano dei cinque ruoli locali già riallineati: nessuna variazione necessaria e nessuna nuova scrittura.
+- Controllo in sola lettura dei prerequisiti della prova Volontario: BOLLE, CENTRO_ASCOLTO, CONSEGNE, LOGISTICA e MAGAZZINO_SOLIDALE attivi. Nessuna scelta dei moduli modificata per ottenere il risultato.
+- Nessun dato sintetico del collaudo inserito sulla 8082. Tutti i database e le reti Docker temporanei del runner sono stati rimossi; nessun volume di test creato.
+
+Prova manuale principale: usare sulla **8082** un account con ruolo **Volontario** e Area assegnata; aprire una consegna della sua Area con Bolla già emessa e premere **“Scarica bolla trasporto”**. Il PDF deve essere scaricabile; comandi di modifica di Bolla, prodotti, quantità e consegna devono restare indisponibili. Verificare inoltre Turni e Mappa in consultazione, la separazione dall'altra Area e i normali workflow degli altri profili della matrice. Una consegna senza Bolla emessa non propone il download.
+
+**Pronto per l'OK manuale finale.** Restano NON ESEGUITI i sette condizionali su file esterni e il collaudo funzionale BUG6 su AIM (ancora a80e8c0, intenzionalmente non aggiornato). La ricognizione AIM in sola lettura è invece conclusa. Nessuna fase `##merge`, pubblicazione Git o distribuzione remota eseguita.
