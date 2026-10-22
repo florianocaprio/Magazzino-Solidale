@@ -6,7 +6,7 @@ import { logisticsSources } from "./logisticsAccess";
 
 const policy: Record<
   ReportSection,
-  { areas: string[]; all?: string[]; any?: string[]; grant?: string }
+  { areas: string[]; all?: string[]; any?: string[]; grant?: string; grants?: string[] }
 > = {
   generale: { areas: [] },
   pacchi: {
@@ -14,8 +14,8 @@ const policy: Record<
     all: ["MAGAZZINO_SOLIDALE", "BOLLE"],
     grant: "bolle.view",
   },
-  "centro-ascolto": { areas: ["sociale"], all: ["CENTRO_ASCOLTO"] },
-  emporio: { areas: ["emporio"], all: ["EMPORIO_SOLIDALE"] },
+  "centro-ascolto": { areas: ["sociale"], all: ["CENTRO_ASCOLTO"], grants: ["beneficiari.view", "sociale.interventi.view"] },
+  emporio: { areas: ["emporio"], all: ["EMPORIO_SOLIDALE"], grants: ["emporio.sales.view", "credito.view"] },
   mensa: { areas: ["mensa"], all: ["MENSA"], grant: "mensa.reports.view" },
   uds: { areas: ["uds"], all: ["UDS"], grant: "uds.reports.view" },
   "magazzino-logistica": {
@@ -25,6 +25,7 @@ const policy: Record<
       "LOTTI",
       "TRASFERIMENTI",
       "MEZZI",
+      "VOLONTARI",
       "FORNITORI",
       "APPROVVIGIONAMENTI",
     ],
@@ -47,10 +48,12 @@ export async function assertReportSectionAccess(
   if (!rule) throw new ReportingError(400, "Sezione non valida");
   if (
     !user.isAdmin &&
-    (!user.aree.includes("analisi") ||
+    ((section === "generale" && !user.aree.some((area) => area === "generale" || area === "analisi")) ||
       (rule.areas.length &&
         !rule.areas.some((area) => user.aree.includes(area))) ||
-      (rule.grant && !user.permessi.includes(rule.grant)))
+      (rule.grant && !user.permessi.includes(rule.grant)) ||
+      (rule.grants && !rule.grants.every((grant) => user.permessi.includes(grant))) ||
+      (section === "fse-plus" && !user.aree.includes("analisi")))
   )
     throw new ReportingError(
       403,

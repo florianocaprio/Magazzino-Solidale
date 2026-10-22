@@ -62,6 +62,7 @@ vi.mock("@workspace/api-client-react", () => ({
   listBeneficiari: vi.fn().mockResolvedValue([]),
   useListCentriAscolto: () => ({ data: mocks.centri }),
   useListMagazzini: () => ({ data: [] }),
+useListMagazziniOperativi: () => ({ data: [] }),
   useGetBeneficiario: () => ({ data: undefined }),
   useCercaBeneficiariSimili: () => ({ data: [] }),
   useListAreeOperative: () => ({ data: mocks.areaOperativa }),

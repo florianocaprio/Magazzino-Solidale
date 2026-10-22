@@ -30,7 +30,7 @@ import {
   useGetSessioneCassaEmporio,
   useGetSpesaEmporio,
   useGetSpesaEmporioBySessione,
-  useGetImpostazioniStampa,
+  useGetStampaOperativa,
   useListAreeOperative,
   useListEmporiOperativi,
   useListSessioniCassaEmporio,
@@ -338,7 +338,7 @@ function EmporioCassa() {
   const { hasPermission, user } = useAuth();
   const { canOperate, canForce, canAdjustCredito } =
     cassaEmporioCapabilities(hasPermission);
-  const { data: impostazioniStampa } = useGetImpostazioniStampa();
+  const { data: impostazioniStampa } = useGetStampaOperativa({ contesto: "emporio" });
   const initialAccessoEmporioId = useMemo(() => {
     const raw = new URLSearchParams(window.location.search).get(
       "accessoEmporioId",

@@ -37,7 +37,7 @@ let operatoreId: number;
 let magNull: number;
 
 const appAs = (centro: number | null, areaOperativa: number | null) =>
-  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa, isAdmin: centro == null && areaOperativa == null });
+  makeScopedApp(reportRouter, { aree: ["logistica"], permessi: ["logistica.mezzi.view"], id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa, isAdmin: centro == null && areaOperativa == null });
 
 type Riga = {
   mezzoId: number;

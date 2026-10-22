@@ -19,8 +19,8 @@ import {
   useListBeneficiari,
   useListMagazzini,
   getListMagazziniQueryKey,
-  useListProdotti,
-  getListProdottiQueryKey,
+  useListProdottiOperativi,
+  getListProdottiOperativiQueryKey,
   useListRichiesteMagazzino,
   type RichiestaMagazzino,
 } from "@workspace/api-client-react";
@@ -467,8 +467,8 @@ export default function RichiesteMagazzino() {
   const warehouses = useListMagazzini({
     query: { enabled: canPrepare, queryKey: getListMagazziniQueryKey() },
   });
-  const products = useListProdotti(undefined, {
-    query: { enabled: canPrepare, queryKey: getListProdottiQueryKey() },
+  const products = useListProdottiOperativi({ contesto: "richieste" }, {
+    query: { enabled: canPrepare, queryKey: getListProdottiOperativiQueryKey({ contesto: "richieste" }) },
   });
   const availableWarehouses = warehouses.isError
     ? []

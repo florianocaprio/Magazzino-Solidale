@@ -5,6 +5,156 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export type MagazzinoOperativoTipoMagazzino =
+  (typeof MagazzinoOperativoTipoMagazzino)[keyof typeof MagazzinoOperativoTipoMagazzino];
+
+export const MagazzinoOperativoTipoMagazzino = {
+  logistico: "logistico",
+  emporio: "emporio",
+  misto: "misto",
+  mensa: "mensa",
+} as const;
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface MagazzinoOperativo {
+  id: number;
+  /** @minLength 1 */
+  nome: string;
+  areaOperativaId: number;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  stato: string;
+  tipoMagazzino: MagazzinoOperativoTipoMagazzino;
+}
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface FornitoreOperativo {
+  id: number;
+  nome: string;
+  tipo: string;
+  /** @nullable */
+  areaOperativaId: number | null;
+  attivo: boolean;
+}
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface ProdottoOperativo {
+  lottoFisicoObbligatorio: boolean;
+  id: number;
+  nome: string;
+  codice: string;
+  unitaMisura: string;
+  attivo: boolean;
+}
+
+export type VolontarioOperativoTipoVolontario =
+  (typeof VolontarioOperativoTipoVolontario)[keyof typeof VolontarioOperativoTipoVolontario];
+
+export const VolontarioOperativoTipoVolontario = {
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
+} as const;
+
+export type VolontarioOperativoStatoApprovazione =
+  (typeof VolontarioOperativoStatoApprovazione)[keyof typeof VolontarioOperativoStatoApprovazione];
+
+export const VolontarioOperativoStatoApprovazione = {
+  in_attesa: "in_attesa",
+  approvato: "approvato",
+  respinto: "respinto",
+} as const;
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface VolontarioOperativo {
+  id: number;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  matricola: string | null;
+  /** @nullable */
+  areaOperativaId: number | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  tipoVolontario: VolontarioOperativoTipoVolontario;
+  ruolo: string;
+  /** @nullable */
+  ruoloVolontarioId: number | null;
+  patente: boolean;
+  mezzoPersonale: boolean;
+  /** @minimum 0 */
+  maxConsegneTurno: number;
+  /** Abilitazione amministrativa/manuale; non equivale allo stato operativo. */
+  attivo: boolean;
+  statoApprovazione: VolontarioOperativoStatoApprovazione;
+  operativo: boolean;
+  /** @nullable */
+  motivoNonOperativo: string | null;
+}
+
+export type MezzoOperativoStato =
+  (typeof MezzoOperativoStato)[keyof typeof MezzoOperativoStato];
+
+export const MezzoOperativoStato = {
+  disponibile: "disponibile",
+  non_disponibile: "non_disponibile",
+  manutenzione: "manutenzione",
+  respinto: "respinto",
+  ritirato: "ritirato",
+} as const;
+
+export type MezzoOperativoStatoApprovazione =
+  (typeof MezzoOperativoStatoApprovazione)[keyof typeof MezzoOperativoStatoApprovazione];
+
+export const MezzoOperativoStatoApprovazione = {
+  in_attesa: "in_attesa",
+  approvato: "approvato",
+  respinto: "respinto",
+} as const;
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface MezzoOperativo {
+  id: number;
+  codice: string;
+  tipo: string;
+  /** @nullable */
+  targa: string | null;
+  /** @nullable */
+  volontarioId: number | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  areaOperativaId: number | null;
+  /** @nullable */
+  effectiveCentroId: number | null;
+  stato: MezzoOperativoStato;
+  statoApprovazione: MezzoOperativoStatoApprovazione;
+  /** @nullable */
+  scadenzaAssicurazione: string | null;
+  /** @nullable */
+  scadenzaRevisione: string | null;
+}
+
+/**
+ * Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.
+ */
+export interface RuoloVolontarioOperativo {
+  id: number;
+  nome: string;
+  attivo: boolean;
+}
+
 export interface RichiestaMagazzinoOrigine {
   id: number;
   codice: string;
@@ -6167,6 +6317,9 @@ export interface ModuloFunzionale {
   ordine: number;
   attivoDefault: boolean;
   attivo: boolean;
+  disponibile?: boolean;
+  configuratoAttivo?: boolean;
+  dipendenze?: string[];
   dataCreazione: string;
   dataAggiornamento: string;
   /** @nullable */
@@ -10691,6 +10844,8 @@ export interface Area {
   label: string;
   /** Permessi operativi suggeriti dalla UX quando l'Area viene selezionata */
   permessi: string[];
+  /** Dotazione ordinaria del servizio, senza capacità aggiuntive sensibili */
+  permessiOrdinari?: string[];
 }
 
 export interface Permission {
@@ -11200,6 +11355,231 @@ export type MapsDaParameter = string;
  * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
  */
 export type MapsAParameter = string;
+
+export type GetCaricoVolontariOperativoParams = {
+  contesto: GetCaricoVolontariOperativoContesto;
+  /**
+   * Data del turno (YYYY-MM-DD)
+   */
+  data: string;
+  excludeConsegnaId?: number;
+  fascia: GetCaricoVolontariOperativoFascia;
+};
+
+export type GetCaricoVolontariOperativoContesto =
+  (typeof GetCaricoVolontariOperativoContesto)[keyof typeof GetCaricoVolontariOperativoContesto];
+
+export const GetCaricoVolontariOperativoContesto = {
+  consegne: "consegne",
+  turni: "turni",
+} as const;
+
+export type GetCaricoVolontariOperativoFascia =
+  (typeof GetCaricoVolontariOperativoFascia)[keyof typeof GetCaricoVolontariOperativoFascia];
+
+export const GetCaricoVolontariOperativoFascia = {
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
+} as const;
+
+export type GetCaricoVolontariOperativo200Item = {
+  volontarioId: number;
+  count: number;
+};
+
+export type ListMagazziniOperativiParams = {
+  contesto: ListMagazziniOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type ListMagazziniOperativiContesto =
+  (typeof ListMagazziniOperativiContesto)[keyof typeof ListMagazziniOperativiContesto];
+
+export const ListMagazziniOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type ListFornitoriOperativiParams = {
+  contesto: ListFornitoriOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type ListFornitoriOperativiContesto =
+  (typeof ListFornitoriOperativiContesto)[keyof typeof ListFornitoriOperativiContesto];
+
+export const ListFornitoriOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type ListProdottiOperativiParams = {
+  contesto: ListProdottiOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type ListProdottiOperativiContesto =
+  (typeof ListProdottiOperativiContesto)[keyof typeof ListProdottiOperativiContesto];
+
+export const ListProdottiOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type ListVolontariOperativiParams = {
+  contesto: ListVolontariOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  dataRiferimento?: string;
+  stato?: ListVolontariOperativiStato;
+};
+
+export type ListVolontariOperativiContesto =
+  (typeof ListVolontariOperativiContesto)[keyof typeof ListVolontariOperativiContesto];
+
+export const ListVolontariOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type ListVolontariOperativiStato =
+  (typeof ListVolontariOperativiStato)[keyof typeof ListVolontariOperativiStato];
+
+export const ListVolontariOperativiStato = {
+  attivi: "attivi",
+  non_attivi: "non_attivi",
+  tutti: "tutti",
+} as const;
+
+export type ListMezziOperativiParams = {
+  contesto: ListMezziOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type ListMezziOperativiContesto =
+  (typeof ListMezziOperativiContesto)[keyof typeof ListMezziOperativiContesto];
+
+export const ListMezziOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type ListRuoliVolontariOperativiParams = {
+  contesto: ListRuoliVolontariOperativiContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type ListRuoliVolontariOperativiContesto =
+  (typeof ListRuoliVolontariOperativiContesto)[keyof typeof ListRuoliVolontariOperativiContesto];
+
+export const ListRuoliVolontariOperativiContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
+
+export type GetStampaOperativaParams = {
+  contesto: GetStampaOperativaContesto;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type GetStampaOperativaContesto =
+  (typeof GetStampaOperativaContesto)[keyof typeof GetStampaOperativaContesto];
+
+export const GetStampaOperativaContesto = {
+  consegne: "consegne",
+  turni: "turni",
+  magazzino: "magazzino",
+  approvvigionamenti: "approvvigionamenti",
+  documenti: "documenti",
+  richieste: "richieste",
+  beneficiari: "beneficiari",
+  emporio: "emporio",
+} as const;
 
 export type ListRichiesteMagazzinoParams = {
   /**

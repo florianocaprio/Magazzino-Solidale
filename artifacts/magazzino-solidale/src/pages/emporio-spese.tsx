@@ -11,9 +11,9 @@ import {
   getGetSpesaEmporioQueryKey,
   getListSpeseEmporioQueryKey,
   useGetSpesaEmporio,
-  useGetImpostazioniStampa,
+  useGetStampaOperativa,
   useListCentriAscolto,
-  useListMagazzini,
+  useListMagazziniOperativi,
   useListSpeseEmporio,
   useRegistraInvioManualeBollaSpesaEmporio,
   useStornaSpesaEmporio,
@@ -215,7 +215,7 @@ function EmporioSpese() {
   const queryClient = useQueryClient();
   const { hasPermission, user } = useAuth();
   const { canManage, canReverse } = speseEmporioCapabilities(hasPermission);
-  const { data: impostazioniStampa } = useGetImpostazioniStampa();
+  const { data: impostazioniStampa } = useGetStampaOperativa({ contesto: "emporio" });
   const initialSpesaId = useMemo(() => {
     const raw = new URLSearchParams(window.location.search).get("spesaId");
     const id = raw ? Number(raw) : NaN;
@@ -252,7 +252,7 @@ function EmporioSpese() {
   );
 
   const { data: centri = [] } = useListCentriAscolto();
-  const { data: magazzini = [] } = useListMagazzini();
+  const { data: magazzini = [] } = useListMagazziniOperativi({ contesto: "emporio" });
   const empori = useMemo(
     () =>
       magazzini.filter(

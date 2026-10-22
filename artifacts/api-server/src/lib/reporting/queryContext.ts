@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { UNAVAILABLE_MODULES, MODULE_DEPENDENCIES } from "../modulePolicy";
 import { db, ambienteModuliTable, moduliFunzionaliTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { CONFIGURAZIONE_AMBIENTE_ID } from "../configurazioneAmbiente";
@@ -22,6 +23,8 @@ export function withReportExecutor<T>(
 
 /** Reporting must never initialize configuration as a side effect of a read. */
 export async function isReportModuleActive(code: string): Promise<boolean> {
+  if (UNAVAILABLE_MODULES.has(code)) return false;
+  if (!(await Promise.all((MODULE_DEPENDENCIES[code] ?? []).map(isReportModuleActive))).every(Boolean)) return false;
   const [row] = await reportExecutor()
     .select({ module: moduliFunzionaliTable, environment: ambienteModuliTable })
     .from(moduliFunzionaliTable)

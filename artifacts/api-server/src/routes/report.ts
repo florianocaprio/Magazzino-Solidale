@@ -3,7 +3,9 @@ import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
 import { requireAllModuli, requireAnyModulo } from "../lib/featureFlags";
-import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
+import { requirePermission } from "../middlewares/auth";
+import { reportRequestSection } from "../lib/reporting/requestSection";
+import { assertReportSectionAccess } from "../lib/reporting/access";
 import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
 import { buildFsePlusReport } from "../lib/reporting/fsePlus";
 import { logisticsSources } from "../lib/reporting/logisticsAccess";
@@ -16,7 +18,6 @@ import {
 
 const router: IRouter = Router();
 
-const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
 const requireReportOnly = requireAllModuli(["REPORT"]);
 const requireAnyFseSource = requireAnyModulo([
@@ -49,21 +50,21 @@ const requireFseSourceArea = (
   res.status(403).json({ error: "Area sorgente FSE+ richiesta" });
 };
 
-router.use("/report", (req, res, next) => {
-  const guard =
-    req.path === "/fse-plus"
-      ? requireReportOnly
-      : isUdsReportRequest(req)
-        ? requireReportUds
-        : requireReportCentro;
-  guard(req, res, next);
-});
-router.use("/report", (req, res, next) => {
-  if (req.user?.isAdmin || req.user?.aree.includes("analisi")) {
+router.use("/report", async (req, res, next) => {
+  try {
+    const section = reportRequestSection(req);
+    if (!section) { next(); return; }
+    await assertReportSectionAccess(req, section);
+    const actor = req.user!;
+    if (["/consegne-per-mese", "/consegne-per-centro"].includes(req.path) && !actor.isAdmin && !actor.permessi.includes("consegne.view"))
+      throw new ReportingError(403, "Consultazione Consegne non autorizzata");
+    if (req.path === "/allocazione-mezzi" && !actor.isAdmin && (!actor.aree.includes("logistica") || !actor.permessi.includes("logistica.mezzi.view")))
+      throw new ReportingError(403, "Consultazione Mezzi non autorizzata");
     next();
-    return;
+  } catch (error) {
+    if (error instanceof ReportingError) res.status(error.status).json({ error: error.message });
+    else next(error);
   }
-  res.status(403).json({ error: "Area Analisi richiesta" });
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
 router.use(

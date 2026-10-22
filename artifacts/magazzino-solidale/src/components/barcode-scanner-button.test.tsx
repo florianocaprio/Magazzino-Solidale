@@ -24,11 +24,13 @@ vi.mock("@/components/ui/dialog", () => ({
   ),
 }));
 const mocks = vi.hoisted(() => ({
+  enabled: true,
   decode: vi.fn(),
   stop: vi.fn(),
   hints: undefined as Map<unknown, unknown> | undefined,
   t: (key: string) => key,
 }));
+vi.mock("@/lib/use-moduli", () => ({ useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => mocks.enabled }) }));
 vi.mock("@zxing/browser", () => ({
   BrowserMultiFormatReader: class {
     constructor(hints: Map<unknown, unknown>) {
@@ -49,6 +51,7 @@ beforeEach(() => {
     configurable: true,
     value: { getUserMedia: vi.fn() },
   });
+  mocks.enabled = true;
   mocks.decode.mockReset().mockResolvedValue({ stop: mocks.stop });
   mocks.stop.mockReset();
   scanned.mockReset();
@@ -148,4 +151,11 @@ it("starts with the mounted video and releases a pending decoder on unmount", as
     callback({ getText: () => "LATE" }, undefined, { stop: mocks.stop }),
   );
   expect(scanned).not.toHaveBeenCalled();
+});
+
+it("il modulo Barcode spento non avvia la fotocamera", async () => {
+  mocks.enabled = false;
+  await open();
+  expect(host.querySelector<HTMLButtonElement>("button")!.disabled).toBe(true);
+  expect(mocks.decode).not.toHaveBeenCalled();
 });

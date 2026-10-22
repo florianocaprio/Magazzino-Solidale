@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useConsegnaScan } from "@/hooks/use-consegna-scan";
+import { ConsegnaBollaDownload } from "@/components/consegna-bolla-download";
 import { ReadQueryFeedback } from "@/components/read-query-feedback";
 import {
   useListConsegne,
@@ -19,19 +20,19 @@ import {
   useListBeneficiari,
   useGetBeneficiario,
   getGetBeneficiarioQueryKey,
-  useListMagazzini,
-  useListVolontari,
-  useListMezzi,
-  useGetVolontariCarico,
-  getGetVolontariCaricoQueryKey,
+  useListMagazziniOperativi,
+  useListVolontariOperativi,
+  useListMezziOperativi,
+  useGetCaricoVolontariOperativo,
+  getGetCaricoVolontariOperativoQueryKey,
   useListCentriAscolto,
   useListAreeOperative,
   getListAreeOperativeQueryKey,
   getListConsegneQueryKey,
   useCreateTurnoVolontarioPending,
   useCreateTurnoMezzoPending,
-  useListRuoliVolontari,
-  getListVolontariQueryKey,
+  useListRuoliVolontariOperativi,
+  getListVolontariOperativiQueryKey,
   getListMezziQueryKey,
   type Consegna,
   type Volontario,
@@ -183,6 +184,7 @@ export default function Consegne() {
   const canCreateVolontario = hasPermission("logistica.volontari.manage");
   const canCreateMezzo = hasPermission("logistica.mezzi.manage");
   const canManage = hasPermission("consegne.manage");
+  const canConsultBolle = hasPermission("bolle.view") && Boolean(user?.isAdmin || user?.aree?.some((area) => ["sociale", "magazzino"].includes(area)));
   const canCreateBolla =
     canManage && authUserCanOperateBolle(user, "bolle.manage");
   const canComplete = hasPermission("consegne.complete");
@@ -355,11 +357,11 @@ export default function Consegne() {
     ...(createCentroId !== "all"
       ? { centroAscoltoId: parseInt(createCentroId) }
       : {}),
-  });
-  const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
-  const { data: magazzini } = useListMagazzini();
-  const { data: mezzi } = useListMezzi();
-  const { data: ruoliVolontari } = useListRuoliVolontari();
+  }, { query: { queryKey: ["/api/beneficiari", "consegne", createCentroId], enabled: canManage } });
+  const { data: allBeneficiari } = useListBeneficiari({ attivo: true }, { query: { queryKey: ["/api/beneficiari", { attivo: true }], enabled: canManage } });
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "consegne" });
+  const { data: mezzi } = useListMezziOperativi({ contesto: "consegne" });
+  const { data: ruoliVolontari } = useListRuoliVolontariOperativi({ contesto: "consegne" });
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativaList } = useListAreeOperative({
     query: {
@@ -445,7 +447,7 @@ export default function Consegne() {
     note: "",
   });
 
-  const { data: bolle } = useListBolle();
+  const { data: bolle } = useListBolle(undefined, { query: { queryKey: ["/api/bolle"], enabled: canManage && hasPermission("bolle.view") } });
 
   const createConsegna = useCreateConsegna();
   const pianificaDaBolla = usePianificaConsegnaDaBolla();
@@ -599,13 +601,13 @@ export default function Consegne() {
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
-  const volontariOperativiParams = {
+  const volontariOperativiParams = { contesto: "consegne" as const,
     dataRiferimento: dataPrevistaWatch,
     stato: "attivi" as const,
   };
-  const { data: volontari } = useListVolontari(volontariOperativiParams, {
+  const { data: volontari } = useListVolontariOperativi(volontariOperativiParams, {
     query: {
-      queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      queryKey: getListVolontariOperativiQueryKey(volontariOperativiParams),
       enabled: /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? ""),
     },
   });
@@ -618,13 +620,13 @@ export default function Consegne() {
           ? "18-20"
           : null;
   const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
-  const caricoParams = {
+  const caricoParams = { contesto: "consegne" as const,
     data: dataPrevistaWatch,
     fascia: (fasciaCanonica ?? "09-13") as "09-13" | "14-18" | "18-20",
   };
-  const { data: caricoTurno } = useGetVolontariCarico(caricoParams, {
+  const { data: caricoTurno } = useGetCaricoVolontariOperativo(caricoParams, {
     query: {
-      queryKey: getGetVolontariCaricoQueryKey(caricoParams),
+      queryKey: getGetCaricoVolontariOperativoQueryKey(caricoParams),
       enabled: validData && fasciaCanonica != null,
     },
   });
@@ -877,7 +879,7 @@ export default function Consegne() {
             ...prev.filter((v) => v.id !== created.id),
           ]);
           queryClient.invalidateQueries({
-            queryKey: getListVolontariQueryKey(),
+            queryKey: getListVolontariOperativiQueryKey(),
           });
           toast({
             description: t("turni.pendingVolCreated", {
@@ -1311,7 +1313,8 @@ export default function Consegne() {
                 {linkedConsegna.data.stato}
               </p>
             </div>
-            {linkedConsegna.data.bollaId != null && (
+            {!canConsultBolle && <ConsegnaBollaDownload consegnaId={linkedConsegna.data.id} bollaStato={linkedConsegna.data.bollaStato} />}
+            {canConsultBolle && linkedConsegna.data.bollaId != null && (
               <Button
                 variant="outline"
                 onClick={() =>
@@ -1564,7 +1567,8 @@ export default function Consegne() {
                       className="justify-start"
                     />
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {c.bollaId != null && (
+                      {!canConsultBolle && <ConsegnaBollaDownload consegnaId={c.id} bollaStato={c.bollaStato} />}
+                      {canConsultBolle && c.bollaId != null && (
                         <Button
                           className="min-h-11 gap-2"
                           variant="outline"
@@ -1802,7 +1806,7 @@ export default function Consegne() {
                           <button
                             type="button"
                             disabled={
-                              (consegnata && c.bollaId == null) ||
+                              (consegnata && (c.bollaId == null || !canConsultBolle)) ||
                               (!consegnata && !canManage)
                             }
                             onClick={() => {
@@ -1857,9 +1861,10 @@ export default function Consegne() {
                         className="mb-2 justify-end sm:mb-0 sm:me-2"
                         compact
                       />
+                      {!canConsultBolle && <ConsegnaBollaDownload consegnaId={c.id} bollaStato={c.bollaStato} />}
                       {c.stato === "effettuata" ? (
                         <div className="flex items-center justify-end gap-2">
-                          {c.bollaId != null && (
+                          {canConsultBolle && c.bollaId != null && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -1910,7 +1915,7 @@ export default function Consegne() {
                                     {t("consegne.btnCreaBolla")}
                                   </Button>
                                 )
-                              ) : (
+                              ) : canConsultBolle ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1920,7 +1925,7 @@ export default function Consegne() {
                                   <FileText className="h-3.5 w-3.5" />{" "}
                                   {t("consegne.btnCompilaBolla")}
                                 </Button>
-                              )}
+                              ) : null}
                               <Button
                                 size="sm"
                                 variant="outline"

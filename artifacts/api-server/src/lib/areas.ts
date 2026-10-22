@@ -3,14 +3,14 @@ export const MENSA_AREA_KEY = "mensa";
 
 export const ALL_AREAS = [
   { key: "generale", label: "Generale" },
+  { key: "amministrazione", label: "Amministrazione" },
   { key: "magazzino", label: "Magazzino" },
-  { key: "sociale", label: "Sociale" },
+  { key: "sociale", label: "Centro di Ascolto" },
   { key: EMPORIO_AREA_KEY, label: "Emporio" },
   { key: MENSA_AREA_KEY, label: "Mensa" },
   { key: "uds", label: "Unità di Strada" },
   { key: "logistica", label: "Logistica" },
   { key: "analisi", label: "Analisi" },
-  { key: "amministrazione", label: "Amministrazione" },
 ] as const;
 
 export const ALL_AREA_KEYS: string[] = ALL_AREAS.map((a) => a.key);
@@ -38,6 +38,13 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   magazzini: ["magazzino", EMPORIO_AREA_KEY],
   prodotti: "magazzino",
   lotti: "magazzino",
+  "lotti-logici": "magazzino",
+  carichi: "magazzino",
+  "carico-pratiche": "magazzino",
+  // FSE retains its specialist warehouse/analysis read policy.
+  fse: ["magazzino", "analisi"],
+  "fse-importazioni": ["magazzino", "analisi"],
+  agea: ["magazzino", "analisi"],
   "lotti-produttore": "magazzino",
   movimenti: "magazzino",
   giacenze: "magazzino",
@@ -57,10 +64,10 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   ],
   beneficiari: ["sociale", "uds", EMPORIO_AREA_KEY],
   interventi: ["sociale", "uds"],
-  consegne: "sociale",
+  consegne: ["sociale", "logistica"],
   bolle: ["sociale", "magazzino"],
   scarichi: "magazzino",
-  turni: "sociale",
+  turni: ["sociale", "logistica"],
 
   volontari: "logistica",
   // Mapped to "logistica" so non-admin logistica staff can READ the list to
@@ -99,7 +106,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   // MAPS è un adapter tecnico: agli utenti standard il segmento richiede almeno
   // un'area sorgente. areaGuard ammette Admin/SuperAdmin senza aree applicative;
   // i singoli provider applicano comunque moduli e scope territoriali.
-  maps: ["sociale", "magazzino", "uds"],
+  maps: ["sociale", "magazzino", "uds", "logistica"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

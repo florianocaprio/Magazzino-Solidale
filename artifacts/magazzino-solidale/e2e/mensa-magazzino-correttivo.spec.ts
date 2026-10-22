@@ -148,7 +148,7 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
       await page.getByLabel(/username|nome utente/i).fill(username);
       await page.getByLabel(/^password$/i).fill(password);
       await page.getByRole("button", { name: /accedi|login/i }).click();
-      await expect(page).toHaveURL(/\/$/);
+      await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
     };
     const counts = async () =>
       (

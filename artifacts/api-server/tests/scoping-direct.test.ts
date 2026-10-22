@@ -83,13 +83,17 @@ afterAll(async () => {
   await pool.end();
 });
 
+// Scope tests have explicit archive grants; RBAC denials are tested separately.
+const makeFornitoriApp = (user: Parameters<typeof makeScopedApp>[1]) =>
+  makeScopedApp(fornitoriRouter, { permessi: ["fornitori.view", "fornitori.manage"], ...user });
+
 describe("Fornitori — scoping per area operativa", () => {
   it("lista: il caller della area operativa A vede A + comuni (NULL), non B", async () => {
     const fA = await createFornitore(scope, areaOperativaA);
     const fB = await createFornitore(scope, areaOperativaB);
     const fNull = await createFornitore(scope, null);
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: areaOperativaA,
       }),
@@ -105,7 +109,7 @@ describe("Fornitori — scoping per area operativa", () => {
     const fA = await createFornitore(scope, areaOperativaA);
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: null,
       }),
@@ -118,7 +122,7 @@ describe("Fornitori — scoping per area operativa", () => {
     const foreign = await createFornitore(scope, areaOperativaB);
     const global = await createFornitore(scope, null);
     for (const callerArea of [null, areaOperativaA]) {
-      const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: callerArea });
+      const app = makeFornitoriApp( { id: operatoreId, areaOperativaId: callerArea });
       const res = await request(app).get(`/fornitori?ambito=globali&areaOperativaId=${areaOperativaB}`);
       expect(res.status).toBe(200);
       expect(idsOf(res.body)).toContain(global);
@@ -132,12 +136,12 @@ describe("Fornitori — scoping per area operativa", () => {
     const local = await createFornitore(scope, areaOperativaA);
     const foreign = await createFornitore(scope, areaOperativaB);
     const global = await createFornitore(scope, null);
-    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const app = makeFornitoriApp( { id: operatoreId, areaOperativaId: null });
     const res = await request(app).get(`/fornitori?areaOperativaId=${areaOperativaA}`);
     expect(res.status).toBe(200);
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([local, global]));
     expect(idsOf(res.body)).not.toContain(foreign);
-    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    const scoped = makeFornitoriApp( { id: operatoreId, areaOperativaId: areaOperativaA });
     const attempted = await request(scoped).get(`/fornitori?areaOperativaId=${areaOperativaB}`);
     expect(attempted.status).toBe(200);
     expect(idsOf(attempted.body)).toEqual(expect.arrayContaining([local, global]));
@@ -145,12 +149,12 @@ describe("Fornitori — scoping per area operativa", () => {
   });
 
   it.each(["ambito=altro", "ambito=globali&ambito=tutti", "areaOperativaId=0", "areaOperativaId=1x", "areaOperativaId=NaN"])("BUG17: rifiuta il filtro malformato %s", async (query) => {
-    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const app = makeFornitoriApp( { id: operatoreId, areaOperativaId: null });
     expect((await request(app).get(`/fornitori?${query}`)).status).toBe(400);
   });
 
   it("BUG17: crea e modifica un globale; il territoriale può leggerlo ma non gestirlo", async () => {
-    const admin = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const admin = makeFornitoriApp( { id: operatoreId, areaOperativaId: null });
     const created = await request(admin).post("/fornitori").send({ nome: "Globale BUG17", tipo: "commerciale", areaOperativaId: null });
     expect(created.status).toBe(201);
     scope.fornitoreIds.push(created.body.id);
@@ -158,7 +162,7 @@ describe("Fornitori — scoping per area operativa", () => {
     const edited = await request(admin).patch(`/fornitori/${created.body.id}`).send({ nome: "Globale BUG17 aggiornato", areaOperativaId: null });
     expect(edited.status).toBe(200);
     expect(edited.body.areaOperativaId).toBeNull();
-    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    const scoped = makeFornitoriApp( { id: operatoreId, areaOperativaId: areaOperativaA });
     expect((await request(scoped).get(`/fornitori/${created.body.id}`)).status).toBe(200);
     expect((await request(scoped).patch(`/fornitori/${created.body.id}`).send({ nome: "Non consentito" })).status).toBe(403);
     expect((await request(scoped).delete(`/fornitori/${created.body.id}`)).status).toBe(403);
@@ -171,7 +175,7 @@ describe("Fornitori — scoping per area operativa", () => {
   it("GET /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: areaOperativaA,
       }),
@@ -181,7 +185,7 @@ describe("Fornitori — scoping per area operativa", () => {
 
   it("POST auto-assegna e blocca la area operativa del caller", async () => {
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: areaOperativaA,
       }),
@@ -200,7 +204,7 @@ describe("Fornitori — scoping per area operativa", () => {
   it("PATCH /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: areaOperativaA,
       }),
@@ -213,7 +217,7 @@ describe("Fornitori — scoping per area operativa", () => {
   it("DELETE /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, {
+      makeFornitoriApp( {
         id: operatoreId,
         areaOperativaId: areaOperativaA,
       }),

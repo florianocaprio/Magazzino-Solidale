@@ -291,7 +291,13 @@ export const APPROVVIGIONAMENTI_PERMISSIONS = [
   },
 ] as const;
 
+export const FORNITORI_PERMISSIONS = [
+  { key: "fornitori.view", label: "Fornitori: consultazione anagrafica" },
+  { key: "fornitori.manage", label: "Fornitori: gestione anagrafica" },
+] as const;
+
 export const ALL_PERMISSIONS = [
+  ...FORNITORI_PERMISSIONS,
   {
     key: "magazzino.fse.export.original.view",
     label: "FSE+: accesso motivato agli originali storici riservati",
@@ -416,6 +422,10 @@ export const AREA_PERMISSION_MAP = {
     ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
   ],
   logistica: [
+    ...permissionKeys(FORNITORI_PERMISSIONS),
+    "consegne.view",
+    "maps.operational",
+    "maps.route",
     ...permissionKeys(LOGISTICA_PERMISSIONS),
     ...permissionKeys(APPROVVIGIONAMENTI_PERMISSIONS),
   ],

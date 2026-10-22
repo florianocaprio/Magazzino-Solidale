@@ -6,7 +6,7 @@ import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampai
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListAreeOperative, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListAreeOperativeQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario, type ListBeneficiariParams } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazziniOperativi, useGetBeneficiario, useCercaBeneficiariSimili, useListAreeOperative, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListAreeOperativeQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario, type ListBeneficiariParams } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -155,7 +155,7 @@ export default function Beneficiari() {
     limit: BENEFICIARI_PAGE_SIZE,
   });
   const { data: centri } = useListCentriAscolto();
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "beneficiari" });
   const emporiDisponibili = useMemo(
     () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
     [magazzini],

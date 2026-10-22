@@ -5,6 +5,7 @@ import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import type { PermissionKey } from "../lib/permissions";
+import { reportRequestSection, REPORT_SERVICE_AREAS } from "../lib/reporting/requestSection";
 import { passwordSessionVersion } from "../lib/userAccess";
 
 export interface SessionUser {
@@ -271,7 +272,7 @@ export function isUdsReportRequest(
   const path = rawPath.replace(/^\/api(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   if (path === "/report/uds" || path.startsWith("/report/uds/")) return true;
   return (
-    (path === "/report/filter-options" || path === "/report/drilldown") &&
+    (path === "/report/filter-options" || path === "/report/drilldown" || path === "/report/prepare") &&
     req.query.section === "uds"
   );
 }
@@ -284,8 +285,8 @@ export function isUdsReportRequest(
  */
 export const areaGuard: RequestHandler = (req, res, next) => {
   const segment = req.path.split("/").filter(Boolean)[0];
-  const mapped = segment === "report" && isUdsReportRequest(req)
-    ? "uds"
+  const section = segment === "report" ? reportRequestSection(req) : null;
+  const mapped = section ? REPORT_SERVICE_AREAS[section]
     : segment ? AREA_BY_SEGMENT[segment] : undefined;
   if (!mapped) {
     next();

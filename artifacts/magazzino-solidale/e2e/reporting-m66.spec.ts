@@ -208,7 +208,7 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
   await page.getByLabel(/username|nome utente/i).fill(username);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   // Deep links and browser history must restore the actual controls, not only
   // the URL. Options failures stay explicit and are not presented as zero data.
   await page.goto("/report/mensa?da=2026-01-04&a=2026-01-20");

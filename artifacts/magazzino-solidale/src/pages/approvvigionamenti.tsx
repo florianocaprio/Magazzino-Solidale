@@ -6,11 +6,11 @@ import {
   useCreateApprovvigionamento,
   useUpdateApprovvigionamento,
   useSubmitApprovvigionamento,
-  useListFornitori,
+  useListFornitoriOperativi,
   useListAreeOperative,
-  useListMagazzini,
+  useListMagazziniOperativi,
   useListCentriAscolto,
-  useListProdotti,
+  useListProdottiOperativi,
   listApprovvigionamenti,
   getListApprovvigionamentiQueryKey,
 } from "@workspace/api-client-react";
@@ -142,11 +142,11 @@ export default function Approvvigionamenti() {
 
   const { data: approvvigionamenti, isLoading } =
     useListApprovvigionamenti(listParams);
-  const { data: fornitori } = useListFornitori();
+  const { data: fornitori } = useListFornitoriOperativi({ contesto: "approvvigionamenti" });
   const { data: areaOperativa } = useListAreeOperative();
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "approvvigionamenti" });
   const { data: centri } = useListCentriAscolto();
-  const { data: prodotti } = useListProdotti();
+  const { data: prodotti } = useListProdottiOperativi({ contesto: "approvvigionamenti" });
 
   const queryClient = useQueryClient();
   const { toast } = useToast();

@@ -11,4 +11,6 @@ export interface Area {
   label: string;
   /** Permessi operativi suggeriti dalla UX quando l'Area viene selezionata */
   permessi: string[];
+  /** Dotazione ordinaria del servizio, senza capacità aggiuntive sensibili */
+  permessiOrdinari?: string[];
 }

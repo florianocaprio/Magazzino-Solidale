@@ -399,7 +399,7 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
       await mensaPage
         .getByRole("button", { name: /accedi|sign in|login/i })
         .click();
-      await expect(mensaPage).toHaveURL(/\/$/);
+      await expect(mensaPage).not.toHaveURL(/\/login(?:[?#]|$)/);
       const created = await mensaPage.request.post("/api/mensa/trasferimenti", {
         data: {
           mensaId: mensa.rows[0].id,

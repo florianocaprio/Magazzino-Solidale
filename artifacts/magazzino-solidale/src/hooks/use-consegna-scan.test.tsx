@@ -6,6 +6,7 @@ import { useConsegnaScan } from "./use-consegna-scan";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 const lookup = vi.hoisted(() => vi.fn());
 const camera = vi.hoisted(() => ({ decode: vi.fn(), stop: vi.fn() }));
+vi.mock("@/lib/use-moduli", () => ({ useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }) }));
 vi.mock("@zxing/browser", () => ({
   BrowserMultiFormatReader: class {
     decodeFromConstraints = camera.decode;

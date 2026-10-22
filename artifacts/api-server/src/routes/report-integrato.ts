@@ -25,6 +25,7 @@ import { buildDrilldown } from "../lib/reporting/drilldown";
 import type { ReportSection } from "../lib/reporting/types";
 import { buildReportFilterOptions } from "../lib/reporting/filterOptions";
 import { assertReportSectionAccess } from "../lib/reporting/access";
+import { reportRequestSection } from "../lib/reporting/requestSection";
 import { prepareReport } from "../lib/reporting/prepare";
 
 const router: IRouter = Router();
@@ -82,8 +83,9 @@ function reportHandler(
 ): RequestHandler {
   return async (req, res) => {
     try {
-      if (req.path === "/report/magazzino-logistica")
-        await assertReportSectionAccess(req, "magazzino-logistica");
+      const section = reportRequestSection(req);
+      if (!section) throw new ReportingError(400, "Sezione non valida");
+      await assertReportSectionAccess(req, section);
       const filters = parseReportFilters(req);
       await assertReportFilterScope(req, filters);
       if (req.path === "/report/mensa" && filters.callerMensaIds?.length === 0)
@@ -109,7 +111,14 @@ router.use(
     "/report/filter-options",
     "/report/drilldown",
   ],
-  requireSourceArea("analisi"),
+  async (req, res, next) => {
+    try {
+      const section = reportRequestSection(req);
+      if (!section) throw new ReportingError(400, "Sezione non valida");
+      await assertReportSectionAccess(req, section);
+      next();
+    } catch (error) { if (!sendError(error, res)) next(error); }
+  },
   requireModulo("REPORT"),
   (req, res, next) => {
     try {

@@ -82,6 +82,7 @@ import {
   getGetMapsCapabilitiesQueryKey,
   useGetMapsCapabilities,
 } from "@workspace/api-client-react";
+import { hasLogisticsReportSource } from "@/lib/logistics-report-access";
 import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 import { currentNavigationItem } from "@/lib/navigation-current";
 import { useNavigationGroups } from "@/hooks/use-navigation-groups";
@@ -100,6 +101,7 @@ export type NavItem = {
   public?: boolean;
   permission?: string;
   anyPermissions?: readonly string[];
+  allPermissions?: readonly string[];
   sourceAreas?: readonly string[];
   requiresMapsLayer?: boolean;
 };
@@ -225,7 +227,7 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/consegne",
     icon: Truck,
     groupKey: "sociale",
-    area: "sociale",
+    area: ["sociale", "logistica"],
     moduloCodiciAll: ["CENTRO_ASCOLTO", "CONSEGNE"],
     permission: "consegne.view",
   },
@@ -243,7 +245,7 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/turni",
     icon: CalendarDays,
     groupKey: "sociale",
-    area: "sociale",
+    area: ["sociale", "logistica"],
     moduloCodice: "CENTRO_ASCOLTO",
     permission: "logistica.turni.view",
   },
@@ -271,7 +273,7 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/emporio/crediti-saldo",
     icon: CreditCard,
     groupKey: "emporio",
-    area: "emporio",
+    area: ["emporio", "sociale", "uds"],
     moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
     permission: "credito.view",
   },
@@ -288,7 +290,7 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/emporio/accessi",
     icon: CalendarClock,
     groupKey: "emporio",
-    area: "emporio",
+    area: ["emporio", "sociale", "uds"],
     moduloCodice: "EMPORIO_SOLIDALE",
     permission: "emporio.access.view",
   },
@@ -389,7 +391,7 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/uds/report-giornaliero",
     icon: CalendarClock,
     groupKey: "uds",
-    area: "analisi",
+    area: "uds",
     moduloCodiciAll: ["UDS", "REPORT"],
     permission: "uds.reports.view",
   },
@@ -400,6 +402,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: UsersRound,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAll: ["LOGISTICA"],
     moduloCodice: "VOLONTARI",
     permission: "logistica.volontari.view",
   },
@@ -409,6 +412,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Car,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAll: ["LOGISTICA"],
     moduloCodice: "MEZZI",
     permission: "logistica.mezzi.view",
   },
@@ -418,15 +422,18 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardCheck,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAll: ["LOGISTICA"],
     moduloCodiciAny: ["VOLONTARI", "MEZZI"],
     permission: "logistica.approvazioni.view",
   },
   {
     key: "fornitori",
+    permission: "fornitori.view",
     url: "/fornitori",
     icon: Store,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAll: ["LOGISTICA"],
     moduloCodice: "FORNITORI",
   },
   {
@@ -435,15 +442,35 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShoppingCart,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAll: ["LOGISTICA"],
     moduloCodice: "APPROVVIGIONAMENTI",
     permission: "approvvigionamenti.view",
+  },
+  {
+    key: "reportLogistica",
+    url: "/report/magazzino-logistica",
+    icon: Warehouse,
+    groupKey: "logistica",
+    area: ["magazzino", "logistica"],
+    anyPermissions: ["magazzino.view", "approvvigionamenti.view", "logistica.mezzi.view", "logistica.volontari.view", "richieste_magazzino.view", ...MENSA_REQUEST_READ_PERMISSIONS],
+    sourceAreas: ["magazzino", "logistica"],
+    moduloCodice: "REPORT",
+    moduloCodiciAny: [
+      "MAGAZZINO_SOLIDALE",
+      "LOTTI",
+      "TRASFERIMENTI",
+      "MEZZI",
+      "VOLONTARI",
+      "FORNITORI",
+      "APPROVVIGIONAMENTI",
+    ],
   },
   {
     key: "maps",
     url: "/maps",
     icon: Map,
     groupKey: "logistica",
-    area: ["sociale", "magazzino"],
+    area: ["sociale", "magazzino", "logistica"],
     permission: "maps.operational",
     requiresMapsLayer: true,
   },
@@ -477,8 +504,9 @@ export const NAV_ITEMS: NavItem[] = [
     key: "reportCentroAscolto",
     url: "/report/centro-ascolto",
     icon: Building2,
-    groupKey: "analisi",
-    area: "analisi",
+    groupKey: "sociale",
+    allPermissions: ["beneficiari.view", "sociale.interventi.view"],
+    area: "sociale",
     sourceAreas: ["sociale"],
     moduloCodiciAll: ["CENTRO_ASCOLTO", "REPORT"],
   },
@@ -486,8 +514,9 @@ export const NAV_ITEMS: NavItem[] = [
     key: "reportEmporio",
     url: "/report/emporio",
     icon: Store,
-    groupKey: "analisi",
-    area: "analisi",
+    groupKey: "emporio",
+    allPermissions: ["emporio.sales.view", "credito.view"],
+    area: "emporio",
     sourceAreas: ["emporio"],
     moduloCodiciAll: ["REPORT", "EMPORIO_SOLIDALE"],
   },
@@ -495,8 +524,8 @@ export const NAV_ITEMS: NavItem[] = [
     key: "reportMensa",
     url: "/report/mensa",
     icon: Soup,
-    groupKey: "analisi",
-    area: "analisi",
+    groupKey: "mensa",
+    area: "mensa",
     sourceAreas: ["mensa"],
     moduloCodiciAll: ["REPORT", "MENSA"],
     permission: "mensa.reports.view",
@@ -505,29 +534,13 @@ export const NAV_ITEMS: NavItem[] = [
     key: "reportUds",
     url: "/report/uds",
     icon: Footprints,
-    groupKey: "analisi",
-    area: "analisi",
+    groupKey: "uds",
+    area: "uds",
     sourceAreas: ["uds"],
     moduloCodiciAll: ["REPORT", "UDS"],
     permission: "uds.reports.view",
   },
-  {
-    key: "reportLogistica",
-    url: "/report/magazzino-logistica",
-    icon: Warehouse,
-    groupKey: "analisi",
-    area: "analisi",
-    sourceAreas: ["magazzino", "logistica"],
-    moduloCodice: "REPORT",
-    moduloCodiciAny: [
-      "MAGAZZINO_SOLIDALE",
-      "LOTTI",
-      "TRASFERIMENTI",
-      "MEZZI",
-      "FORNITORI",
-      "APPROVVIGIONAMENTI",
-    ],
-  },
+
   {
     key: "reportFsePlus",
     url: "/report/fse-plus",
@@ -683,7 +696,7 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
         <span>
           {item.key === "richiesteMagazzino"
             ? t("richiesteMagazzino.title")
-            : item.groupKey === "mensa"
+            : item.groupKey === "mensa" && item.key.startsWith("mensa")
               ? t(`mensa.nav.${item.key}`)
               : t(`nav.items.${item.key}`)}
         </span>
@@ -733,7 +746,8 @@ export function isNavItemEnabledByAccess(
     itemAreas.some(hasArea) &&
     (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
     (!item.permission || hasPermission(item.permission)) &&
-    (!item.anyPermissions || item.anyPermissions.some(hasPermission))
+    (!item.anyPermissions || item.anyPermissions.some(hasPermission)) &&
+    (!item.allPermissions || item.allPermissions.every(hasPermission))
   );
 }
 
@@ -788,6 +802,7 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
     }
     return (
       isNavItemEnabledByAccess(item, hasArea, hasPermission) &&
+      (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, isModuloAttivo)) &&
       isNavItemEnabledByCapabilities(
         item,
         mapsCapabilities?.layers.length ?? 0,

@@ -51,7 +51,7 @@ export default function UdsReportGiornaliero() {
   const { user, hasArea, hasPermission } = useAuth();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canReport =
-    hasArea("analisi") &&
+    hasArea("uds") &&
     hasPermission("uds.reports.view") &&
     isModuloAttivo("UDS") &&
     isModuloAttivo("REPORT");

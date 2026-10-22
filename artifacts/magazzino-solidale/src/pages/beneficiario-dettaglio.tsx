@@ -14,7 +14,8 @@ import {
   getListAccessiEmporioQueryKey,
   useListAccessiEmporio,
   useListCentriAscolto,
-  useListMagazzini,
+  useListMagazziniOperativi,
+  getListMagazziniOperativiQueryKey,
   useUpdateBeneficiario,
   useAddNucleoFamiliare,
   useUpdateNucleoFamiliare,
@@ -1513,7 +1514,7 @@ export function EditBeneficiarioSheet({
     },
   });
   const { data: centri } = useListCentriAscolto();
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "beneficiari" }, { query: { queryKey: getListMagazziniOperativiQueryKey({ contesto: "beneficiari" }), enabled: !udsContext && (user?.isAdmin || user?.aree?.includes("sociale")) } });
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const emporiDisponibili = useMemo(
     () =>

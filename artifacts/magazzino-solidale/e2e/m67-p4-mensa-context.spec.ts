@@ -60,7 +60,7 @@ for (const change of ["Mensa", "Tipo servizio", "Area Operativa"] as const) {
     await page.getByLabel(/username|nome utente/i).fill(actor.username);
     await page.getByLabel(/^password$/i).fill(actor.password);
     await page.getByRole("button", { name: /accedi|login/i }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
     await page.goto("/mensa/postazione");
     if (other) {
       const area = (
@@ -191,7 +191,7 @@ test("C2C: abilitazione motivata dal CdA, seconda Mensa ordinaria e soli stati U
   await page.getByLabel(/username|nome utente/i).fill(actor.username);
   await page.getByLabel(/^password$/i).fill(actor.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const openEdit = async () => {
     await page.goto(`/beneficiari/${person.id}`);
     await page

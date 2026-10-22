@@ -206,7 +206,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     );
   });
 
-  it("separa Report Centro da Report UDS", async () => {
+  it("separa il report stock dal Centro di Ascolto e da UDS", async () => {
     const app = makeScopedApp(reportRouter, {
       id: 0,
       centroAscoltoId: null,
@@ -217,7 +217,7 @@ describe("prerequisiti combinati sulle route reali", () => {
 
     expect(
       (await request(app).get("/report/giacenze-per-magazzino")).status,
-    ).toBe(403);
+    ).toBe(200);
     expect(
       (await request(app).get("/report/uds/interventi-per-mese")).status,
     ).toBe(200);

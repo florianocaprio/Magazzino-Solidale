@@ -17,7 +17,7 @@ import {
   canAccessAreaOperativa,
   andScoped,
 } from "../lib/centroScope";
-import { requireAdmin } from "../middlewares/auth";
+import { requireAdmin, requirePermission } from "../middlewares/auth";
 import { canMutateScopedResource } from "../lib/adminScope";
 import {
   EMPORIO_DISABLED_MSG,
@@ -128,7 +128,7 @@ async function validateMagazzinoAssignment(
   return null;
 }
 
-router.get("/magazzini", async (req, res) => {
+router.get("/magazzini", requirePermission("magazzino.view"), async (req, res) => {
   const rows = await db
     .select({ m: magazziniTable, centroNome: centriAscoltoTable.nome })
     .from(magazziniTable)
@@ -266,7 +266,7 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/magazzini/:id", async (req, res) => {
+router.get("/magazzini/:id", requirePermission("magazzino.view"), async (req, res) => {
   const id = paramId(req.params.id);
   const [row] = await db
     .select()

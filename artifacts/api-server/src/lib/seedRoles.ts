@@ -20,7 +20,9 @@ export const OPERATOR_ROLE_NAME = "Operatore";
 export const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
 
-const SOCIAL_OPERATOR_PERMISSIONS = [
+export const SOCIAL_OPERATOR_PERMISSIONS = [
+  "maps.operational",
+  "maps.route",
   "beneficiari.view",
   "beneficiari.manage",
   "beneficiari.sensitive.view",
@@ -71,13 +73,13 @@ export function defaultSocialOperatorPermissions(
     SOCIAL_OPERATOR_PERMISSIONS,
   );
 }
-const UDS_OPERATOR_PERMISSIONS = [
+export const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
   "beneficiari.manage",
   "beneficiari.duplicates.search",
   ...UDS_PERMISSIONS.map((permission) => permission.key),
 ] as const;
-const EMPORIO_OPERATOR_PERMISSIONS = [
+export const EMPORIO_OPERATOR_PERMISSIONS = [
   "credito.view",
   "emporio.access.view",
   "emporio.access.manage",
@@ -86,13 +88,15 @@ const EMPORIO_OPERATOR_PERMISSIONS = [
   "emporio.sales.view",
   "emporio.sales.manage",
 ] as const;
-const LOGISTICA_OPERATOR_PERMISSIONS = [
+export const LOGISTICA_OPERATOR_PERMISSIONS = [
   "approvvigionamenti.view",
   "approvvigionamenti.manage",
   "approvvigionamenti.receive",
   ...LOGISTICA_PERMISSIONS.map((permission) => permission.key),
+  "fornitori.view",
+  "fornitori.manage",
 ] as const;
-const MAGAZZINO_OPERATOR_PERMISSIONS = [
+export const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
   "richieste_magazzino.view",
   "richieste_magazzino.take",
@@ -190,19 +194,7 @@ export async function ensureSuperAdminRole(): Promise<number> {
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, SUPER_ADMIN_ROLE_NAME));
 
-  if (existing) {
-    await db
-      .update(ruoliTable)
-      .set({
-        descrizione:
-          "Accesso completo a tutte le aree e alla configurazione ambiente",
-        aree: ALL_AREA_KEYS,
-        permessi: adminPermissionsWithExplicitOriginal(existing.permessi ?? []),
-        isAdmin: true,
-      })
-      .where(eq(ruoliTable.id, existing.id));
-    return existing.id;
-  }
+  if (existing) return existing.id;
 
   const [created] = await db
     .insert(ruoliTable)
@@ -219,216 +211,32 @@ export async function ensureSuperAdminRole(): Promise<number> {
   return created.id;
 }
 
-/**
- * Idempotently ensures the default roles exist so first-run setup and
- * environment bootstrap always have stable roles to assign.
- */
+/** Versioned proposals are separate from startup: never overwrite a persisted
+ * role by its name, nor restore an administrator's revoked grants on restart. */
+export const STANDARD_ROLE_PROFILES = [
+  { nome: SUPER_ADMIN_ROLE_NAME, descrizione: "Configurazione ambiente e servizi", aree: ALL_AREA_KEYS, permessi: DEFAULT_ADMIN_PERMISSION_KEYS, isAdmin: true },
+  { nome: ADMIN_ROLE_NAME, descrizione: "Amministrazione dei servizi", aree: ALL_AREA_KEYS, permessi: DEFAULT_ADMIN_PERMISSION_KEYS, isAdmin: true },
+  { nome: OPERATOR_ROLE_NAME, descrizione: "Operatore Centro di Ascolto", aree: ["generale", "sociale"], permessi: [...SOCIAL_OPERATOR_PERMISSIONS], isAdmin: false },
+  { nome: MAGAZZINO_ROLE_NAME, descrizione: "Operatore Magazzino Solidale", aree: ["magazzino"], permessi: [...MAGAZZINO_OPERATOR_PERMISSIONS], isAdmin: false },
+  { nome: LOGISTICA_ROLE_NAME, descrizione: "Operatore Logistica e approvvigionamenti", aree: ["logistica"], permessi: [...LOGISTICA_OPERATOR_PERMISSIONS], isAdmin: false },
+  { nome: UDS_ROLE_NAME, descrizione: "Operatore Unità di Strada", aree: ["uds"], permessi: [...UDS_OPERATOR_PERMISSIONS], isAdmin: false },
+  { nome: EMPORIO_ROLE_NAME, descrizione: "Operatore Emporio Solidale", aree: [EMPORIO_AREA_KEY], permessi: [...EMPORIO_OPERATOR_PERMISSIONS], isAdmin: false },
+  { nome: MENSA_ROLE_NAME, descrizione: "Operatore Mensa", aree: [MENSA_AREA_KEY], permessi: defaultMensaRolePermissions([]), isAdmin: false },
+  { nome: VOLUNTEER_ROLE_NAME, descrizione: "Consultazione turni, consegne dell’Area e mappa operativa", aree: ["logistica"], permessi: ["logistica.turni.view", "consegne.view", "maps.operational", "maps.route"], isAdmin: false },
+];
+
+export const ORDINARY_AREA_PERMISSION_MAP: Record<string, readonly string[]> = {
+  generale: [], amministrazione: [], analisi: [],
+  sociale: SOCIAL_OPERATOR_PERMISSIONS, magazzino: MAGAZZINO_OPERATOR_PERMISSIONS,
+  logistica: LOGISTICA_OPERATOR_PERMISSIONS, uds: UDS_OPERATOR_PERMISSIONS,
+  emporio: EMPORIO_OPERATOR_PERMISSIONS, mensa: defaultMensaRolePermissions([]),
+};
+
 export async function seedRoles(): Promise<void> {
-  await ensureSuperAdminRole();
-
-  const [adminRole] = await db
-    .select({ id: ruoliTable.id })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, ADMIN_ROLE_NAME));
-
-  if (!adminRole) {
-    await db.insert(ruoliTable).values({
-      nome: ADMIN_ROLE_NAME,
-      descrizione: "Accesso completo a tutte le aree e alla gestione utenti",
-      aree: ALL_AREA_KEYS,
-      permessi: DEFAULT_ADMIN_PERMISSION_KEYS,
-      isAdmin: true,
-    });
-    logger.info("Seeded admin role");
-  }
-
-  const [operatorRole] = await db
-    .select({
-      id: ruoliTable.id,
-      aree: ruoliTable.aree,
-      permessi: ruoliTable.permessi,
-    })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, OPERATOR_ROLE_NAME));
-  if (!operatorRole) {
-    await db.insert(ruoliTable).values({
-      nome: OPERATOR_ROLE_NAME,
-      descrizione: "Operatore delle attività generali e sociali",
-      aree: ["generale", "sociale"],
-      permessi: defaultSocialOperatorPermissions([]),
-      isAdmin: false,
-    });
-    logger.info("Seeded operator role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        aree: mergePermissions(operatorRole.aree, ["generale", "sociale"]),
-        permessi: defaultSocialOperatorPermissions(operatorRole.permessi),
-      })
-      .where(eq(ruoliTable.id, operatorRole.id));
-  }
-
-  const [volunteerRole] = await db
-    .select({ id: ruoliTable.id })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, VOLUNTEER_ROLE_NAME));
-  if (!volunteerRole) {
-    await db.insert(ruoliTable).values({
-      nome: VOLUNTEER_ROLE_NAME,
-      descrizione: "Volontario per attività generali e logistiche",
-      aree: ["generale", "logistica"],
-      isAdmin: false,
-    });
-    logger.info("Seeded volunteer role");
-  }
-
-  const [logisticaRole] = await db
-    .select({
-      id: ruoliTable.id,
-      aree: ruoliTable.aree,
-      permessi: ruoliTable.permessi,
-    })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, LOGISTICA_ROLE_NAME));
-  if (!logisticaRole) {
-    await db.insert(ruoliTable).values({
-      nome: LOGISTICA_ROLE_NAME,
-      descrizione: "Operatore degli Approvvigionamenti",
-      aree: ["logistica"],
-      permessi: [...LOGISTICA_OPERATOR_PERMISSIONS],
-      isAdmin: false,
-    });
-    logger.info("Seeded Logistics operator role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        aree: logisticaRole.aree.includes("logistica")
-          ? logisticaRole.aree
-          : [...logisticaRole.aree, "logistica"],
-        permessi: mergePermissions(
-          logisticaRole.permessi,
-          LOGISTICA_OPERATOR_PERMISSIONS,
-        ),
-      })
-      .where(eq(ruoliTable.id, logisticaRole.id));
-  }
-
-  const [magazzinoRole] = await db
-    .select({
-      id: ruoliTable.id,
-      aree: ruoliTable.aree,
-      permessi: ruoliTable.permessi,
-    })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, MAGAZZINO_ROLE_NAME));
-  if (!magazzinoRole) {
-    await db.insert(ruoliTable).values({
-      nome: MAGAZZINO_ROLE_NAME,
-      descrizione: "Operatore del Magazzino Solidale",
-      aree: ["magazzino"],
-      permessi: defaultMagazzinoOperatorPermissions([]),
-      isAdmin: false,
-    });
-    logger.info("Seeded Magazzino operator role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        aree: magazzinoRole.aree.includes("magazzino")
-          ? magazzinoRole.aree
-          : [...magazzinoRole.aree, "magazzino"],
-        permessi: defaultMagazzinoOperatorPermissions(magazzinoRole.permessi),
-      })
-      .where(eq(ruoliTable.id, magazzinoRole.id));
-  }
-
-  // Provide a ready-to-assign "Operatore UDS" role so a street-unit operator can
-  // be created out of the box (admin can still edit/remove it). Idempotent.
-  const [udsRole] = await db
-    .select({ id: ruoliTable.id, permessi: ruoliTable.permessi })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, UDS_ROLE_NAME));
-  if (!udsRole) {
-    await db.insert(ruoliTable).values({
-      nome: UDS_ROLE_NAME,
-      descrizione: "Operatore Unità di Strada: anagrafica e interventi UDS",
-      aree: ["uds"],
-      permessi: [...UDS_OPERATOR_PERMISSIONS],
-      isAdmin: false,
-    });
-    logger.info("Seeded UDS operator role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        permessi: mergePermissions(udsRole.permessi, UDS_OPERATOR_PERMISSIONS),
-      })
-      .where(eq(ruoliTable.id, udsRole.id));
-  }
-
-  // Operational Emporio role. Keep it non-admin and grant only the areas used
-  // by the current Emporio UI/API flows. The generic Sociale area is removed
-  // only from this standard role; differently named custom roles are untouched.
-  const [emporioRole] = await db
-    .select({
-      id: ruoliTable.id,
-      aree: ruoliTable.aree,
-      permessi: ruoliTable.permessi,
-    })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, EMPORIO_ROLE_NAME));
-  if (!emporioRole) {
-    await db.insert(ruoliTable).values({
-      nome: EMPORIO_ROLE_NAME,
-      descrizione: "Operatore Emporio Solidale",
-      aree: ["generale", "magazzino", EMPORIO_AREA_KEY],
-      permessi: [...EMPORIO_OPERATOR_PERMISSIONS],
-      isAdmin: false,
-    });
-    logger.info("Seeded Emporio role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        aree: roleAreasAfterEmporioSeed(EMPORIO_ROLE_NAME, emporioRole.aree),
-        // Il ruolo standard usa le API Emporio minimizzate. I ruoli custom non
-        // vengono toccati e possono ricevere beneficiari.view esplicitamente.
-        permessi: defaultEmporioPermissions(emporioRole.permessi),
-      })
-      .where(eq(ruoliTable.id, emporioRole.id));
-  }
-
-  const defaultMensaPermissions = defaultMensaRolePermissions([]);
-  const [mensaRole] = await db
-    .select({
-      id: ruoliTable.id,
-      aree: ruoliTable.aree,
-      permessi: ruoliTable.permessi,
-    })
-    .from(ruoliTable)
-    .where(eq(ruoliTable.nome, MENSA_ROLE_NAME));
-  if (!mensaRole) {
-    await db.insert(ruoliTable).values({
-      nome: MENSA_ROLE_NAME,
-      descrizione: "Operatore del servizio Mensa",
-      aree: [MENSA_AREA_KEY],
-      permessi: defaultMensaPermissions,
-      isAdmin: false,
-    });
-    logger.info("Seeded Mensa operator role");
-  } else {
-    await db
-      .update(ruoliTable)
-      .set({
-        aree: mensaRole.aree.includes(MENSA_AREA_KEY)
-          ? mensaRole.aree
-          : [...mensaRole.aree, MENSA_AREA_KEY],
-        // Soltanto il ruolo standard viene riallineato: i ruoli custom restano
-        // invariati e possono ricevere esplicitamente override/reopen/dispatch.
-        permessi: defaultMensaRolePermissions(mensaRole.permessi),
-      })
-      .where(eq(ruoliTable.id, mensaRole.id));
+  for (const profile of STANDARD_ROLE_PROFILES) {
+    const [existing] = await db.select({ id: ruoliTable.id }).from(ruoliTable).where(eq(ruoliTable.nome, profile.nome));
+    if (existing) continue;
+    await db.insert(ruoliTable).values({ ...profile, aree: [...profile.aree], permessi: [...profile.permessi] }).onConflictDoNothing();
+    logger.info({ role: profile.nome }, "Created missing standard role; existing roles preserved");
   }
 }

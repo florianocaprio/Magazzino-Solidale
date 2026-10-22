@@ -16,7 +16,10 @@ import {
 import { callerAreaOperativaId } from "../lib/centroScope";
 import { requirePermission } from "../middlewares/auth";
 
+import { requireModulo } from "../lib/featureFlags";
+
 const router: IRouter = Router();
+router.use("/lotti-logici", requireModulo("LOTTI"));
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 class LogicalLotRouteError extends Error {
@@ -203,6 +206,7 @@ router.get(
 
 router.post(
   "/lotti-logici",
+  requireModulo("CARICHI"),
   requirePermission("magazzino.stock.receive"),
   async (req, res) => {
     try {
@@ -276,6 +280,7 @@ router.post(
 
 router.patch(
   "/lotti-logici/:id",
+  requireModulo("CARICHI"),
   requirePermission("magazzino.stock.receive"),
   async (req, res) => {
     try {
@@ -439,7 +444,8 @@ async function transition(
 for (const action of ["chiudi", "riapri", "archivia"] as const) {
   router.post(
     `/lotti-logici/:id/${action}`,
-    requirePermission("magazzino.stock.receive"),
+    requireModulo("CARICHI"),
+  requirePermission("magazzino.stock.receive"),
     async (req, res) => {
       try {
         const row = await transition(

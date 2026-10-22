@@ -539,7 +539,7 @@ describe("UDS hardening territoriale e storico", () => {
           "/report/uds",
         )
       ).status,
-    ).toBe(403);
+    ).toBe(200);
     expect(
       (
         await request(

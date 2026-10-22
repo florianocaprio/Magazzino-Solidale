@@ -38,7 +38,7 @@ async function login(
   await page.getByLabel(/username|nome utente/i).fill(account.username);
   await page.getByLabel(/^password$/i).fill(account.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 
 test("M67-04..07 Area URL/back/forward and exact keyboard scanner beyond 51/101", async ({

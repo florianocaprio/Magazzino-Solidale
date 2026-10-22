@@ -8,11 +8,13 @@ import {
   areaOperativaScopeFilter,
   canAccessAreaOperativa,
 } from "../lib/centroScope";
+import { requirePermission } from "../middlewares/auth";
 import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
 
-router.use("/fornitori", requireModulo("FORNITORI"));
+router.use("/fornitori", requireModulo("FORNITORI"), (req, res, next) =>
+  requirePermission(req.method === "GET" || req.method === "HEAD" ? "fornitori.view" : "fornitori.manage")(req, res, next));
 
 const FORNITORE_FIELDS = new Set([
   "nome", "tipo", "partitaIva", "codiceFiscale", "indirizzo", "comune",

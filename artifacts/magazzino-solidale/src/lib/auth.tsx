@@ -1,7 +1,11 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, Fragment, type ReactNode } from "react";
+import { useLocation } from "wouter";
+import { authorizationSignature, isIdentityQuery } from "./auth-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCurrentUser,
+  useGetConfigurazioneAmbientePubblica,
+  getGetConfigurazioneAmbientePubblicaQueryKey,
   getGetCurrentUserQueryKey,
   useGetBootstrapStatus,
   getGetBootstrapStatusQueryKey,
@@ -65,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     query: {
       queryKey: CURRENT_USER_KEY,
       retry: false,
-      staleTime: 5 * 60 * 1000,
+      staleTime: 0,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: "always",
+      refetchOnReconnect: "always",
     },
   });
   const { data: bootstrapData, isLoading: bootstrapLoading } =
@@ -80,6 +87,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = isError ? null : (data ?? null);
   const bootstrap = bootstrapData?.bootstrap ?? false;
+  const environment = useGetConfigurazioneAmbientePubblica({ query: {
+    queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(), enabled: !!user, staleTime: 30_000, refetchInterval: 30_000, refetchOnWindowFocus: "always", retry: false, retryOnMount: false,
+  } });
+  const signature = JSON.stringify([authorizationSignature(user), environment.isError || !environment.data ? "unavailable" : [...environment.data.moduliAttivi].sort()]);
+  const [settledScope, setSettledScope] = useState<string | null>(null);
+  const [location] = useLocation();
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY });
+  }, [location, queryClient]);
+  useLayoutEffect(() => {
+    let current = true;
+    // Hide the old scope until in-flight reads are cancelled and its cached
+    // payloads removed. A keyed subtree also discards drafts and local details.
+    void queryClient.cancelQueries({ predicate: (query) => !isIdentityQuery(query.queryKey) }).then(() => {
+      if (!current) return;
+      queryClient.removeQueries({ predicate: (query) => !isIdentityQuery(query.queryKey) });
+      queryClient.getMutationCache().clear();
+      setSettledScope(signature);
+    });
+    return () => { current = false; };
+  }, [signature, queryClient]);
 
   const hasArea = (area: string): boolean => {
     return authUserHasArea(user, area);
@@ -116,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isLoading,
+        isLoading: isLoading || settledScope !== signature,
         bootstrap,
         bootstrapLoading,
         refreshBootstrap,
@@ -127,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
       }}
     >
-      {children}
+      <Fragment key={signature}>{children}</Fragment>
     </AuthContext.Provider>
   );
 }

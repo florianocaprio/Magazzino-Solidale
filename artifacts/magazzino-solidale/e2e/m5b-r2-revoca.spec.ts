@@ -12,7 +12,7 @@ async function loginAs(page: Page, username: string) {
   await page.getByLabel(/username|nome utente/i).fill(username);
   await page.getByLabel(/^password$/i).fill(password!);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 
 test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono richiesta o documento", async ({
@@ -108,7 +108,8 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     expect(deniedDetail.status()).toBe(403);
     expect(await deniedDetail.json()).toMatchObject({
       code: "RICHIESTE_MAGAZZINO_FORBIDDEN",
-      error: "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
+      error:
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
     });
     const deniedDocument = await warehousePage.request.get(
       `/api/bolle/${document.documentoId}`,
@@ -132,15 +133,12 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     expect(JSON.stringify(deniedBody)).not.toContain(need);
     expect(JSON.stringify(deniedBody)).not.toContain("TEST-M5B-B1");
 
-    const refreshedDenial = warehousePage.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname ===
-          `/api/richieste-magazzino/${request.id}` && r.status() === 403,
-    );
     await warehousePage.reload();
-    await refreshedDenial;
-    // The current Sheet closes and purges the inaccessible deep-link/cache.
-    // Verify the canonical denial and protected content, not the old inline panel.
+    // BUG6 blocks the entire private subtree before its document queries mount.
+    // The direct API denials above remain mandatory, as do URL/cache cleanup.
+    await expect(warehousePage.getByRole("alert")).toContainText(
+      "Area Operativa non assegnata",
+    );
     await expect(warehousePage.getByTestId("richiesta-sheet")).toHaveCount(0);
     await expect(warehousePage).not.toHaveURL(/richiestaId=/);
     await expect(warehousePage.getByText(need)).toHaveCount(0);
@@ -149,20 +147,31 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     await expect(
       warehousePage.getByRole("button", { name: new RegExp(request.codice) }),
     ).toHaveCount(0);
-    const directDenial = warehousePage.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname ===
-          `/api/richieste-magazzino/${request.id}` && r.status() === 403,
-    );
+    const privateReads: string[] = [];
+    warehousePage.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (
+        path === `/api/richieste-magazzino/${request.id}` ||
+        path === `/api/bolle/${document.documentoId}`
+      )
+        privateReads.push(path);
+    });
     await warehousePage.goto(`/richieste-magazzino?richiestaId=${request.id}`);
-    await directDenial;
+    await expect(warehousePage.getByRole("alert")).toContainText(
+      "Area Operativa non assegnata",
+    );
     await expect(warehousePage.getByTestId("richiesta-sheet")).toHaveCount(0);
     await expect(warehousePage).not.toHaveURL(/richiestaId=/);
     await expect(warehousePage.getByText(need)).toHaveCount(0);
     await warehousePage.goto(`/bolle?bollaId=${document.documentoId}`);
+    await expect(warehousePage.getByRole("alert")).toContainText(
+      "Area Operativa non assegnata",
+    );
+    await expect(warehousePage).not.toHaveURL(/bollaId=/);
     await expect(
       warehousePage.getByRole("button", { name: /scarica pdf/i }),
     ).toHaveCount(0);
+    expect(privateReads).toEqual([]);
     expect(pageErrors).toEqual([]);
   } finally {
     if (adminPage && warehouseUserId && areaId) {

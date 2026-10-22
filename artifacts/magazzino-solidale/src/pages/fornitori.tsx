@@ -43,7 +43,8 @@ const formSchema = z.object({
 
 export default function Fornitori() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canManage = hasPermission("fornitori.manage");
   const lockedAreaOperativaId = user?.areaOperativaId ?? null;
   const isAreaOperativaLocked = lockedAreaOperativaId != null;
   const isGlobal = !isAreaOperativaLocked;
@@ -170,10 +171,10 @@ export default function Fornitori() {
             filename="fornitori"
             title={t("fornitori.exportTitle")}
           />
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+          <Button disabled={!canManage} variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
           </Button>
-          <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("fornitori.newFornitore")}</Button>
+          <Button disabled={!canManage} onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("fornitori.newFornitore")}</Button>
         </div>
       </div>
 
@@ -298,7 +299,7 @@ export default function Fornitori() {
                   </TableCell>
                   <TableCell className="text-sm">{f.referente || "-"}</TableCell>
                   <TableCell>
-                    {(globalAdmin || f.areaOperativaId != null) && <DropdownMenu>
+                    {canManage && (globalAdmin || f.areaOperativaId != null) && <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(f)}><Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}</DropdownMenuItem>

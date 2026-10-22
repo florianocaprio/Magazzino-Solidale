@@ -179,9 +179,9 @@ describe("permission gate della navigazione operativa", () => {
     ).toBe("mensa.consumption.manage");
   });
 
-  it("mostra Turni solo con Area Sociale e permesso dedicato", () => {
+  it("mostra Turni a Sociale o Logistica solo col permesso dedicato", () => {
     const item = NAV_ITEMS.find((candidate) => candidate.key === "turni")!;
-    expect(item.area).toBe("sociale");
+    expect(item.area).toEqual(["sociale", "logistica"]);
     expect(
       isNavItemEnabledByAccess(
         item,

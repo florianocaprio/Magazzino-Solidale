@@ -18,6 +18,9 @@ export async function invalidateLogisticaResources(
   id?: number,
 ) {
   const keys: readonly unknown[][] = [
+    ["/api/operativita/volontari"],
+    ["/api/operativita/mezzi"],
+    ["/api/operativita/carico-volontari"],
     [...getListApprovazioniLogisticaQueryKey()],
     [...getListTurniQueryKey()],
     [...getListMezziQueryKey()], // A volunteer's Centre also scopes their personal vehicle.

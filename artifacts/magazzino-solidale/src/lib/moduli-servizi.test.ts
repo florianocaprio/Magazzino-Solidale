@@ -130,8 +130,9 @@ describe("moduli-servizio e navigazione", () => {
 
   it("mostra Approvazioni Logistica con almeno uno tra Volontari e Mezzi", () => {
     expect(enabledKeys([])).not.toContain("approvazioniLogistica");
-    expect(enabledKeys(["VOLONTARI"])).toContain("approvazioniLogistica");
-    expect(enabledKeys(["MEZZI"])).toContain("approvazioniLogistica");
+    expect(enabledKeys(["LOGISTICA", "VOLONTARI"])).toContain("approvazioniLogistica");
+    expect(enabledKeys(["VOLONTARI"])).not.toContain("approvazioniLogistica");
+    expect(enabledKeys(["LOGISTICA", "MEZZI"])).toContain("approvazioniLogistica");
   });
 
   it("mantiene Impostazioni Stampa indipendente dai moduli Bolle e Magazzino", () => {

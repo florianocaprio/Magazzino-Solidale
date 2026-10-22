@@ -33,15 +33,19 @@ const prodotto = {
 
 vi.mock("@workspace/api-client-react", () => ({
   useListProdotti: () => ({ data: [prodotto], isLoading: false }),
+useListProdottiOperativi: () => ({ data: [prodotto], isLoading: false }),
   useCreateProdotto: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateProdotto: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteProdotto: () => ({ mutate: vi.fn(), isPending: false }),
   useListMagazzini: () => ({ data: [] }),
+useListMagazziniOperativi: () => ({ data: [] }),
   useListLotti: () => ({ data: [], isLoading: false }),
   useListFornitori: () => ({ data: [] }),
+useListFornitoriOperativi: () => ({ data: [] }),
   useBulkProdotti: () => ({ mutateAsync: vi.fn() }),
   useCreateLotto: () => ({ mutate: vi.fn(), isPending: false }),
   getListProdottiQueryKey: () => ["prodotti"],
+getListProdottiOperativiQueryKey: () => ["prodotti"],
   getListGiacenzeQueryKey: () => ["giacenze"],
   getListLottiQueryKey: () => ["lotti"],
   getListMovimentiQueryKey: () => ["movimenti"],
@@ -58,6 +62,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/use-moduli", () => ({
+  useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }),
   EMPORIO_DISABLED_MESSAGE: "Emporio disabilitato",
   useModuloFlags: () => ({ emporioAbilitato: false }),
 }));

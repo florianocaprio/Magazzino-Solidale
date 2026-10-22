@@ -52,7 +52,7 @@ for (const role of ["requester", "manager", "reporter", "mixed"] as const) {
     await page.getByLabel(/username|nome utente/i).fill(f.users[role].username);
     await page.getByLabel(/^password$/i).fill(f.users[role].password);
     await page.getByRole("button", { name: /accedi|login/i }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
     await openSidebar(page);
     const group = page.locator('[data-slot="sidebar-group"]').filter({
       has: page
@@ -124,7 +124,7 @@ test("M67-03 warehouse page revalidates cached rows after same-session territory
   await page.getByLabel(/username|nome utente/i).fill(f.users.mixed.username);
   await page.getByLabel(/^password$/i).fill(f.users.mixed.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   await page.goto("/movimenti");
   await expect(
     page.getByRole("cell", { name: product, exact: true }),
@@ -181,7 +181,7 @@ test("M67-03 warehouse page revalidates cached rows after same-session territory
     page.getByRole("cell", { name: product, exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole("alert")).toContainText(
-    "Accesso negato o sessione scaduta. I dati precedenti non sono consultabili.",
+    "Accesso non più autorizzato: Area Operativa non assegnata.",
   );
 });
 
@@ -269,7 +269,7 @@ test("M67-10/12 receive-only navigation, exact request beyond page one, report r
     .fill(f.users.receiver.username);
   await page.getByLabel(/^password$/i).fill(f.users.receiver.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   // Open via the actual sidebar, not just a manually constructed URL.
   await openSidebar(page);
   const group = page.locator('[data-slot="sidebar-group"]').filter({

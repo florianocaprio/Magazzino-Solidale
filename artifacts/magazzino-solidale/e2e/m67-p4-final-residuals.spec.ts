@@ -55,7 +55,7 @@ test("M67-32: real logistics session edits its calendar slot, rejects stale vers
     .fill(f.users.requester.username);
   await page.getByLabel(/^password$/i).fill(f.users.requester.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const today = dataCivileEuropeRome();
   const payload = {
     centroAscoltoId: centre.id,
@@ -223,7 +223,7 @@ test("M67-34: all sixteen layer combinations use real scoped APIs, then revoke d
     .fill(f.users.requester.username);
   await page.getByLabel(/^password$/i).fill(f.users.requester.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const layers = [
     ["Interventi sociali pianificati", "sociale/interventi", intervention],
     ["Consegne pacchi", "pacchi/consegne", delivery],

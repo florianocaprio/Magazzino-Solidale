@@ -1,15 +1,17 @@
+import type { Ruolo } from "@workspace/api-client-react";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  roles: [] as Ruolo[],
   create: vi.fn(),
   update: vi.fn(),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getListRuoliQueryKey: () => ["ruoli"],
-  useListRuoli: () => ({ data: [], isLoading: false }),
+  useListRuoli: () => ({ data: mocks.roles, isLoading: false }),
   useListAree: () => ({
     data: [
       { key: "generale", label: "Generale", permessi: [] },
@@ -43,6 +45,14 @@ vi.mock("@workspace/api-client-react", () => ({
   useCreateRuolo: () => ({ mutate: mocks.create, isPending: false }),
   useUpdateRuolo: () => ({ mutate: mocks.update, isPending: false }),
   useDeleteRuolo: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// Exercise the role form and its actions; menu portal mechanics are tested separately.
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => <button disabled={disabled} onClick={onClick}>{children}</button>,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -94,6 +104,7 @@ describe("pagina Ruoli: suggerimenti Area -> permessi", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.roles = [];
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -138,6 +149,8 @@ describe("pagina Ruoli: suggerimenti Area -> permessi", () => {
 
     const sociale = document.querySelector<HTMLButtonElement>("#area-sociale")!;
     await act(async () => sociale.click());
+    await act(async () => magazzino.click());
+    expect(magazzino.dataset.state).toBe("checked"); // complete the partial ordinary selection
     await act(async () => magazzino.click());
 
     expect(magazzino.dataset.state).toBe("unchecked");
@@ -188,4 +201,26 @@ describe("pagina Ruoli: suggerimenti Area -> permessi", () => {
       },
     });
   });
+  it("apre e salva un ruolo senza cambiare aree, ordine dei grant o chiavi persistite sconosciute", async () => {
+    const role = { id: 91, nome: " Custom ", descrizione: " Note conservate ", aree: ["sociale", "legacy.area"], permessi: ["legacy.grant", "bolle.view"], isAdmin: false, dataCreazione: "2026-10-22" };
+    mocks.roles = [role];
+    await act(async () => root.render(<Ruoli />));
+    await act(async () => buttonByText("common.edit").click());
+    await act(async () => buttonByText("ruoli.saveChanges").click());
+    expect(mocks.update.mock.calls[0][0]).toEqual({ id: 91, data: {
+      nome: role.nome, descrizione: role.descrizione, aree: role.aree, permessi: role.permessi, isAdmin: false,
+    } });
+  });
+
+  it("crea una copia personalizzata senza aggiornare il ruolo originale", async () => {
+    const role = { id: 92, nome: "Operatore", descrizione: null, aree: ["sociale"], permessi: ["bolle.view"], isAdmin: false, dataCreazione: "2026-10-22" };
+    mocks.roles = [role];
+    await act(async () => root.render(<Ruoli />));
+    await act(async () => buttonByText("Crea ruolo personalizzato da questo").click());
+    await act(async () => buttonByText("ruoli.createRole").click());
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.create.mock.calls[0][0].data).toMatchObject({ nome: "Operatore - copia", aree: role.aree, permessi: role.permessi, isAdmin: false });
+    expect(role.nome).toBe("Operatore");
+  });
+
 });

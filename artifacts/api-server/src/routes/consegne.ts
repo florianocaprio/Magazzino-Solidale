@@ -81,6 +81,7 @@ import {
   beneficiarioAccessScopeFromRequest,
   isBeneficiarioActive,
 } from "../lib/beneficiarioPolicy";
+import { buildDettaglio, canAccessBollaOperativa } from "./bolle";
 import { requirePermission } from "../middlewares/auth";
 import { requireWarehouseReadScope } from "../middlewares/warehouseReadScope";
 import { operationalStatesForRows } from "../lib/volontariOperational";
@@ -364,7 +365,16 @@ async function bollePerConsegne(
     .where(
       and(
         inArray(bolleTable.consegnaId, consegnaIds),
-        m5bLinkedM4ListScope(actor, "bolla", bolleTable.id),
+        or(
+          m5bLinkedM4ListScope(actor, "bolla", bolleTable.id),
+          // Delivery readers may see transport metadata without acquiring the
+          // request dossier. The caller already scoped these delivery IDs.
+          and(
+            actor.isAdmin || (actor.aree.some((area) => ["sociale", "logistica"].includes(area)) && actor.permessi.includes("consegne.view")) ? sql`true` : sql`false`,
+            inArray(bolleTable.stato, ["confermato", "in_trasporto", "consegnato"]),
+            sql`exists (select 1 from consegne transport where transport.id = ${bolleTable.consegnaId} and transport.beneficiario_id = ${bolleTable.beneficiarioId} and transport.magazzino_id = ${bolleTable.magazzinoId})`,
+          ),
+        ),
       ),
     );
   for (const r of rows) {
@@ -1138,6 +1148,49 @@ router.post(
       if (handlePlanningError(error, res)) return;
       throw error;
     }
+  },
+);
+
+/** Transport projection only: never grants the Bolla archive or commands. */
+router.get(
+  "/consegne/:id/bolla-trasporto",
+  requirePermission("consegne.view"),
+  requireAllModuli(["MAGAZZINO_SOLIDALE", "BOLLE"]),
+  async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, private");
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) { res.status(400).json({ error: "Consegna non valida" }); return; }
+    const [delivery] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
+    if (!delivery || delivery.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Consegna non trovata" }); return; }
+    if (!(await canAccessConsegna(req, delivery))) { res.status(403).json({ error: "Consegna non accessibile per la tua Area" }); return; }
+    const [linked] = await db.select({ id: bolleTable.id }).from(bolleTable).where(and(
+      eq(bolleTable.consegnaId, delivery.id), eq(bolleTable.beneficiarioId, delivery.beneficiarioId),
+      eq(bolleTable.magazzinoId, delivery.magazzinoId),
+      inArray(bolleTable.stato, ["confermato", "in_trasporto", "consegnato"]),
+    )).orderBy(desc(bolleTable.id)).limit(1);
+    if (!linked) { res.status(404).json({ error: "Nessuna bolla di trasporto emessa per questa consegna" }); return; }
+    const detail = await buildDettaglio(linked.id);
+    if (!detail || !(await canAccessBollaOperativa(detail, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
+      res.status(403).json({ error: "Bolla di trasporto non accessibile" }); return;
+    }
+    // Only fields used by the transport PDF: no notes, audit, financial dossier
+    // or receipt/reversal metadata. Reuse the existing PDF DTO and renderer.
+    res.json({
+      id: detail.id, numeroBolla: detail.numeroBolla, dataBolla: detail.dataBolla,
+      tipoDestinatario: detail.tipoDestinatario, beneficiarioId: detail.beneficiarioId,
+      beneficiarioNome: detail.beneficiarioNome, beneficiarioFascicolo: detail.beneficiarioFascicolo,
+      beneficiarioIndirizzo: detail.beneficiarioIndirizzo, beneficiarioTelefono: detail.beneficiarioTelefono,
+      destinatarioSnapshotCongelato: detail.destinatarioSnapshotCongelato,
+      consegnaId: delivery.id, magazzinoId: detail.magazzinoId, magazzinoNome: detail.magazzinoNome,
+      magazzinoIndirizzo: detail.magazzinoIndirizzo, magazzinoComune: detail.magazzinoComune,
+      indirizzoConsegna: detail.indirizzoConsegna, volontarioNome: detail.volontarioNome,
+      trasportatoreNome: detail.trasportatoreNome, operatoreCodice: detail.operatoreCodice,
+      stato: detail.stato, confermaRicezione: detail.confermaRicezione,
+      versione: detail.versione, dataCreazione: detail.dataCreazione,
+      righe: detail.righe.map(({ id, bollaId, prodottoId, prodottoNome, lottoId, codiceLotto, fondoOrigine, ripartizioniLotto, fsePlus, quantita, unitaMisura }) => ({
+        id, bollaId, prodottoId, prodottoNome, lottoId, codiceLotto, fondoOrigine, ripartizioniLotto, fsePlus, quantita, unitaMisura,
+      })),
+    });
   },
 );
 

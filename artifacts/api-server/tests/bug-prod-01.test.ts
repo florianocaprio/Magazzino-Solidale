@@ -166,11 +166,11 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
   it("1. il catalogo aree accessibili contiene EMPORIO", async () => {
     const response = await superAgent.get("/api/aree");
     expect(response.status).toBe(200);
-    expect(response.body).toContainEqual({
+    expect(response.body).toContainEqual(expect.objectContaining({
       key: EMPORIO_AREA_KEY,
       label: "Emporio",
       permessi: [...AREA_PERMISSION_MAP.emporio],
-    });
+    }));
   });
 
   it("2. crea un ruolo con area EMPORIO", async () => {

@@ -1,3 +1,4 @@
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { cn } from "@/lib/utils";
 import { ProducerLotLookup } from "@/components/producer-lot-lookup";
 import i18nInstance from "@/lib/i18n";
@@ -18,7 +19,7 @@ import {
   useListAreeOperative,
   useListCaricoPratiche,
   useListLottiLogici,
-  useListFornitori,
+  useListFornitoriOperativi,
   useListMagazzini,
   useListProdotti,
   useRegisterCaricoPratica,
@@ -259,7 +260,7 @@ function CarichiContent() {
   const { data: areas = [] } = useListAreeOperative();
   const { data: warehouses = [] } = useListMagazzini();
   const { data: products = [] } = useListProdotti();
-  const { data: suppliers = [] } = useListFornitori();
+  const { data: suppliers = [] } = useListFornitoriOperativi({ contesto: "magazzino" });
   const selectedAreaId = header.areaOperativaId
     ? Number(header.areaOperativaId)
     : null;
@@ -2442,7 +2443,9 @@ function CarichiContent() {
 }
 
 export default function CaricoMerce() {
-  const active = parseCaricoMerceTab(useSearch());
+  const requested = parseCaricoMerceTab(useSearch());
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const active = requested !== "lotti" && !isModuloAttivo("CARICHI") ? "lotti" : requested;
   return (
     <div>
       <CaricoMerceTabs active={active} />

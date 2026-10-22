@@ -8,6 +8,288 @@
 import * as zod from "zod";
 
 /**
+ * @summary Carico per volontario nella stessa data e fascia canonica
+ */
+export const GetCaricoVolontariOperativoQueryParams = zod.object({
+  contesto: zod.enum(["consegne", "turni"]),
+  data: zod.coerce.string().describe("Data del turno (YYYY-MM-DD)"),
+  excludeConsegnaId: zod.coerce.number().optional(),
+  fascia: zod.enum(["09-13", "14-18", "18-20"]),
+});
+
+export const GetCaricoVolontariOperativoResponseItem = zod.object({
+  volontarioId: zod.number(),
+  count: zod.number(),
+});
+export const GetCaricoVolontariOperativoResponse = zod.array(
+  GetCaricoVolontariOperativoResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListMagazziniOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const ListMagazziniOperativiResponseItem = zod
+  .object({
+    id: zod.number(),
+    nome: zod.string().min(1),
+    areaOperativaId: zod.number(),
+    centroAscoltoId: zod.number().nullable(),
+    stato: zod.string(),
+    tipoMagazzino: zod.enum(["logistico", "emporio", "misto", "mensa"]),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListMagazziniOperativiResponse = zod.array(
+  ListMagazziniOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListFornitoriOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const ListFornitoriOperativiResponseItem = zod
+  .object({
+    id: zod.number(),
+    nome: zod.string(),
+    tipo: zod.string(),
+    areaOperativaId: zod.number().nullable(),
+    attivo: zod.boolean(),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListFornitoriOperativiResponse = zod.array(
+  ListFornitoriOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListProdottiOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const ListProdottiOperativiResponseItem = zod
+  .object({
+    lottoFisicoObbligatorio: zod.boolean(),
+    id: zod.number(),
+    nome: zod.string(),
+    codice: zod.string(),
+    unitaMisura: zod.string(),
+    attivo: zod.boolean(),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListProdottiOperativiResponse = zod.array(
+  ListProdottiOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListVolontariOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+  dataRiferimento: zod.date().optional(),
+  stato: zod.enum(["attivi", "non_attivi", "tutti"]).optional(),
+});
+
+export const listVolontariOperativiResponseMaxConsegneTurnoMin = 0;
+
+export const ListVolontariOperativiResponseItem = zod
+  .object({
+    id: zod.number(),
+    nome: zod.string(),
+    cognome: zod.string(),
+    matricola: zod.string().nullable(),
+    areaOperativaId: zod.number().nullable(),
+    centroAscoltoId: zod.number().nullable(),
+    centroAscoltoNome: zod.string().nullable(),
+    tipoVolontario: zod.enum(["PERMANENTE", "TEMPORANEO"]),
+    ruolo: zod.string(),
+    ruoloVolontarioId: zod.number().nullable(),
+    patente: zod.boolean(),
+    mezzoPersonale: zod.boolean(),
+    maxConsegneTurno: zod
+      .number()
+      .min(listVolontariOperativiResponseMaxConsegneTurnoMin),
+    attivo: zod
+      .boolean()
+      .describe(
+        "Abilitazione amministrativa\/manuale; non equivale allo stato operativo.",
+      ),
+    statoApprovazione: zod.enum(["in_attesa", "approvato", "respinto"]),
+    operativo: zod.boolean(),
+    motivoNonOperativo: zod.string().nullable(),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListVolontariOperativiResponse = zod.array(
+  ListVolontariOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListMezziOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const ListMezziOperativiResponseItem = zod
+  .object({
+    id: zod.number(),
+    codice: zod.string(),
+    tipo: zod.string(),
+    targa: zod.string().nullable(),
+    volontarioId: zod.number().nullable(),
+    centroAscoltoId: zod.number().nullable(),
+    areaOperativaId: zod.number().nullable(),
+    effectiveCentroId: zod.number().nullable(),
+    stato: zod.enum([
+      "disponibile",
+      "non_disponibile",
+      "manutenzione",
+      "respinto",
+      "ritirato",
+    ]),
+    statoApprovazione: zod.enum(["in_attesa", "approvato", "respinto"]),
+    scadenzaAssicurazione: zod.string().nullable(),
+    scadenzaRevisione: zod.string().nullable(),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListMezziOperativiResponse = zod.array(
+  ListMezziOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const ListRuoliVolontariOperativiQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const ListRuoliVolontariOperativiResponseItem = zod
+  .object({
+    id: zod.number(),
+    nome: zod.string(),
+    attivo: zod.boolean(),
+  })
+  .describe(
+    "Proiezione minima di selezione operativa; non autorizza il dossier o la gestione della risorsa.",
+  );
+export const ListRuoliVolontariOperativiResponse = zod.array(
+  ListRuoliVolontariOperativiResponseItem,
+);
+
+/**
+ * @summary Lettura minima per un workflow autorizzato
+ */
+
+export const GetStampaOperativaQueryParams = zod.object({
+  contesto: zod.enum([
+    "consegne",
+    "turni",
+    "magazzino",
+    "approvvigionamenti",
+    "documenti",
+    "richieste",
+    "beneficiari",
+    "emporio",
+  ]),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const GetStampaOperativaResponse = zod.object({
+  templateBolla: zod.enum(["standard", "moderno", "minimal"]),
+  footerBolla: zod.string().nullish(),
+  dataAggiornamento: zod.string().optional(),
+});
+
+/**
  * @summary Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
  */
 
@@ -13088,6 +13370,108 @@ export const DeleteConsegnaParams = zod.object({
 });
 
 /**
+ * Richiede consegne.view, moduli del servizio e della Bolla e accesso alla consegna e al documento nella stessa Area. Non concede accesso all'archivio Bolle o ai comandi.
+ * @summary Bolla emessa collegata alla consegna, in sola lettura per il download
+ */
+
+export const GetBollaTrasportoConsegnaParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBollaTrasportoConsegnaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
+  id: zod.number(),
+  numeroBolla: zod.string(),
+  dataBolla: zod.string(),
+  tipoDestinatario: zod.enum(["beneficiario", "ente"]),
+  beneficiarioId: zod.number().nullish(),
+  beneficiarioNome: zod.string().nullish(),
+  enteDestinatarioId: zod.number().nullish(),
+  enteDestinatarioNome: zod.string().nullish(),
+  enteDestinatarioIndirizzo: zod.string().nullish(),
+  enteDestinatarioTelefono: zod.string().nullish(),
+  enteDestinatarioEmail: zod.string().nullish(),
+  destinatarioSnapshotCongelato: zod.boolean(),
+  destinatarioSnapshotFonte: zod
+    .union([
+      zod.literal("confermato"),
+      zod.literal("legacy_live"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  consegnaId: zod.number().nullish(),
+  consegnaDataPrevista: zod.coerce.date().nullish(),
+  consegnaFasciaOraria: zod.string().nullish(),
+  consegnaVolontarioNome: zod.string().nullish(),
+  daPianificazione: zod.boolean().optional(),
+  magazzinoId: zod.number(),
+  magazzinoNome: zod.string().nullish(),
+  indirizzoConsegna: zod.string().nullish(),
+  volontarioConsegnaId: zod.number().nullish(),
+  volontarioNome: zod.string().nullish(),
+  magazzinoIndirizzo: zod.string().nullish(),
+  magazzinoComune: zod.string().nullish(),
+  beneficiarioIndirizzo: zod.string().nullish(),
+  beneficiarioTelefono: zod.string().nullish(),
+  trasportatoreNome: zod.string().nullish(),
+  mezzoId: zod.number().nullish(),
+  mezzoAltro: zod.boolean().optional(),
+  stato: zod.string(),
+  noteConsegna: zod.string().nullish(),
+  confermaRicezione: zod.boolean(),
+  noteRicezione: zod.string().nullish(),
+  ritiroNonEffettuatoAt: zod.coerce.date().nullish(),
+  ritiroNonEffettuatoOperatoreId: zod.number().nullish(),
+  ritiroNonEffettuatoMotivo: zod.string().nullish(),
+  operatoreId: zod.number().nullish(),
+  operatoreCodice: zod.string().nullish(),
+  motivoAnnullamento: zod.string().nullish(),
+  motivoMancataConsegna: zod.string().nullish(),
+  versione: zod.number().min(1),
+  dataCreazione: zod.string(),
+  righe: zod.array(
+    zod.object({
+      id: zod.number(),
+      bollaId: zod.number(),
+      prodottoId: zod.number(),
+      prodottoNome: zod.string().nullish(),
+      lottoId: zod.number().nullish(),
+      codiceLotto: zod.string().nullish(),
+      fondoOrigine: zod.string().nullish(),
+      ripartizioniLotto: zod.array(
+        zod.object({
+          lottoId: zod.number().nullable(),
+          codiceLotto: zod.string().nullable(),
+          fondoOrigine: zod.string(),
+          quantita: zod.number(),
+        }),
+      ),
+      fsePlus: zod.boolean(),
+      fsePlusQuantita: zod.number().optional(),
+      nonFsePlusQuantita: zod.number().optional(),
+      quantitaLorda: zod
+        .number()
+        .optional()
+        .describe(
+          "Quantità distribuita prima degli storni, dal ledger canonico",
+        ),
+      quantitaStornata: zod
+        .number()
+        .optional()
+        .describe("Quantità complessivamente stornata"),
+      quantitaNetta: zod
+        .number()
+        .optional()
+        .describe("Quantità distribuita netta dopo gli storni"),
+      quantita: zod.number(),
+      unitaMisura: zod.string().nullable(),
+      note: zod.string().nullish(),
+      versioneBolla: zod.number().min(1).optional(),
+    }),
+  ),
+});
+
+/**
  * @summary Mark delivery as completed - atomic operation
  */
 export const CompletaConsegnaParams = zod.object({
@@ -18285,6 +18669,9 @@ export const GetConfigurazioneAmbientePubblicaResponse = zod.object({
       ordine: zod.number(),
       attivoDefault: zod.boolean(),
       attivo: zod.boolean(),
+      disponibile: zod.boolean().optional(),
+      configuratoAttivo: zod.boolean().optional(),
+      dipendenze: zod.array(zod.string()).optional(),
       dataCreazione: zod.coerce.date(),
       dataAggiornamento: zod.coerce.date(),
       ambienteModuloId: zod.number().nullable(),
@@ -18825,6 +19212,9 @@ export const ListSuperAdminModuliResponseItem = zod.object({
   ordine: zod.number(),
   attivoDefault: zod.boolean(),
   attivo: zod.boolean(),
+  disponibile: zod.boolean().optional(),
+  configuratoAttivo: zod.boolean().optional(),
+  dipendenze: zod.array(zod.string()).optional(),
   dataCreazione: zod.coerce.date(),
   dataAggiornamento: zod.coerce.date(),
   ambienteModuloId: zod.number().nullable(),
@@ -18852,6 +19242,9 @@ export const UpdateSuperAdminModuloResponse = zod.object({
   ordine: zod.number(),
   attivoDefault: zod.boolean(),
   attivo: zod.boolean(),
+  disponibile: zod.boolean().optional(),
+  configuratoAttivo: zod.boolean().optional(),
+  dipendenze: zod.array(zod.string()).optional(),
   dataCreazione: zod.coerce.date(),
   dataAggiornamento: zod.coerce.date(),
   ambienteModuloId: zod.number().nullable(),
@@ -24521,6 +24914,12 @@ export const ListAreeResponseItem = zod.object({
     .array(zod.string())
     .describe(
       "Permessi operativi suggeriti dalla UX quando l'Area viene selezionata",
+    ),
+  permessiOrdinari: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Dotazione ordinaria del servizio, senza capacità aggiuntive sensibili",
     ),
 });
 export const ListAreeResponse = zod.array(ListAreeResponseItem);

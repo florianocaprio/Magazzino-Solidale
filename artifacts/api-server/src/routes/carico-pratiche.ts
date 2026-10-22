@@ -69,7 +69,7 @@ import {
   ProductOperationalQuantityError,
   validateProductOperationalQuantity,
 } from "../lib/productQuantity";
-import { requireModulo } from "../lib/featureFlags";
+import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import type { InventoryTransaction } from "../lib/scaricoInventory";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
@@ -82,7 +82,7 @@ import {
 import { CurrentCommandActorError } from "../lib/currentCommandActor";
 
 const router: IRouter = Router();
-router.use("/carico-pratiche", requireModulo("LOTTI"));
+router.use("/carico-pratiche", requireAllModuli(["CARICHI", "LOTTI"]));
 
 class CaricoPraticaError extends Error {
   constructor(

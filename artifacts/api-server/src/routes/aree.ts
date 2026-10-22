@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
+import { ORDINARY_AREA_PERMISSION_MAP } from "../lib/seedRoles";
 import { ALL_AREAS } from "../lib/areas";
 import { ALL_PERMISSIONS, AREA_PERMISSION_MAP } from "../lib/permissions";
 
@@ -10,7 +11,8 @@ router.get("/aree", requireAuth, requireAdmin, (_req, res): void => {
     ALL_AREAS.map((area) => ({
       key: area.key,
       label: area.label,
-      permessi: [...AREA_PERMISSION_MAP[area.key]],
+      permessi: [...new Set([...AREA_PERMISSION_MAP[area.key], ...(ORDINARY_AREA_PERMISSION_MAP[area.key] ?? [])])],
+      permessiOrdinari: [...(ORDINARY_AREA_PERMISSION_MAP[area.key] ?? [])],
     })),
   );
 });

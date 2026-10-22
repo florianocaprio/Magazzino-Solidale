@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import { requireWarehouseReadScope } from "../middlewares/warehouseReadScope";
+import { requireModulo } from "../lib/featureFlags";
 import healthRouter from "./health";
 import dashboardRouter from "./dashboard";
+import operativitaRouter from "./operativita";
 import magazziniRouter from "./magazzini";
 import prodottiRouter from "./prodotti";
 import fornitoriRouter from "./fornitori";
@@ -105,7 +107,9 @@ router.use(
   requireWarehouseReadScope,
 );
 
+router.use(["/volontari", "/mezzi", "/approvazioni-logistica", "/fornitori", "/approvvigionamenti"], requireModulo("LOGISTICA"));
 router.use(dashboardRouter);
+router.use(operativitaRouter);
 router.use(magazziniRouter);
 router.use(prodottiRouter);
 router.use(fornitoriRouter);

@@ -137,7 +137,7 @@ async function login(page: Page, f: Fixture) {
   await page.getByLabel(/username|nome utente/i).fill(f.username);
   await page.getByLabel(/^password$/i).fill(f.password);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 async function createAccess(page: Page, f: Fixture) {
   const response = await page.request.post("/api/accessi-emporio", {

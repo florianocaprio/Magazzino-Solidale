@@ -1,4 +1,6 @@
 import { volunteerAreaFilter, volunteerCallerArea } from "../lib/volontariArea";
+import { isModuloAttivo } from "../lib/featureFlags";
+import type { SessionUser } from "../middlewares/auth";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
@@ -21,6 +23,20 @@ import {
 import { addDaysToCivilDate, dataCivileEuropeRome } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
+
+async function dashboardSources(user: SessionUser) {
+  const allowed = (areas: string[], grant: string) => user.isAdmin ||
+    (areas.some((area) => user.aree.includes(area)) && user.permessi.includes(grant));
+  const [warehouse, lots, centre, deliveries, volunteers, logistics] = await Promise.all(
+    ["MAGAZZINO_SOLIDALE", "LOTTI", "CENTRO_ASCOLTO", "CONSEGNE", "VOLONTARI", "LOGISTICA"].map(isModuloAttivo));
+  return {
+    stock: (warehouse || lots) && allowed(["magazzino"], "magazzino.view"),
+    beneficiaries: centre && allowed(["sociale"], "beneficiari.view"),
+    interventions: centre && allowed(["sociale"], "sociale.interventi.view"),
+    deliveries: centre && deliveries && allowed(["sociale", "logistica"], "consegne.view"),
+    volunteers: logistics && volunteers && allowed(["logistica"], "logistica.volontari.view"),
+  };
+}
 
 /**
  * SQL scoping a beneficiario-keyed count to the caller's centro (own OR null)
@@ -47,6 +63,7 @@ function benScopeSql(
 }
 
 router.get("/dashboard/stats", async (req, res) => {
+  const sources = await dashboardSources(req.user!);
   const oggi = dataCivileEuropeRome();
   const inizioMese = `${oggi.slice(0, 7)}-01`;
   const in30str = addDaysToCivilDate(oggi, 30);
@@ -56,15 +73,15 @@ router.get("/dashboard/stats", async (req, res) => {
   const magIds = await visibleMagazzinoIds(caller, areaOperativa);
   const areaOperativaCentroIds = await visibleCentroIds(areaOperativa);
 
-  const [magCount] = await db.select({ n: count() }).from(magazziniTable).where(andScoped(eq(magazziniTable.stato, "attivo"), centroScopeFilter(magazziniTable.centroAscoltoId, caller), areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaOperativa)));
-  const [prodCount] = await db.select({ n: count() }).from(prodottiTable).where(eq(prodottiTable.attivo, true));
-  const [benCount] = await db.select({ n: count() }).from(beneficiariTable).where(andScoped(eq(beneficiariTable.attivo, true), centroScopeFilter(beneficiariTable.centroAscoltoId, caller), areaOperativaScopeFilter(beneficiariTable.areaOperativaId, areaOperativa)));
-  const [volCount] = await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), volunteerAreaFilter(await volunteerCallerArea(req))));
-  const [consOggi] = await db.select({ n: count() }).from(consegneTable).where(andScoped(eq(consegneTable.dataPrevista, oggi), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa)));
-  const [consMese] = await db.select({ n: count() }).from(consegneTable).where(andScoped(gte(consegneTable.dataPrevista, inizioMese), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa)));
-  const [lottiScad] = await db.select({ n: count() }).from(lottiTable).where(andScoped(gt(lottiTable.quantitaResidua, "0"), lte(lottiTable.dataScadenza, in30str), magazzinoScopeFilter(lottiTable.magazzinoId, magIds)));
-  const [trasCorso] = await db.select({ n: count() }).from(trasferimentiTable).where(andScoped(eq(trasferimentiTable.stato, "in_transito"), trasferimentoScopeFilter(trasferimentiTable.magazzinoOrigineId, trasferimentiTable.magazzinoDestinoId, magIds)));
-  const [intMese] = await db.select({ n: count() }).from(interventiTable).where(andScoped(gte(interventiTable.dataIntervento, inizioMese), benScopeSql(sql`${interventiTable.beneficiarioId}`, caller, areaOperativa)));
+  const [magCount] = sources.stock ? await db.select({ n: count() }).from(magazziniTable).where(andScoped(eq(magazziniTable.stato, "attivo"), centroScopeFilter(magazziniTable.centroAscoltoId, caller), areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaOperativa))) : [{ n: 0 }];
+  const [prodCount] = sources.stock ? await db.select({ n: count() }).from(prodottiTable).where(eq(prodottiTable.attivo, true)) : [{ n: 0 }];
+  const [benCount] = sources.beneficiaries ? await db.select({ n: count() }).from(beneficiariTable).where(andScoped(eq(beneficiariTable.attivo, true), centroScopeFilter(beneficiariTable.centroAscoltoId, caller), areaOperativaScopeFilter(beneficiariTable.areaOperativaId, areaOperativa))) : [{ n: 0 }];
+  const [volCount] = sources.volunteers ? await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), volunteerAreaFilter(await volunteerCallerArea(req)))) : [{ n: 0 }];
+  const [consOggi] = sources.deliveries ? await db.select({ n: count() }).from(consegneTable).where(andScoped(eq(consegneTable.dataPrevista, oggi), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa))) : [{ n: 0 }];
+  const [consMese] = sources.deliveries ? await db.select({ n: count() }).from(consegneTable).where(andScoped(gte(consegneTable.dataPrevista, inizioMese), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa))) : [{ n: 0 }];
+  const [lottiScad] = sources.stock ? await db.select({ n: count() }).from(lottiTable).where(andScoped(gt(lottiTable.quantitaResidua, "0"), lte(lottiTable.dataScadenza, in30str), magazzinoScopeFilter(lottiTable.magazzinoId, magIds))) : [{ n: 0 }];
+  const [trasCorso] = sources.stock ? await db.select({ n: count() }).from(trasferimentiTable).where(andScoped(eq(trasferimentiTable.stato, "in_transito"), trasferimentoScopeFilter(trasferimentiTable.magazzinoOrigineId, trasferimentiTable.magazzinoDestinoId, magIds))) : [{ n: 0 }];
+  const [intMese] = sources.interventions ? await db.select({ n: count() }).from(interventiTable).where(andScoped(gte(interventiTable.dataIntervento, inizioMese), sql`(${interventiTable.ambito} = 'sociale' OR ${interventiTable.ambito} IS NULL)`, benScopeSql(sql`${interventiTable.beneficiarioId}`, caller, areaOperativa))) : [{ n: 0 }];
 
   res.json({
     totMagazzini: Number(magCount.n),
@@ -81,6 +98,7 @@ router.get("/dashboard/stats", async (req, res) => {
 });
 
 router.get("/dashboard/alerts", async (req, res) => {
+  if (!(await dashboardSources(req.user!)).stock) { res.json([]); return; }
   const dataCivileOggi = dataCivileEuropeRome();
   const in7str = addDaysToCivilDate(dataCivileOggi, 7);
   const in30str = addDaysToCivilDate(dataCivileOggi, 30);
@@ -111,6 +129,7 @@ router.get("/dashboard/alerts", async (req, res) => {
 });
 
 router.get("/dashboard/movimenti-recenti", async (req, res) => {
+  if (!(await dashboardSources(req.user!)).stock) { res.json([]); return; }
   const magIds = await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req));
   const magScope = magIds == null
     ? sql``

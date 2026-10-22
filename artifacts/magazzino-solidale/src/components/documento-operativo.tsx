@@ -29,13 +29,13 @@ import {
   useUpdateBolla,
   useListBeneficiari,
   useListCentriAscolto,
-  useListMagazzini,
+  useListMagazziniOperativi,
   useListGiacenze,
   useListLotti,
   useListProdotti,
-  useListVolontari,
-  useListMezzi,
-  useGetImpostazioniStampa,
+  useListVolontariOperativi,
+  useListMezziOperativi,
+  useGetStampaOperativa,
   useListDocumentiOperativi,
   useGetDocumentoOperativoRichiesta,
   useGetRichiestaMagazzino,
@@ -72,7 +72,7 @@ import {
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
   getGetConsegnaQueryKey,
-  getListVolontariQueryKey,
+  getListVolontariOperativiQueryKey,
   type ConversioneConsegnaInputFasciaOraria,
   type BollaDettaglio as BollaDettaglioDto,
   type Trasferimento,
@@ -420,11 +420,10 @@ export function CreaiBollaDialog({
     query: { enabled: open && !!lockedBeneficiario && consegnaId != null, queryKey: [...getGetBollaBeneficiarioConsegnaQueryKey(lockedBeneficiario?.id ?? 0, lockedParams), authLookupContext], retry: false },
   });
   const selectedBenef = lockedBeneficiario ? lockedCandidate.data : selectedBeneficiario;
-  const volontariParams =
-    selectedBenef?.centroAscoltoId != null
-      ? { centroAscoltoId: selectedBenef.centroAscoltoId }
-      : undefined;
-  const { data: magazzini } = useListMagazzini();
+  const volontariParams = { contesto: "magazzino" as const,
+    ...(selectedBenef?.centroAscoltoId != null ? { centroAscoltoId: selectedBenef.centroAscoltoId } : {}),
+  };
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "magazzino" });
   const enteContextArea = magazzini?.find((m) => String(m.id) === magazzinoId)?.areaOperativaId ??
     (initialAreaId && initialAreaId !== "all" ? Number(initialAreaId) : user?.areaOperativaId);
   useEffect(() => {
@@ -451,13 +450,13 @@ export function CreaiBollaDialog({
   const enteAreaNames = new Map(
     areeEnti?.map((area) => [area.id, area.nome]) ?? [],
   );
-  const { data: volontari } = useListVolontari(volontariParams, {
+  const { data: volontari } = useListVolontariOperativi(volontariParams, {
     query: {
-      queryKey: getListVolontariQueryKey(volontariParams),
+      queryKey: getListVolontariOperativiQueryKey(volontariParams),
       enabled: selectedBenef != null,
     },
   });
-  const { data: mezzi } = useListMezzi();
+  const { data: mezzi } = useListMezziOperativi({ contesto: "magazzino" });
   const { data: consegnaSource } = useGetConsegna(consegnaId ?? 0, {
     query: {
       enabled: consegnaId != null,
@@ -950,7 +949,7 @@ function ModificaBollaDialog({
       },
     },
   );
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "magazzino" });
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1144,7 +1143,7 @@ function AggiungiProdottoDialog({
   const [quantita, setQuantita] = useState("");
   const [scanProdotto, setScanProdotto] = useState("");
 
-  const { data: magazzini } = useListMagazzini();
+  const { data: magazzini } = useListMagazziniOperativi({ contesto: "magazzino" });
   const areaOperativaId =
     magazzini?.find((m) => m.id === magazzinoId)?.areaOperativaId ?? 0;
   const giacenzeParams = { areaOperativaId, magazzinoId };
@@ -1638,7 +1637,7 @@ export function BollaDettaglio({
     bolla?.volontarioConsegnaId == null && !bolla?.trasportatoreNome?.trim();
   const { data: centri } = useListCentriAscolto();
   const { data: impostazioni, isLoading: impostazioniLoading } =
-    useGetImpostazioniStampa();
+    useGetStampaOperativa({ contesto: "magazzino" });
   const deleteRiga = useDeleteBollaRiga();
   const confermaBolla = useConfermaBolla();
   const consegnaBolla = useConsegnaBolla();

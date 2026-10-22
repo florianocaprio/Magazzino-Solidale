@@ -14,13 +14,13 @@ import {
   useListCentriAscolto,
   useListAreeOperative,
   type CentroAscolto,
-  useListVolontari,
-  getListVolontariQueryKey,
-  useListMezzi,
+  useListVolontariOperativi,
+  getListVolontariOperativiQueryKey,
+  useListMezziOperativi,
   getListMezziQueryKey,
-  useListRuoliVolontari,
-  useGetVolontariCarico,
-  getGetVolontariCaricoQueryKey,
+  useListRuoliVolontariOperativi,
+  useGetCaricoVolontariOperativo,
+  getGetCaricoVolontariOperativoQueryKey,
   type Volontario,
   type Mezzo,
 } from "@workspace/api-client-react";
@@ -182,9 +182,9 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
   const da = toISODate(days[0]);
   const a = toISODate(days[6]);
 
-  const { data: ruoliVolontari } = useListRuoliVolontari();
-  const volunteersParams = { centroAscoltoId: effectiveCentro, stato: "tutti" as const };
-  const { data: volontari } = useListVolontari(volunteersParams, { query: { queryKey: getListVolontariQueryKey(volunteersParams) } });
+  const { data: ruoliVolontari } = useListRuoliVolontariOperativi({ contesto: "turni" });
+  const volunteersParams = { contesto: "turni" as const, centroAscoltoId: effectiveCentro, stato: "tutti" as const };
+  const { data: volontari } = useListVolontariOperativi(volunteersParams, { query: { queryKey: getListVolontariOperativiQueryKey(volunteersParams) } });
   const volontariCentro = useMemo(
     () =>
       (volontari ?? []).filter((v, idx, all) => {
@@ -198,7 +198,7 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
     [volontari, selectedArea, effectiveCentro],
   );
 
-  const { data: mezzi, isFetching: fetchingMezzi, isError: errorMezzi } = useListMezzi();
+  const { data: mezzi, isFetching: fetchingMezzi, isError: errorMezzi } = useListMezziOperativi({ contesto: "turni" });
   const mezziCentro = useMemo(
     () =>
       (mezzi ?? []).filter((m, idx, all) => {
@@ -264,27 +264,27 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
   const [dialog, setDialog] = useState<{ data: string; fascia: string } | null>(null);
   const [rows, setRows] = useState<VolRow[]>([]);
   const [mezzoId, setMezzoId] = useState<number | null>(null);
-  const caricoParams = {
+  const caricoParams = { contesto: "turni" as const,
     data: dialog?.data ?? "",
     fascia: (dialog?.fascia ?? "09-13") as "09-13" | "14-18" | "18-20",
   };
-  const { data: caricoTurno, isFetching: fetchingCarico, isError: errorCarico } = useGetVolontariCarico(caricoParams, {
+  const { data: caricoTurno, isFetching: fetchingCarico, isError: errorCarico } = useGetCaricoVolontariOperativo(caricoParams, {
     query: {
       enabled: dialog != null,
-      queryKey: getGetVolontariCaricoQueryKey(caricoParams),
+      queryKey: getGetCaricoVolontariOperativoQueryKey(caricoParams),
     },
   });
-  const volontariOperativiParams = {
+  const volontariOperativiParams = { contesto: "turni" as const,
     dataRiferimento: dialog?.data ?? da,
     stato: "attivi" as const,
     centroAscoltoId: effectiveCentro,
   };
-  const { data: volontariOperativiDialog, isFetching: fetchingVolontari, isError: errorVolontari } = useListVolontari(
+  const { data: volontariOperativiDialog, isFetching: fetchingVolontari, isError: errorVolontari } = useListVolontariOperativi(
     volontariOperativiParams,
     {
       query: {
         enabled: dialog != null,
-        queryKey: getListVolontariQueryKey(volontariOperativiParams),
+        queryKey: getListVolontariOperativiQueryKey(volontariOperativiParams),
       },
     },
   );
@@ -415,7 +415,7 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
           invalidateLogisticaResources(queryClient, "volontari");
           if (!currentContext.current) return;
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
-          queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListVolontariOperativiQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
           setNuovoVolontario({ nome: "", cognome: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);

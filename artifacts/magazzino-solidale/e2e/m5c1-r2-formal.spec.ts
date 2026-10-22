@@ -57,7 +57,7 @@ async function loginAs(page: Page, username: string) {
   await page.getByLabel(/username|nome utente/i).fill(username);
   await page.getByLabel(/^password$/i).fill(password!);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 
 test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con errore reale", async ({
