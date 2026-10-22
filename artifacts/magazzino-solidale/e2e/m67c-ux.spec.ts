@@ -167,16 +167,23 @@ test.describe("Explicit touch and rotation matrix", () => {
         await menu.getByRole("button", { name: "Chiudi", exact: true }).tap();
         await expect(menu).toBeHidden();
       } else {
-        await expect(
-          page.locator(
-            '[data-state="collapsed"][data-collapsible="offcanvas"]',
-          ),
-        ).toBeVisible();
+        const sidebar = page.locator('[data-slot="sidebar"][data-side]');
+        const panel = sidebar.locator('[data-slot="sidebar-container"]');
+        // The collapsed wrapper has zero width after its transition. Check
+        // the actual offscreen, non-interactive panel, not wrapper visibility.
+        await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+        await expect(sidebar).toHaveAttribute("data-collapsible", "offcanvas");
+        await expect(panel).toHaveAttribute("aria-hidden", "true");
+        await expect(panel).toHaveAttribute("inert", "");
+        await expect(panel).not.toBeInViewport();
         await trigger.tap();
-        await expect(
-          page.locator('[data-state="expanded"][data-side]'),
-        ).toBeVisible();
+        await expect(sidebar).toHaveAttribute("data-state", "expanded");
+        await expect(panel).toBeInViewport();
+        await expect(panel).not.toHaveAttribute("inert", "");
+        await expect(panel).not.toHaveAttribute("aria-hidden", "true");
         await trigger.tap();
+        await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+        await expect(panel).not.toBeInViewport();
       }
       await page
         .getByRole("button", { name: "Nuova richiesta", exact: true })
