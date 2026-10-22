@@ -90,7 +90,7 @@ test("M67-31: two real UDS Area sessions separate minimal directory, territorial
       await p.getByLabel(/username|nome utente/i).fill(actors[i].username);
       await p.getByLabel(/^password$/i).fill(actors[i].password);
       await p.getByRole("button", { name: /accedi|login/i }).click();
-      await expect(p).toHaveURL(/\/$/);
+      await expect(p).not.toHaveURL(/\/login(?:[?#]|$)/);
       expect(await (await p.request.get("/api/auth/me")).json()).toMatchObject({
         areaOperativaId: areas[i],
         zonaUdsId: null,

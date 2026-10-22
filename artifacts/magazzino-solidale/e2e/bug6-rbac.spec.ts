@@ -74,6 +74,21 @@ const profiles = [
     areas: ["logistica", "uds"],
   },
 ];
+// Independent expected destinations: ordinary workflow suites must not assume
+// that every authenticated actor has permission to open the Dashboard.
+const expectedHome: Record<string, string> = {
+  Amministratore: "/",
+  SuperAdmin: "/",
+  Operatore: "/",
+  "Operatore Magazzino": "/prodotti",
+  "Operatore Logistica": "/turni",
+  "Operatore UDS": "/uds/anagrafica",
+  Emporio: "/emporio/cassa",
+  "Operatore Mensa": "/mensa/postazione",
+  Volontario: "/consegne",
+  "BUG6 readonly": "/prodotti",
+  "BUG6 multi": "/turni",
+};
 let admin: APIRequestContext;
 let areaId: number;
 let secondAreaId: number;
@@ -300,6 +315,9 @@ for (const profile of profiles)
         denied.push(new URL(response.url()).pathname);
     });
     await login(page, users.get(profile.name)!.username);
+    await expect(page).toHaveURL(
+      (url) => url.pathname === expectedHome[profile.name],
+    );
     const identity = await (await page.request.get("/api/auth/me")).json();
     expect(identity.isAdmin).toBe("admin" in profile);
     expect(identity.isSuperAdmin).toBe(profile.name === "SuperAdmin");
@@ -453,4 +471,7 @@ test("Configurazione indisponibile: nessun dato privato resta nella pagina", asy
   await expect(
     page.getByRole("button", { name: "Scarica bolla trasporto" }),
   ).toHaveCount(0);
+  await page.unroute("**/api/configurazione-ambiente");
+  await page.getByRole("button", { name: "Riprova", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Scarica bolla trasporto" }).first()).toBeVisible();
 });

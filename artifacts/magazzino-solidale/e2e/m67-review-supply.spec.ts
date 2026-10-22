@@ -38,7 +38,7 @@ test("EXT67-04 real receipt form retains exact quantity and acquires required ph
   await page.getByLabel(/username|nome utente/i).fill(f.users.admin.username);
   await page.getByLabel(/^password$/i).fill(f.users.admin.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const create = await page.request.post("/api/approvvigionamenti", {
     data: {
       areaOperativaId: f.area,

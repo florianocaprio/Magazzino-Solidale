@@ -109,7 +109,7 @@ async function fixture(
   await page.getByLabel(/username|nome utente/i).fill(username);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const post = async (url: string, data: unknown) => {
     const r = await page.request.post("/api" + url, { data });
     expect(r.ok(), await r.text()).toBe(true);

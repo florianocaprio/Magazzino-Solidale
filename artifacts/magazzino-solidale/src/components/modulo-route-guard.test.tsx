@@ -7,11 +7,14 @@ const moduleState = vi.hoisted(() => ({
   permissions: new Set<string>(),
   isAdmin: false,
   isSuperAdmin: false,
+  areaOperativaId: 1 as number | null,
+  configError: false,
 }));
 
 vi.mock("@/lib/use-moduli", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/use-moduli")>()),
   useConfigurazioneAmbienteFlags: () => ({
+    isError: moduleState.configError,
     isModuloAttivo: (codice: string) => moduleState.activeCodes.has(codice),
     isAnyModuloAttivo: (codici: readonly string[]) =>
       codici.some((codice) => moduleState.activeCodes.has(codice)),
@@ -24,6 +27,7 @@ vi.mock("@/lib/auth", async (importOriginal) => ({
     user: {
       isAdmin: moduleState.isAdmin,
       isSuperAdmin: moduleState.isSuperAdmin,
+      areaOperativaId: moduleState.areaOperativaId,
     },
     hasArea: (area: string) => moduleState.areas.has(area),
     hasPermission: (permission: string) => moduleState.permissions.has(permission),
@@ -36,6 +40,7 @@ vi.mock("react-i18next", async (importOriginal) => ({
 }));
 
 import {
+  AppRoutes,
   RequireAnyModulo,
   RequireAreaModulo,
   RequireMapsAccess,
@@ -43,6 +48,25 @@ import {
 } from "@/App";
 
 describe("RequireModulo", () => {
+  it.each([
+    { area: null, admin: false, expected: "Area Operativa non assegnata", absent: "Configurazione dei servizi non disponibile" },
+    { area: 1, admin: false, expected: "Configurazione dei servizi non disponibile", absent: "Area Operativa non assegnata" },
+    { area: null, admin: true, expected: "Configurazione dei servizi non disponibile", absent: "Area Operativa non assegnata" },
+  ])("distingue assegnazione mancante da configurazione indisponibile ($area, admin $admin)", ({ area, admin, expected, absent }) => {
+    moduleState.areaOperativaId = area;
+    moduleState.isAdmin = admin;
+    moduleState.configError = true;
+    try {
+      const html = renderToStaticMarkup(<AppRoutes />);
+      expect(html).toContain('role="alert"');
+      expect(html).toContain(expected);
+      expect(html).not.toContain(absent);
+    } finally {
+      moduleState.areaOperativaId = 1;
+      moduleState.isAdmin = false;
+      moduleState.configError = false;
+    }
+  });
   it("blocca il contenuto della route quando il modulo è disabilitato", () => {
     moduleState.activeCodes.clear();
 

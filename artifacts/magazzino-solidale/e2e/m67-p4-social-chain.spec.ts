@@ -26,7 +26,7 @@ async function login(page: Page, user: { username: string; password: string }) {
   await page.getByLabel(/username|nome utente/i).fill(user.username);
   await page.getByLabel(/^password$/i).fill(user.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 test("M67-18/19: two ordinary actors carry one intervention/request through preparation, volunteer planning, delivery and Reporting", async ({
   page,

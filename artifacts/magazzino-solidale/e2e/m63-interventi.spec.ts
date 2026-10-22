@@ -98,7 +98,7 @@ test("M63 pagine reali, filtri, calendario bounded, dettaglio e revoca", async (
   await page.getByLabel(/username|nome utente/i).fill(user.username);
   await page.getByLabel(/^password$/i).fill(process.env.E2E_PASSWORD!);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   await page.goto(`/interventi?vista=pianificati&tipo=M63-${suffix}`);
   const nav = page.getByRole("navigation", { name: "Pagine Interventi" });
   await expect(nav).toContainText("201 risultati");

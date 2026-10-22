@@ -282,7 +282,7 @@ async function login(
   await page.getByLabel(/username|nome utente/i).fill(account.username);
   await page.getByLabel(/^password$/i).fill(account.password);
   await page.getByRole("button", { name: /accedi|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
 }
 
 for (const change of ["logout", "different-user"] as const) {

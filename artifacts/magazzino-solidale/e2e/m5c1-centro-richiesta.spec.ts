@@ -11,7 +11,7 @@ async function login(page: Page, username: string) {
   await page.getByLabel(/username|nome utente/i).fill(username);
   await page.getByLabel(/^password$/i).fill(password!);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/);
   const current = await page.request.get("/api/auth/me");
   expect(current.status()).toBe(200);
   return current.json() as Promise<{
