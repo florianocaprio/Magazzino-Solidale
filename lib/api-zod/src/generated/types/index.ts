@@ -949,6 +949,7 @@ export * from "./udsLinkCandidateItemFasciaEtaCorrente";
 export * from "./udsPersonePerZonaReport";
 export * from "./udsReportBisogno";
 export * from "./udsReportBisognoTipo";
+export * from "./updateMyProfileInput";
 export * from "./utente";
 export * from "./utenteInput";
 export * from "./utenteMensa";

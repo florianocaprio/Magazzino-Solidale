@@ -705,6 +705,19 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   );
 }
 
+function ProfileLink() {
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const { isMobile, setOpenMobile } = useSidebar();
+  return <Link href="/profilo" title={t("profile.title")} aria-label={t("profile.title")}
+    onClick={() => { if (isMobile) setOpenMobile(false); }}
+    className="min-w-0 flex-1 rounded-md p-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <p className="truncate text-sm font-medium">{[user?.nome, user?.cognome].filter(Boolean).join(" ")}</p>
+    <p className="truncate text-xs text-muted-foreground">{user?.ruoloNome ?? t("common.noRole")}</p>
+    <p className="text-xs text-primary underline underline-offset-2">{t("profile.title")}</p>
+  </Link>;
+}
+
 export function isNavItemEnabledByModules(
   item: NavItem,
   isModuloAttivo: (codice?: string | null) => boolean,
@@ -909,14 +922,7 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
               <LanguageSelector />
             </div>
             <div className="flex items-center justify-between gap-2 px-2 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {[user?.nome, user?.cognome].filter(Boolean).join(" ")}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {user?.ruoloNome ?? t("common.noRole")}
-                </p>
-              </div>
+              <ProfileLink />
               <Button
                 variant="ghost"
                 size="icon"

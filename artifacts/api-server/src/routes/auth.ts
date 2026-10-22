@@ -5,6 +5,7 @@ import { db, passwordResetTokensTable, utentiTable } from "@workspace/db";
 import {
   LoginUserBody,
   ChangePasswordBody,
+  UpdateMyProfileBody,
   ForgotPasswordBody,
   ResetPasswordBody,
   type AuthUser,
@@ -406,6 +407,55 @@ router.post("/auth/logout", (req, res): void => {
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
   res.json(authUserResponse(req.user!));
+});
+
+router.patch("/auth/profile", requireAuth, async (req, res): Promise<void> => {
+  const input = req.body && typeof req.body.email === "string"
+    ? { ...req.body, email: normalizeEmail(req.body.email) } : req.body;
+  const parsed = UpdateMyProfileBody.safeParse(input);
+  if (!parsed.success || Object.keys(req.body).some((key) => key !== "email")) {
+    res.status(400).json({ error: "Inserisci un'email valida. È possibile modificare soltanto la propria email." });
+    return;
+  }
+  const email = normalizeEmail(parsed.data.email);
+  if (!isValidUserEmail(email)) {
+    res.status(400).json({ error: "Inserisci un'email valida" });
+    return;
+  }
+  try {
+    const changed = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(utentiTable)
+        .where(eq(utentiTable.id, req.user!.id)).for("update");
+      if (!current?.attivo || req.session.passwordVersion !== passwordSessionVersion(current.passwordHash))
+        return "conflict";
+      if (current.email === email && !current.emailDaAggiornare) return "unchanged";
+      await tx.update(utentiTable).set({ email, emailDaAggiornare: false, emailVerifiedAt: null })
+        .where(eq(utentiTable.id, current.id));
+      // Recovery links issued to the previous address must no longer work.
+      await tx.update(passwordResetTokensTable).set({ invalidatedAt: new Date() }).where(and(
+        eq(passwordResetTokensTable.utenteId, current.id),
+        isNull(passwordResetTokensTable.usedAt), isNull(passwordResetTokensTable.invalidatedAt),
+      ));
+      return "changed";
+    });
+    if (changed === "conflict") {
+      res.status(409).json({ error: "Le credenziali sono cambiate. Accedi nuovamente." });
+      return;
+    }
+    if (changed === "changed") await logSystemEvent({
+      evento: "USER_EMAIL_CHANGED", esito: "SUCCESS", targetUserId: req.user!.id,
+      ...systemLogMetaFromRequest(req),
+    });
+    res.status(204).send();
+  } catch (error) {
+    const cause = error as { code?: string; cause?: { code?: string } };
+    if (cause.code === "23505" || cause.cause?.code === "23505") {
+      res.status(409).json({ error: "Questa email è già utilizzata da un altro account" });
+      return;
+    }
+    req.log.error({ userId: req.user!.id }, "Profile email update failed");
+    res.status(500).json({ error: "Impossibile aggiornare l'email. Riprova." });
+  }
 });
 
 router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {

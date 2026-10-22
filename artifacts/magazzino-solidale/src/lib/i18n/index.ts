@@ -59,6 +59,7 @@ import { passwordRecovery } from "./namespaces/passwordRecovery";
 import { logSistema } from "./namespaces/logSistema";
 import { setup } from "./namespaces/setup";
 import { changePassword } from "./namespaces/changePassword";
+import { profile } from "./namespaces/profile";
 import { notAuthorized } from "./namespaces/notAuthorized";
 import { notFound } from "./namespaces/notFound";
 import { tessera } from "./namespaces/tessera";
@@ -128,6 +129,7 @@ const PAGE_NAMESPACES = {
   logSistema,
   setup,
   changePassword,
+  profile,
   notAuthorized,
   notFound,
   tessera,

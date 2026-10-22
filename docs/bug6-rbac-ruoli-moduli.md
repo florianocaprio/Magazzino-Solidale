@@ -1,6 +1,6 @@
 # BUG 6.0 — Ruoli, permessi e moduli
 
-**Stato conclusivo:** fase `##test` completata, **OK manuale finale di Floriano ricevuto** e **CI completa della PR PASS**. Integrazione Git tracciata nella [PR #30](https://github.com/florianocaprio/Magazzino-Solidale/pull/30). Codice applicativo validato sulla 8082 `ba131c3`, conservato senza variazioni funzionali nell'integrazione del branch `codex/bug6-rbac-ruoli-moduli`. Le sezioni precedenti conservano la cronologia; la ricevuta finale è riportata in chiusura.
+**Stato conclusivo:** `##test`, OK manuale di Floriano, merge della [PR #30](https://github.com/florianocaprio/Magazzino-Solidale/pull/30) e successivo deploy Hetzner autorizzato completati. Produzione aggiornata al commit `6d659e45687f8ea75b1dac829f21a347d4c21267`; CI completa di PR e main PASS, controlli tecnici e consultazione autenticata produttiva PASS. Codice applicativo identico a quello approvato sulla 8082 (`ba131c3`). Dopo il deploy, il ruolo produttivo Operatore UDS è stato esplicitamente ristretto ai dieci grant standard su autorizzazione di Floriano, come documentato nell'ultima sezione. Le sezioni precedenti conservano la cronologia.
 
 ## Mandato e base
 
@@ -483,3 +483,70 @@ Le evidenze locali del candidato vengono riusate; la CI verifica nuovamente il r
 Rispetto al candidato della PR, il commit di integrazione aggiunge **soltanto questa ricevuta documentale**: nessun cambiamento applicativo successivo alla CI o all'OK manuale. Il controllo dell'albero di integrazione esclude esplicitamente il solo audit e richiede differenza nulla su tutti gli altri file. Nessun hook locale di merge e nessuna esecuzione di `scripts/post-merge.sh`.
 
 La 8082 conserva il codice applicativo approvato; non è necessaria una ricompilazione per la sola ricevuta documentale. **Nessun deploy Hetzner, riallineamento produttivo dei ruoli, modifica utenti/moduli o dato assistenziale è stato eseguito nella fase `##merge` BUG6.** Il riallineamento dei ruoli esistenti resta una manutenzione esplicita con dry-run e backup; il bootstrap conserva i profili personalizzati. I sette condizionali su file esterni restano NON ESEGUITI, come dichiarato nella validazione.
+
+## Deploy Hetzner — 22 ottobre 2026
+
+Mandato successivo esplicito di Floriano: «Procedi a fare il nuovo deploy su Hetzner». Questa fase segue il merge e supera il precedente limite al solo lavoro Git. Ricevuta documentale sul branch separato `codex/bug6-hetzner-release`; nessuna nuova modifica applicativa, dipendenza, schema o migrazione DB.
+
+### Versione e distribuzione
+
+- Sorgente distribuita: main `6d659e45687f8ea75b1dac829f21a347d4c21267`, con differenza nulla rispetto al codice applicativo approvato `ba131c3`, escluso questo audit. [CI main 39775188031](https://github.com/florianocaprio/Magazzino-Solidale/actions/runs/39775188031): tutti i sei job SUCCESS; ricevute effettive API **2.166 PASS / 7 SKIP**, UI **861 PASS**, browser **881 PASS / 179 SKIP / zero FAIL e flaky**. Installazione frozen, codegen, typecheck e build PASS.
+- Build remota da archivio Git dei soli file tracciati, SHA-256 `12eae58d41a0daac1eac02c0bb1c2a16ebbddc6b8e01e50f253983701542bc8a`; nessun file locale o `.env` incluso. Build API e WEB PASS, budget frontend Linux **394,2 KiB gzip / 400 KiB**.
+- API `magazzino-api:sha-6d659e45687f`, image ID `sha256:9d48c2c4e47fc19b7d97267058fe80dbf4fcbbd88b12da98726b74cab18dd93a`.
+- WEB `magazzino-web:sha-6d659e45687f`, image ID `sha256:c85e7b5a44446e07d71113dc8c2d65bd69be2fb2f101a245a91d67553a3b293c`.
+- Avvio API/WEB alle **19:49 Europe/Rome**. Progetto Compose esistente `magazzino-m67-prod`, WEB su `127.0.0.1:8082`, pubblicato dal reverse proxy HTTPS. PostgreSQL conservato con stesso container, mount e avvio del 17 ottobre: nessun riavvio del database.
+- Configurazione persistente Compose, overlay di rilascio e riferimento sorgente aggiornati e verificati semanticamente contro il runtime; un riavvio mantiene le nuove immagini. Ambiente applicativo conservato; differenze ammesse nei soli metadati di versione `NODE_VERSION` e `SOURCE_REPO_DIR`. Nessuna credenziale riportata nell'audit.
+
+### Backup e integrità
+
+Directory privata remota: `/mnt/HC_Volume_106190628/bug6-release-6d659e45687f`; backup in `backup/`. Dump DB SHA-256 `6fd07693ff8cf91abcfad2b8a77b1fa26cba9edabd2e4faf2072b5be7f7d3856`; archivio uploads/exports SHA-256 `1fb0962fe41825587c8a541760996b6384a011eaddd7bd2a508444d0eafb8427`.
+
+Ripristino realmente eseguito in PostgreSQL temporaneo isolato, senza porte pubblicate o mount produttivi: impronte delle **57 tabelle controllate**, ruoli, account, scelte dei moduli e file persistenti corrispondenti al backup. Replay canonico delle migrazioni eseguito due volte, **63 → 63**; container e rete temporanei rimossi. Nessun `db push`, ripristino del database produttivo, rebaseline o pulizia indiscriminata di immagini/backup.
+
+Dopo il rilascio, ledger **63/63**, nessuna migrazione pendente, fuori ordine o checksum difforme. Ricarica mensile **2026-10** già completata, zero destinatari pendenti/in errore e nessuna variazione ai movimenti di credito. Stock, anagrafiche, documenti, import FSE+, pasti e file persistenti conservati. Unica variazione attesa tra le 57 tabelle: **sei righe di audit configurazioni** relative al riallineamento esplicito dei ruoli, verificate contro prima/dopo; righe di audit preesistenti invariate.
+
+### Riallineamento controllato dei ruoli
+
+Usata la CLI ufficiale `rbac-roles.ts`, versione piano `BUG6_RBAC_1`, nell'immagine candidata, dopo verifica di host/database e backup ripristinabile. Dry-run, confronto esatto dei template storici, apply transazionale e seconda esecuzione idempotente completati. Nessuna modifica agli ID/assegnazioni dei ruoli, account, credenziali, territori o scelte dei moduli.
+
+| Ruolo | Esito |
+| --- | --- |
+| SuperAdmin (1), Amministratore (2) | Grant ordinari 108 → 110 |
+| Operatore (3) | Grant 33 → 35 |
+| Volontario (4) | Quattro grant di consultazione: Turni, Consegne, Mappa operativa e percorso; area Logistica |
+| Operatore Logistica (5) | Grant 13 → 15 |
+| Emporio (8) | Sette grant conservati, area Emporio |
+| Operatore Magazzino (6), Operatore Mensa (9) | Già allineati, conservati |
+| Operatore UDS (7) | **Profilo produttivo personalizzato di 20 grant conservato integralmente** |
+
+Il Volontario può scaricare la Bolla già emessa della consegna della propria Area tramite l'endpoint dedicato, senza grant CRUD Bolle. Nessun ampliamento implicito ai dossier. Secondo apply senza modifiche; dry-run conclusivo **zero proposte**. Piani e backup RBAC restano privati nella directory del rilascio.
+
+### Verifiche produttive e limiti
+
+Su loopback e HTTPS pubblico: home, configurazione client, health e readiness **HTTP 200**; utenti senza autenticazione **401**. HTML e asset pubblici delle schermate BUG6 confrontati con la build effettiva, inclusi Ruoli, Moduli, Consegne e UDS. API sana, WEB operativo, zero eventi API di livello errore rilevati nel controllo del rilascio.
+
+Dopo l'accesso eseguito direttamente da Floriano, consultazione autenticata con il suo profilo SuperAdmin: **Dashboard, Ruoli, Moduli funzionali, Report Unità di Strada e Consegne pianificate caricati correttamente**. Catalogo con servizi separati, dipendenza Carichi/Lotti e componenti futuri non attivabili visibili. Nessun salvataggio, cambio abilitazioni o dato sintetico in produzione. Verifica successiva alla navigazione: ruoli, account (escluso il normale ultimo accesso), moduli e impronte delle 57 tabelle ancora corrispondenti allo stato atteso.
+
+Il controllo autenticato produttivo è di consultazione SuperAdmin: i workflow mutanti e i dinieghi dei singoli ruoli, incluso il PDF Volontario, restano attestati dalla CI isolata e dall'OK manuale di Floriano sulla 8082; non vengono dichiarati rieseguiti con account di prova produttivi. I sette casi condizionali su file esterni restano SKIP. Per questa ricevuta esclusivamente documentale si riusano i gate completi dell'esatto SHA distribuito; nessuna suite mutante eseguita sul DB produttivo o UAT.
+
+Controlli locali sulla ricevuta: `pnpm install --frozen-lockfile`, `pnpm run typecheck` e `git diff --check` **PASS**; lockfile invariato. Il primo tentativo di installazione nel sandbox non raggiungeva il registro npm; ripetizione con accesso rete riuscita. Suite API non rieseguita per il solo testo documentale: fa fede la campagna completa dell'esatto commit distribuito sopra collegata, eseguita su database isolato.
+
+Immagini precedenti `a80e8c0a21a1` e tag di recupero conservati. Un eventuale rollback applicativo richiede anche la valutazione del ripristino RBAC tramite il backup della CLI; il dump DB non va ripristinato automaticamente dopo nuove operazioni reali. Ricevute operative e segreti restano fuori Git. La 8082 locale conserva le immagini approvate `ba131c3`; nessuna ricompilazione necessaria per questo solo aggiornamento documentale.
+
+## Correzione esplicita del profilo UDS su Hetzner — 22 ottobre 2026
+
+Segnalazione di Floriano: Operatore UDS vede anche il menu Emporio, mentre deve operare nel solo servizio UDS. La verifica in sola lettura conferma il ruolo produttivo ID **7**, area funzionale `uds`, non amministratore, con **20 grant**. I grant aggiuntivi `credito.view` ed `emporio.access.view` consentivano le voci Credito e Accessi nel gruppo Emporio; erano presenti anche capacità di gestione Credito/Emporio, FSE, dati sensibili, export e tessere. La conservazione di questa configurazione personalizzata durante il deploy, riportata sopra, spiega il comportamento: nessuna nuova concessione automatica del BUG6.
+
+Il primo tentativo di riallineamento è stato bloccato dalla revisione automatica prima dell'esecuzione, poiché la richiesta iniziale chiedeva la verifica della causa senza autorizzare esplicitamente tutte le revoche. Dopo la domanda con le due alternative, Floriano ha autorizzato espressamente: **«Riallinea ai dieci permessi standard UDS, revocando anche gli extra FSE, dati sensibili, export e tessere»**. Questa istruzione sostituisce, per questo specifico ruolo, la precedente conservazione della personalizzazione.
+
+Applicata esclusivamente la configurazione standard già definita in `UDS_OPERATOR_PERMISSIONS`: sette grant `uds.*` per directory, interventi, note, bisogni e report, più `beneficiari.view`, `beneficiari.manage`, `beneficiari.duplicates.search` necessari al workflow UDS. Area `uds`, ID, descrizione, flag amministrativi, utenti assegnati e loro territori conservati. Rimossi esattamente:
+
+- `credito.view`, `credito.quota.manage`, `credito.adjust`;
+- `emporio.access.view`, `emporio.access.manage`;
+- `beneficiari.sensitive.view`, `beneficiari.export`, `beneficiari.fse.view`, `beneficiari.fse.manage`, `beneficiari.cards.manage`.
+
+Backup mirato privato prima della scrittura: `/mnt/HC_Volume_106190628/bug6-uds-scope-20261022T182216Z/before.private.json`. Modifica atomica con lock della sola riga, confronto dell'intera configurazione riletta contro il controllo precedente e timeout del lock; in caso di modifica concorrente nessuna scrittura. Audit configurazioni **ID 40**, chiave `BUG6_UDS_SCOPE:7`, azione `restrizione_ruolo`, con configurazioni prima/dopo. Nessun segreto, helper operativo o backup incluso in Git.
+
+Verifiche effettive: ruolo **20 → 10 grant**, tutti gli altri ruoli identici; impronte account/assegnazioni e scelte dei moduli invariate; impronte delle **57 tabelle** controllate invariate salvo l'audit esplicito appena inserito; API sana e readiness pubblica positiva con ledger **63/63**. Seconda esecuzione **nessuna modifica necessaria**, senza aggiungere audit duplicati. La verifica UI locale precedente all'autorizzazione ha eseguito la suite completa: **132 file / 861 test PASS**. Dopo la ricevuta documentale, installazione frozen, typecheck e controllo diff **PASS**, lockfile invariato. Suite API non rieseguita per la sola configurazione/documentazione: codice invariato e gate dello SHA distribuito riportati sopra; nessuna suite mutante contro produzione. Il comportamento con l'account UDS produttivo resta da provare direttamente da Floriano: nessuna impersonificazione o creazione di account di test.
+
+Il server rilegge i permessi dal DB a ogni richiesta autenticata; la UI aggiorna l'identità su navigazione, focus e ogni 30 secondi. Ricaricare la pagina con il profilo UDS per la prova immediata. Emporio e Credito non sono più concessi; restano i menu operativi UDS e la voce pubblica di supporto comune a tutti i profili. Nessuna modifica al codice, schema, OpenAPI o immagini: non è necessaria una ricompilazione locale/remota o un nuovo deploy. Il bootstrap conservativo non reintroduce i grant rimossi nei successivi riavvii.

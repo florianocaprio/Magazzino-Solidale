@@ -6384,6 +6384,7 @@ export const SystemLogEventType = {
   USER_DISABLED: "USER_DISABLED",
   USER_DELETED: "USER_DELETED",
   USER_ROLE_CHANGED: "USER_ROLE_CHANGED",
+  USER_EMAIL_CHANGED: "USER_EMAIL_CHANGED",
   ACCOUNT_LOCKED: "ACCOUNT_LOCKED",
   ACCOUNT_UNLOCKED: "ACCOUNT_UNLOCKED",
 } as const;
@@ -10916,6 +10917,14 @@ export interface LoginInput {
   username: string;
   /** @minLength 1 */
   password: string;
+}
+
+export interface UpdateMyProfileInput {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  email: string;
 }
 
 export interface ChangePasswordInput {

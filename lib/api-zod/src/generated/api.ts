@@ -19311,6 +19311,7 @@ export const ListSuperAdminLogSistemaQueryParams = zod.object({
       "USER_DISABLED",
       "USER_DELETED",
       "USER_ROLE_CHANGED",
+      "USER_EMAIL_CHANGED",
       "ACCOUNT_LOCKED",
       "ACCOUNT_UNLOCKED",
     ])
@@ -19346,6 +19347,7 @@ export const ListSuperAdminLogSistemaResponse = zod.object({
         "USER_DISABLED",
         "USER_DELETED",
         "USER_ROLE_CHANGED",
+        "USER_EMAIL_CHANGED",
         "ACCOUNT_LOCKED",
         "ACCOUNT_UNLOCKED",
       ]),
@@ -23374,6 +23376,15 @@ export const ResetPasswordBody = zod.object({
 
 export const ResetPasswordResponse = zod.object({
   message: zod.string(),
+});
+
+/**
+ * @summary Aggiorna esclusivamente l'email dell'utente autenticato.
+ */
+export const updateMyProfileBodyEmailMax = 255;
+
+export const UpdateMyProfileBody = zod.object({
+  email: zod.string().email().min(1).max(updateMyProfileBodyEmailMax),
 });
 
 export const changePasswordBodyNewPasswordMin = 8;

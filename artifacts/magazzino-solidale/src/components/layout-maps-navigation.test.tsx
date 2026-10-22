@@ -197,6 +197,16 @@ describe("Sidebar - Mappa Operativa", () => {
 
   const trigger = (label: string) => sidebarGroup(label)!.querySelector<HTMLButtonElement>('[data-slot="sidebar-group-label"]')!;
 
+  it("il nome apre il profilo personale anche senza permessi amministrativi", async () => {
+    mocks.areas = new Set(["uds"]);
+    mocks.permissions = new Set(["uds.directory.view"]);
+    await renderLayout();
+    const profile = container.querySelector<HTMLAnchorElement>('a[href="/profilo"]');
+    expect(profile?.textContent).toContain("Utente Test");
+    expect(profile?.getAttribute("aria-label")).toBe("profile.title");
+    expect(groupLinks("Amministrazione")).toHaveLength(0);
+  });
+
   it("separa corrente e aperto nelle quattro combinazioni, senza duplicare aria-current", async () => {
     mocks.isAdmin = true;
     mocks.location = "/volontari";
