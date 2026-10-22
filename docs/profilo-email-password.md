@@ -1,6 +1,6 @@
 # Profilo personale — email e password
 
-Stato: candidato locale **pronto per la verifica manuale sulla 8082**. Branch `codex/profilo-email-password`, codice `bd117a12d1462d4827961b8832e29583f717132c`. Nessun merge o deploy Hetzner eseguito per questa modifica. Il punto precedente UDS è stato confermato chiuso da Floriano; la configurazione produttiva UDS non viene modificata da questo intervento.
+Stato: **verifica manuale sulla 8082 confermata PASS da Floriano; merge autorizzato**. Branch `codex/profilo-email-password`, codice applicativo `bd117a12d1462d4827961b8832e29583f717132c`. Il deploy Hetzner resta da concordare separatamente secondo l'ultima istruzione. Il punto precedente UDS è stato confermato chiuso da Floriano; la configurazione produttiva UDS non viene modificata da questo intervento.
 
 ## Comportamento
 
@@ -47,4 +47,10 @@ La prima preparazione dell'archivio si era fermata per un riferimento Git errato
 3. Inserire nuova password e conferma; provare gli occhi, poi salvare. Verificare messaggio di successo, accesso con la nuova password e rifiuto di quella precedente.
 4. Verificare che ruolo, Area e normali funzionalità dell'account restino quelli previsti. La procedura è disponibile anche a un operatore, senza gestione degli account altrui.
 
-Dopo la conferma della verifica locale si procede con PR, controlli del merge e deploy Hetzner secondo la richiesta di Floriano. Credenziali, `.env`, log, dump e screenshot restano esclusi da Git; i cinque documenti locali estranei restano intatti e non inclusi.
+## OK manuale e mandato di merge
+
+Floriano ha confermato: «Perfetto funziona ho testo fai pure il merge e poi concordiamo come portalo in produzione su Hetzener». La prova manuale è quindi PASS e il merge è autorizzato; il precedente piano di deploy dopo il test è sostituito dal rinvio esplicito del rilascio a un accordo successivo. Nessun accesso SSH, riallineamento produttivo o deploy viene eseguito in questa fase.
+
+Preflight Git: `origin/main` ancora `6d659e45687f8ea75b1dac829f21a347d4c21267`, nessun avanzamento concorrente. Il ramo include la funzionalità locale e due precedenti ricevute documentali del deploy BUG6 e della restrizione UDS, già pubblicate nei rispettivi branch: nessun altro cambiamento applicativo. Prima della PR il diff applicativo rispetto al candidato manuale `bd117a1` deve essere nullo, escludendo soltanto questo audit. Si attende la CI completa prevista dal workflow prima del merge. Il workflow non contiene distribuzioni automatiche.
+
+La 8082 conserva le immagini del candidato approvato; un aggiornamento della sola documentazione non richiede ricompilazione. `scripts/post-merge.sh` non viene eseguito: nessuna modifica DB è necessaria. Credenziali, `.env`, log, dump e screenshot restano esclusi da Git; i cinque documenti locali estranei restano intatti e non inclusi.
