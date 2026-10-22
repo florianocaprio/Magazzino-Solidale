@@ -66,6 +66,7 @@ export function useModuloFlags() {
     query: {
       queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(),
       staleTime: 30_000,
+      retryOnMount: false,
       refetchInterval: 30_000,
       refetchOnWindowFocus: "always",
     },
@@ -86,6 +87,7 @@ export function useConfigurazioneAmbienteFlags() {
     query: {
       queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(),
       staleTime: 30_000,
+      retryOnMount: false,
       refetchInterval: 30_000,
       refetchOnWindowFocus: "always",
     },

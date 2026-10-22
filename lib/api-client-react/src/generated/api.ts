@@ -20051,6 +20051,96 @@ export const useDeleteConsegna = <
   return useMutation(getDeleteConsegnaMutationOptions(options));
 };
 
+export const getGetBollaTrasportoConsegnaUrl = (id: number) => {
+  return `/api/consegne/${id}/bolla-trasporto`;
+};
+
+/**
+ * Richiede consegne.view, moduli del servizio e della Bolla e accesso alla consegna e al documento nella stessa Area. Non concede accesso all'archivio Bolle o ai comandi.
+ * @summary Bolla emessa collegata alla consegna, in sola lettura per il download
+ */
+export const getBollaTrasportoConsegna = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BollaDettaglio> => {
+  return customFetch<BollaDettaglio>(getGetBollaTrasportoConsegnaUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBollaTrasportoConsegnaQueryKey = (id: number) => {
+  return [`/api/consegne/${id}/bolla-trasporto`] as const;
+};
+
+export const getGetBollaTrasportoConsegnaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBollaTrasportoConsegna>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBollaTrasportoConsegna>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBollaTrasportoConsegnaQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBollaTrasportoConsegna>>
+  > = ({ signal }) =>
+    getBollaTrasportoConsegna(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBollaTrasportoConsegna>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBollaTrasportoConsegnaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBollaTrasportoConsegna>>
+>;
+export type GetBollaTrasportoConsegnaQueryError = ErrorType<void>;
+
+/**
+ * @summary Bolla emessa collegata alla consegna, in sola lettura per il download
+ */
+
+export function useGetBollaTrasportoConsegna<
+  TData = Awaited<ReturnType<typeof getBollaTrasportoConsegna>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBollaTrasportoConsegna>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBollaTrasportoConsegnaQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
 export const getCompletaConsegnaUrl = (id: number) => {
   return `/api/consegne/${id}/completa`;
 };

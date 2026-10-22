@@ -88,9 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = isError ? null : (data ?? null);
   const bootstrap = bootstrapData?.bootstrap ?? false;
   const environment = useGetConfigurazioneAmbientePubblica({ query: {
-    queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(), enabled: !!user, staleTime: 30_000, refetchInterval: 30_000, refetchOnWindowFocus: "always", retry: false,
+    queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(), enabled: !!user, staleTime: 30_000, refetchInterval: 30_000, refetchOnWindowFocus: "always", retry: false, retryOnMount: false,
   } });
-  const signature = JSON.stringify([authorizationSignature(user), environment.isError ? "unavailable" : [...(environment.data?.moduliAttivi ?? [])].sort()]);
+  const signature = JSON.stringify([authorizationSignature(user), environment.isError || !environment.data ? "unavailable" : [...environment.data.moduliAttivi].sort()]);
   const [settledScope, setSettledScope] = useState<string | null>(null);
   const [location] = useLocation();
   useEffect(() => {

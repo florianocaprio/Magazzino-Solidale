@@ -16,6 +16,7 @@ import {
   volontariTable,
   beneficiariTable,
   consegneTable,
+  bolleTable, bollaRigheTable, richiesteMagazzinoTable, richiesteMagazzinoDocumentiTable,
   menseTable,
   ambienteModuliTable,
   moduliFunzionaliTable,
@@ -39,6 +40,7 @@ const areaIds: number[] = [],
   beneficiaryIds: number[] = [],
   deliveryIds: number[] = [],
   mensaIds: number[] = [];
+const bollaIds: number[] = [], requestIds: number[] = [];
 let productId: number;
 let moduleBefore: Array<{ id: number; attivo: boolean }> = [];
 
@@ -223,6 +225,15 @@ beforeAll(async () => {
     expect(login.body.isSuperAdmin).toBe(profile.nome === "SuperAdmin");
     agents.set(profile.nome, agent);
   }
+  for (let i = 0; i < areaIds.length; i++) {
+    const [bolla] = await db.insert(bolleTable).values({ numeroBolla: `B6-${suffix}-${i}`, dataBolla: "2026-10-22", beneficiarioId: beneficiaryIds[i], consegnaId: deliveryIds[i], magazzinoId: warehouseIds[i], stato: "confermato", noteRicezione: "PRIVATE-RECEIPT", motivoAnnullamento: "PRIVATE-AUDIT" }).returning();
+    bollaIds.push(bolla.id);
+    await db.insert(bollaRigheTable).values({ bollaId: bolla.id, prodottoId: productId, quantita: "2", unitaMisura: "pz", note: "PRIVATE-LINE" });
+    const [req] = await db.insert(richiesteMagazzinoTable).values({ codice: `B6-REQ-${suffix}-${i}`, tipoDestinatario: "beneficiario", beneficiarioId: beneficiaryIds[i], areaOperativaId: areaIds[i], centroAscoltoId: centreIds[i], sorgente: "beneficiario", destinatarioNomeSnapshot: "Synthetic", areaNomeSnapshot: "Synthetic", bisogno: "PRIVATE-REQUEST", inviatoDa: roles.get("Operatore")!.userId }).returning();
+    requestIds.push(req.id);
+    await db.insert(richiesteMagazzinoDocumentiTable).values({ richiestaId: req.id, tipoDocumento: "bolla", bollaId: bolla.id, creatoDa: roles.get("Operatore Magazzino")!.userId });
+  }
+
 }, 60_000);
 
 afterAll(async () => {
@@ -231,6 +242,14 @@ afterAll(async () => {
       .update(ambienteModuliTable)
       .set({ attivo: row.attivo })
       .where(eq(ambienteModuliTable.id, row.id));
+  if (requestIds.length) {
+    await db.delete(richiesteMagazzinoDocumentiTable).where(inArray(richiesteMagazzinoDocumentiTable.richiestaId, requestIds));
+    await db.delete(richiesteMagazzinoTable).where(inArray(richiesteMagazzinoTable.id, requestIds));
+  }
+  if (bollaIds.length) {
+    await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, bollaIds));
+    await db.delete(bolleTable).where(inArray(bolleTable.id, bollaIds));
+  }
   if (deliveryIds.length)
     await db
       .delete(consegneTable)
@@ -506,6 +525,26 @@ describe("BUG6 — identità reali, sessioni normali e catena middleware complet
           ).send({})
         ).status,
       ).toBe(403);
+  });
+
+  it("Volontario scarica solo la bolla emessa della consegna dell'Area, senza dossier o mutazioni", async () => {
+    const volunteer = agent("Volontario");
+    const response = await volunteer.get(`/api/consegne/${deliveryIds[0]}/bolla-trasporto`);
+    expect(response.status).toBe(200); expect(response.headers["cache-control"]).toContain("no-store");
+    expect(response.body).toMatchObject({ id: bollaIds[0], consegnaId: deliveryIds[0], stato: "confermato", righe: [{ prodottoId: productId, quantita: 2 }] });
+    expect(response.body).not.toHaveProperty("noteRicezione"); expect(response.body).not.toHaveProperty("motivoAnnullamento");
+    expect(response.body.righe[0]).not.toHaveProperty("note");
+    const listed = await volunteer.get("/api/consegne");
+    expect(listed.body.items.find((row: { id: number }) => row.id === deliveryIds[0]).bollaId).toBe(bollaIds[0]);
+    expect((await volunteer.get(`/api/consegne/${deliveryIds[1]}/bolla-trasporto`)).status).toBe(403);
+    expect((await volunteer.get(`/api/bolle/${bollaIds[0]}`)).status).toBe(403);
+    expect((await volunteer.get(`/api/richieste-magazzino/${requestIds[0]}`)).status).toBe(403);
+    for (const method of ["patch", "delete"] as const) expect((await volunteer[method](`/api/bolle/${bollaIds[0]}`).send({})).status).toBe(403);
+    expect((await volunteer.post(`/api/consegne/${deliveryIds[0]}/bolla-trasporto`).send({})).status).toBe(404);
+    expect((await volunteer.get("/api/operativita/stampa").query({ contesto: "consegne" })).status).toBe(200);
+    await db.update(bolleTable).set({ stato: "bozza" }).where(eq(bolleTable.id, bollaIds[0]));
+    try { expect((await volunteer.get(`/api/consegne/${deliveryIds[0]}/bolla-trasporto`)).status).toBe(404); }
+    finally { await db.update(bolleTable).set({ stato: "confermato" }).where(eq(bolleTable.id, bollaIds[0])); }
   });
 
   it("Custom readonly e multi-area non acquisiscono gestione o sorgenti estranee", async () => {

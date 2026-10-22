@@ -17,6 +17,7 @@ export const OPERATIONAL_SELECTIONS: Record<string, SelectionPolicy> = {
       "volontari",
       "ruoli-volontari",
       "carico-volontari",
+      "stampa",
     ],
   },
   turni: {

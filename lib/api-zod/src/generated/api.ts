@@ -13370,6 +13370,108 @@ export const DeleteConsegnaParams = zod.object({
 });
 
 /**
+ * Richiede consegne.view, moduli del servizio e della Bolla e accesso alla consegna e al documento nella stessa Area. Non concede accesso all'archivio Bolle o ai comandi.
+ * @summary Bolla emessa collegata alla consegna, in sola lettura per il download
+ */
+
+export const GetBollaTrasportoConsegnaParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBollaTrasportoConsegnaResponse = zod.object({
+  beneficiarioFascicolo: zod.string().nullish(),
+  id: zod.number(),
+  numeroBolla: zod.string(),
+  dataBolla: zod.string(),
+  tipoDestinatario: zod.enum(["beneficiario", "ente"]),
+  beneficiarioId: zod.number().nullish(),
+  beneficiarioNome: zod.string().nullish(),
+  enteDestinatarioId: zod.number().nullish(),
+  enteDestinatarioNome: zod.string().nullish(),
+  enteDestinatarioIndirizzo: zod.string().nullish(),
+  enteDestinatarioTelefono: zod.string().nullish(),
+  enteDestinatarioEmail: zod.string().nullish(),
+  destinatarioSnapshotCongelato: zod.boolean(),
+  destinatarioSnapshotFonte: zod
+    .union([
+      zod.literal("confermato"),
+      zod.literal("legacy_live"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  consegnaId: zod.number().nullish(),
+  consegnaDataPrevista: zod.coerce.date().nullish(),
+  consegnaFasciaOraria: zod.string().nullish(),
+  consegnaVolontarioNome: zod.string().nullish(),
+  daPianificazione: zod.boolean().optional(),
+  magazzinoId: zod.number(),
+  magazzinoNome: zod.string().nullish(),
+  indirizzoConsegna: zod.string().nullish(),
+  volontarioConsegnaId: zod.number().nullish(),
+  volontarioNome: zod.string().nullish(),
+  magazzinoIndirizzo: zod.string().nullish(),
+  magazzinoComune: zod.string().nullish(),
+  beneficiarioIndirizzo: zod.string().nullish(),
+  beneficiarioTelefono: zod.string().nullish(),
+  trasportatoreNome: zod.string().nullish(),
+  mezzoId: zod.number().nullish(),
+  mezzoAltro: zod.boolean().optional(),
+  stato: zod.string(),
+  noteConsegna: zod.string().nullish(),
+  confermaRicezione: zod.boolean(),
+  noteRicezione: zod.string().nullish(),
+  ritiroNonEffettuatoAt: zod.coerce.date().nullish(),
+  ritiroNonEffettuatoOperatoreId: zod.number().nullish(),
+  ritiroNonEffettuatoMotivo: zod.string().nullish(),
+  operatoreId: zod.number().nullish(),
+  operatoreCodice: zod.string().nullish(),
+  motivoAnnullamento: zod.string().nullish(),
+  motivoMancataConsegna: zod.string().nullish(),
+  versione: zod.number().min(1),
+  dataCreazione: zod.string(),
+  righe: zod.array(
+    zod.object({
+      id: zod.number(),
+      bollaId: zod.number(),
+      prodottoId: zod.number(),
+      prodottoNome: zod.string().nullish(),
+      lottoId: zod.number().nullish(),
+      codiceLotto: zod.string().nullish(),
+      fondoOrigine: zod.string().nullish(),
+      ripartizioniLotto: zod.array(
+        zod.object({
+          lottoId: zod.number().nullable(),
+          codiceLotto: zod.string().nullable(),
+          fondoOrigine: zod.string(),
+          quantita: zod.number(),
+        }),
+      ),
+      fsePlus: zod.boolean(),
+      fsePlusQuantita: zod.number().optional(),
+      nonFsePlusQuantita: zod.number().optional(),
+      quantitaLorda: zod
+        .number()
+        .optional()
+        .describe(
+          "Quantità distribuita prima degli storni, dal ledger canonico",
+        ),
+      quantitaStornata: zod
+        .number()
+        .optional()
+        .describe("Quantità complessivamente stornata"),
+      quantitaNetta: zod
+        .number()
+        .optional()
+        .describe("Quantità distribuita netta dopo gli storni"),
+      quantita: zod.number(),
+      unitaMisura: zod.string().nullable(),
+      note: zod.string().nullish(),
+      versioneBolla: zod.number().min(1).optional(),
+    }),
+  ),
+});
+
+/**
  * @summary Mark delivery as completed - atomic operation
  */
 export const CompletaConsegnaParams = zod.object({

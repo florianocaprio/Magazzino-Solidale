@@ -8,6 +8,7 @@ const server = vi.hoisted(() => ({
   user: null as AuthUser | null,
   modules: ["UDS"],
   unavailable: false,
+  configReads: 0,
 }));
 vi.mock("@workspace/api-client-react", async () => {
   const { useQuery } = await import("@tanstack/react-query");
@@ -33,6 +34,7 @@ vi.mock("@workspace/api-client-react", async () => {
       useQuery({
         queryKey: ["/api/configurazione-ambiente"],
         queryFn: async () => {
+          server.configReads++;
           if (server.unavailable) throw new Error("Configuration unavailable");
           return { moduliAttivi: server.modules };
         },
@@ -42,10 +44,13 @@ vi.mock("@workspace/api-client-react", async () => {
   };
 });
 import { AuthProvider, useAuth } from "./auth";
+import { useConfigurazioneAmbienteFlags } from "./use-moduli";
 function Probe() {
   const { user, isLoading } = useAuth();
+  const flags = useConfigurazioneAmbienteFlags();
   const [draft, setDraft] = useState("");
-  if (isLoading) return <div>loading</div>;
+  if (isLoading || flags.isLoading) return <div>loading</div>;
+  if (flags.isError) return <div role="alert">Configuration unavailable</div>;
   return (
     <div>
       <span>
@@ -73,6 +78,7 @@ describe("BUG6 — provider reale e cache tra sessioni", () => {
     } as AuthUser;
     server.modules = ["UDS"];
     server.unavailable = false;
+    server.configReads = 0;
     client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
@@ -137,4 +143,19 @@ describe("BUG6 — provider reale e cache tra sessioni", () => {
       expect(client.getQueryData(["/api/report/uds"])).toBeUndefined();
     }
   });
+  it("la configurazione assente al primo accesso mostra l'errore senza cicli di rimontaggio, poi recupera", async () => {
+    server.unavailable = true;
+    await mount();
+    await act(tick);
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Configuration unavailable");
+    const reads = server.configReads;
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 100)); });
+    expect(server.configReads).toBe(reads);
+    expect(client.getQueryData(["/api/beneficiari"])).toBeUndefined();
+    server.unavailable = false;
+    await act(async () => { await client.refetchQueries({ queryKey: ["/api/configurazione-ambiente"] }); await tick(); });
+    expect(container.querySelector("output")).not.toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
 });

@@ -5647,6 +5647,27 @@ paths:
         "204":
           description: Deleted
 
+  /consegne/{id}/bolla-trasporto:
+    get:
+      operationId: getBollaTrasportoConsegna
+      tags: [consegne]
+      summary: Bolla emessa collegata alla consegna, in sola lettura per il download
+      description: Richiede consegne.view, moduli del servizio e della Bolla e accesso alla consegna e al documento nella stessa Area. Non concede accesso all'archivio Bolle o ai comandi.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: Proiezione dei soli dati stampabili della Bolla di trasporto
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BollaDettaglio"}
+        "400": {description: Identificativo non valido}
+        "403": {description: "Permesso, modulo o territorio non autorizzato"}
+        "404": {description: Consegna o Bolla emessa non presente}
+
   /consegne/{id}/completa:
     post:
       operationId: completaConsegna
