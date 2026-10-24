@@ -4,6 +4,10 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { CaricoPraticaDettaglio } from "@workspace/api-client-react";
 const api = vi.hoisted(() => ({
   analyze: vi.fn(),
+  fetchDetail: vi.fn(),
+  resume: vi.fn(),
+  reviseDate: vi.fn(),
+  reviseRow: vi.fn(),
   attach: vi.fn(),
   invalidate: vi.fn().mockResolvedValue(undefined),
   ready: vi.fn(),
@@ -44,6 +48,8 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("@workspace/api-client-react", () => ({
   analyzeFsePracticeImport: api.analyze,
+  getFseImportSession: api.fetchDetail,
+  useReviseFseReferenceDate: () => ({ isPending: false, mutateAsync: api.reviseDate }),
   getGetFseImportSessionQueryKey: (id: number) => [id],
   getListFseImportSourcesQueryKey: () => ["sources"],
   getListProdottiQueryKey: () => ["/api/prodotti"],
@@ -61,7 +67,7 @@ vi.mock("@workspace/api-client-react", () => ({
   resolveAutomaticFseImportSource: vi.fn().mockResolvedValue({ id: 1 }),
   useMapFseImportProduct: () => ({ isPending: false }),
   useCreateProdotto: () => ({ isPending: false }),
-  useReviseFseImportRow: () => ({ isPending: false }),
+  useReviseFseImportRow: () => ({ isPending: false, mutateAsync: api.reviseRow }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: api.invalidate }),
@@ -75,6 +81,7 @@ vi.mock("@/components/barcode-scanner-button", () => ({
 }));
 import i18n from "@/lib/i18n";
 import { FseImportPracticeWizard } from "./fse-import-practice-wizard";
+const initialDetail = structuredClone(api.detail);
 let root: Root, host: HTMLDivElement;
 async function click(text: string) {
   const button = [...document.querySelectorAll("button")].find(
@@ -95,7 +102,9 @@ async function file(id: string, value: File) {
 }
 beforeEach(async () => {
   vi.clearAllMocks();
+  Object.assign(api.detail, structuredClone(initialDetail));
   api.analyze.mockReset();
+  api.fetchDetail.mockReset().mockImplementation(async () => api.detail);
   api.detail.modalita = "NUOVI_CARICHI";
   api.detail.files = [];
   api.detail.dataRiferimentoSaldo = null;
@@ -123,6 +132,7 @@ beforeEach(async () => {
         }
         products={[]}
         onPracticeReady={api.ready}
+        onResumePractice={api.resume}
       />,
     );
   });
@@ -196,6 +206,7 @@ it("riprende una sessione Saldo con solo Registro senza richiedere di ricaricarl
         }
         products={[]}
         onPracticeReady={api.ready}
+        onResumePractice={api.resume}
       />,
     );
   });
@@ -212,4 +223,53 @@ it("riprende una sessione Saldo con solo Registro senza richiedere di ricaricarl
     profilo: "GIACENZE",
     modalita: "SALDO_INIZIALE",
   });
+});
+
+it("se il file esiste in un’altra pratica propone il recupero e non carica Giacenze nella pratica errata", async () => {
+  api.analyze.mockResolvedValueOnce({ sessionId: 18, replay: true });
+  api.fetchDetail.mockResolvedValueOnce({ ...api.detail, id: 18, caricoPraticaId: 77 });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await file("fse-stock-file", new File(["stock"], "Giacenze.xlsx"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  expect(api.analyze).toHaveBeenCalledTimes(1);
+  expect(document.body.textContent).toContain("già salvati in un’altra pratica");
+  await click("Riprendi pratica #77");
+  expect(api.resume).toHaveBeenCalledWith(77, 18);
+  expect(api.attach).not.toHaveBeenCalled();
+});
+
+it("sospende senza contabilizzare o annullare la sessione", async () => {
+  api.analyze.mockResolvedValueOnce({ sessionId: 10 });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  expect(document.body.textContent).toContain("Importazione #10 salvata nella pratica #4");
+  await click("Sospendi importazione");
+  expect(api.close).toHaveBeenCalledWith(false);
+  expect(api.attach).not.toHaveBeenCalled();
+});
+
+it("usa la data del Registro quando la data Giacenze è lasciata vuota", async () => {
+  api.analyze.mockResolvedValue({ sessionId: 10 });
+  api.fetchDetail.mockResolvedValueOnce({ ...api.detail, files: [{ profilo: "REGISTRO", dataRiferimento: "2026-10-20" }] });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await file("fse-stock-file", new File(["stock"], "Giacenze.xlsx"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  expect(api.analyze.mock.calls[1][1]).toMatchObject({ profilo: "GIACENZE", dataRiferimento: "2026-10-20" });
+});
+
+it("conferma in sequenza solo le date senza altri errori e usa la versione restituita", async () => {
+  const base = { ...api.detail.rows[0], tipoMovimento: "CARICO", dataDocumento: "2026-10-20", dataOperativaProposta: "2026-10-20", stato: "DA_VERIFICARE", warningCodes: ["DATA_DOCUMENTO_FALLBACK"] };
+  Object.assign(api.detail, { rows: [
+    { ...base, id: 21 }, { ...base, id: 22 },
+    { ...base, id: 23, errorCodes: ["QUANTITA_NON_COMPATIBILE"] },
+    { ...base, id: 24, dataOperativaProposta: "2026-10-19" },
+  ] });
+  api.analyze.mockResolvedValueOnce({ sessionId: 10 });
+  api.reviseRow.mockResolvedValueOnce({ versione: 3 }).mockResolvedValueOnce({ versione: 4 });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  await click("Conferma la data documento per 2 righe");
+  expect(api.reviseRow.mock.calls.map(call => [call[0].rigaId, call[0].data.versione])).toEqual([[21, 2], [22, 3]]);
+  expect(api.reviseRow.mock.calls.every(call => call[0].data.accettaFallbackData === true)).toBe(true);
+  expect(api.attach).not.toHaveBeenCalled();
 });

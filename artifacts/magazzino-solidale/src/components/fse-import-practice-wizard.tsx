@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   analyzeFsePracticeImport,
+  getFseImportSession,
+  useReviseFseReferenceDate,
   getGetFseImportSessionQueryKey,
   getListFseImportSourcesQueryKey,
   getListFseImportSessionsQueryKey,
@@ -69,6 +71,8 @@ type Props = {
   practice: CaricoPraticaDettaglio;
   products: Prodotto[];
   onPracticeReady: (practiceId: number) => void;
+  initialSessionId?: number | null;
+  onResumePractice?: (practiceId: number, sessionId: number) => void;
 };
 
 type NewProduct = {
@@ -95,7 +99,12 @@ type CorrectionDraft = {
 
 function correctionFromRow(row: FseImportRow): CorrectionDraft {
   return {
-    quantity: row.quantitaOperativa ?? "",
+    quantity:
+      row.quantitaOperativa ??
+      (row.prodotto?.unitaMisura === "pz"
+        ? row.quantitaPezzi
+        : row.quantitaKgLt) ??
+      "",
     documentNumber: row.numeroDocumento ?? "",
     documentDate: row.dataDocumento ?? "",
     operationalDate: row.dataOperativaProposta ?? "",
@@ -123,6 +132,8 @@ export function FseImportPracticeWizard({
   practice,
   products,
   onPracticeReady,
+  initialSessionId,
+  onResumePractice,
 }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -138,6 +149,22 @@ export function FseImportPracticeWizard({
   const canManageMappings = hasPermission("magazzino.agea.mapping.manage");
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
   const [step, setStep] = useState(0);
+  const [otherPractice, setOtherPractice] = useState<{
+    practiceId: number;
+    sessionId: number;
+  } | null>(null);
+  const [remapping, setRemapping] = useState<string | null>(null);
+  const [dateReason, setDateReason] = useState("");
+  const mappingPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (remapping) mappingPanel.current?.scrollIntoView?.({ block: "nearest" });
+  }, [remapping]);
+  useEffect(() => {
+    if (open && initialSessionId) {
+      setSessionId(initialSessionId);
+      setStep(1);
+    }
+  }, [open, initialSessionId]);
   const [inlineError, setInlineError] = useState("");
   const [addedPracticeId, setAddedPracticeId] = useState<number | null>(null);
   const acquiredRegistry = useRef<{
@@ -201,6 +228,7 @@ export function FseImportPracticeWizard({
   const addToPractice = useAddFseImportToPractice();
   const createProduct = useCreateProdotto();
   const reviseRow = useReviseFseImportRow();
+  const reviseDate = useReviseFseReferenceDate();
   const detail = detailQuery.data;
   const registryAcquired = detail?.files?.find(
     (file) => file.profilo === "REGISTRO",
@@ -213,7 +241,8 @@ export function FseImportPracticeWizard({
     mapProduct.isPending ||
     addToPractice.isPending ||
     createProduct.isPending ||
-    reviseRow.isPending;
+    reviseRow.isPending ||
+    reviseDate.isPending;
   useEffect(() => {
     if (!detail) return;
     setMode(detail.modalita);
@@ -234,6 +263,8 @@ export function FseImportPracticeWizard({
           detail.dataRiferimentoSaldo ??
             detail.files?.find((file) => file.profilo === "GIACENZE")
               ?.dataRiferimento ??
+            detail.files?.find((file) => file.profilo === "REGISTRO")
+              ?.dataRiferimento ??
             "",
         );
       if (
@@ -253,6 +284,7 @@ export function FseImportPracticeWizard({
   const descriptionsToMap = useMemo(
     () => [
       ...new Set([
+        ...(remapping ? [remapping] : []),
         ...(detail?.rows ?? [])
           .filter((row) => row.stato === "DA_ASSOCIARE")
           .map((row) => row.prodottoEsterno),
@@ -261,7 +293,7 @@ export function FseImportPracticeWizard({
           .map((row) => row.prodottoEsterno),
       ]),
     ],
-    [detail],
+    [detail, remapping],
   );
 
   const showError = (error: unknown) => {
@@ -273,8 +305,9 @@ export function FseImportPracticeWizard({
     });
   };
 
-  const disabledReason =
-    sourcesQuery.isLoading || sourcesQuery.isError
+  const disabledReason = otherPractice
+    ? t("blocco07.resumeOtherHelp")
+    : sourcesQuery.isLoading || sourcesQuery.isError
       ? t("blocco07.sourceLoading")
       : !sourceId && areaSources.length > 1
         ? t("blocco07.missingSource")
@@ -282,11 +315,9 @@ export function FseImportPracticeWizard({
           ? t("blocco07.missingRegistry")
           : mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired
             ? t("blocco07.missingStock")
-            : mode === "SALDO_INIZIALE" && !referenceDate
-              ? t("blocco07.missingDate")
-              : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
-                ? t("blocco07.missingCoverage")
-                : "";
+            : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
+              ? t("blocco07.missingCoverage")
+              : "";
   const chooseFile = (file: File | null, registry: boolean) => {
     if (
       file &&
@@ -296,6 +327,7 @@ export function FseImportPracticeWizard({
       return;
     }
     setInlineError("");
+    setOtherPractice(null);
     if (registry) {
       setRegistryFile(file);
       acquiredRegistry.current = null;
@@ -307,11 +339,7 @@ export function FseImportPracticeWizard({
     if ((!registryFile && !registryAcquired) || disabledReason || pending)
       return;
     setInlineError("");
-    if (
-      mode === "SALDO_INIZIALE" &&
-      ((!stockFile && !stockAcquired) || !referenceDate)
-    )
-      return;
+    if (mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired) return;
     setBusy(true);
     try {
       const resolvedSourceId =
@@ -360,6 +388,24 @@ export function FseImportPracticeWizard({
         });
       }
       if (acquiredSessionId == null) return;
+      const acquired = await getFseImportSession(acquiredSessionId);
+      if (
+        acquired.caricoPraticaId != null &&
+        acquired.caricoPraticaId !== practice.id
+      ) {
+        setOtherPractice({
+          practiceId: acquired.caricoPraticaId,
+          sessionId: acquired.id,
+        });
+        setInlineError(t("blocco07.resumeOtherHelp"));
+        return;
+      }
+      const effectiveDate =
+        referenceDate ||
+        acquired.files.find((file) => file.profilo === "REGISTRO")
+          ?.dataRiferimento ||
+        "";
+      setReferenceDate(effectiveDate);
       if (stockFile) {
         const stock = await analyzeFsePracticeImport(stockFile, {
           ...base,
@@ -367,7 +413,7 @@ export function FseImportPracticeWizard({
           sessionId: acquiredSessionId,
           profilo: "GIACENZE",
           nomeFile: stockFile.name,
-          dataRiferimento: referenceDate || undefined,
+          dataRiferimento: effectiveDate || undefined,
         });
         acquiredSessionId = stock.sessionId;
       }
@@ -405,6 +451,8 @@ export function FseImportPracticeWizard({
         },
       });
       await detailQuery.refetch();
+      setRemapping(null);
+      setInlineError("");
       attachIntent.current = null;
       return true;
     } catch (error) {
@@ -436,9 +484,10 @@ export function FseImportPracticeWizard({
         [newProductFor]: String(created.id),
       }));
       await queryClient.invalidateQueries({ queryKey: ["/api/prodotti"] });
-      await confirmMapping(newProductFor, created.id);
-      setNewProductFor(null);
-      setNewProduct(emptyProduct);
+      if (await confirmMapping(newProductFor, created.id)) {
+        setNewProductFor(null);
+        setNewProduct(emptyProduct);
+      }
     } catch (error) {
       showError(error);
     }
@@ -466,6 +515,7 @@ export function FseImportPracticeWizard({
       });
       setEditingRowId(null);
       setCorrection(null);
+      setInlineError("");
       await detailQuery.refetch();
       attachIntent.current = null;
     } catch (error) {
@@ -514,7 +564,72 @@ export function FseImportPracticeWizard({
     }
   };
 
+  const documentDateRows =
+    detail?.modalita === "NUOVI_CARICHI"
+      ? detail.rows.filter(
+          (row) =>
+            row.stato === "DA_VERIFICARE" &&
+            row.errorCodes.length === 0 &&
+            row.warningCodes.length === 1 &&
+            row.warningCodes[0] === "DATA_DOCUMENTO_FALLBACK" &&
+            row.dataDocumento != null &&
+            row.dataOperativaProposta === row.dataDocumento,
+        )
+      : [];
+  const confirmDocumentDates = async () => {
+    if (!detail || pending || !documentDateRows.length) return;
+    setBusy(true);
+    let version = detail.versione;
+    try {
+      for (const row of documentDateRows) {
+        const updated = await reviseRow.mutateAsync({
+          id: detail.id,
+          rigaId: row.id,
+          data: {
+            versione: version,
+            accettaFallbackData: true,
+            motivo: t("blocco07.documentDatesReason"),
+          },
+        });
+        version = updated.versione;
+      }
+      setInlineError("");
+    } catch (error) {
+      showError(error);
+    } finally {
+      await detailQuery.refetch();
+      attachIntent.current = null;
+      setBusy(false);
+    }
+  };
+  const saveReferenceDate = async () => {
+    if (!detail || !referenceDate || !dateReason.trim()) return;
+    try {
+      await reviseDate.mutateAsync({
+        id: detail.id,
+        data: {
+          versione: detail.versione,
+          dataRiferimento: referenceDate,
+          motivo: dateReason.trim(),
+        },
+      });
+      await detailQuery.refetch();
+      setInlineError("");
+      setDateReason("");
+      attachIntent.current = null;
+    } catch (error) {
+      showError(error);
+    }
+  };
+  const dateMismatch =
+    detail?.modalita === "SALDO_INIZIALE" &&
+    (!stockAcquired?.dataRiferimento ||
+      (registryAcquired?.dataRiferimento != null &&
+        registryAcquired.dataRiferimento !== stockAcquired.dataRiferimento));
   const reset = () => {
+    setOtherPractice(null);
+    setRemapping(null);
+    setDateReason("");
     setSourceId("");
     setStep(0);
     setInlineError("");
@@ -577,6 +692,27 @@ export function FseImportPracticeWizard({
             className="rounded-md border border-destructive p-3 text-sm text-destructive"
           >
             {inlineError}
+          </p>
+        )}
+        {otherPractice && onResumePractice && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              const target = otherPractice;
+              reset();
+              onResumePractice(target.practiceId, target.sessionId);
+            }}
+          >
+            {t("blocco07.resumePractice", { id: otherPractice.practiceId })}
+          </Button>
+        )}
+        {sessionId && detail && (
+          <p className="text-sm text-muted-foreground">
+            {t("blocco07.savedSession", {
+              id: detail.id,
+              practice: detail.caricoPraticaId ?? practice.id,
+            })}
           </p>
         )}
         <ScrollArea className="max-h-[60vh] pr-4">
@@ -730,6 +866,9 @@ export function FseImportPracticeWizard({
               {(mode === "SALDO_INIZIALE" || stockFile) && (
                 <div className="max-w-xs space-y-2">
                   <Label>{t("caricoPratiche.fseReferenceDate")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("blocco07.referenceDateHelp")}
+                  </p>
                   <Input
                     type="date"
                     value={referenceDate}
@@ -768,7 +907,6 @@ export function FseImportPracticeWizard({
                           (session.caricoPraticaId == null ||
                             session.caricoPraticaId === practice.id),
                       )
-                      .slice(0, 5)
                       .map((session) => (
                         <Button
                           key={session.id}
@@ -789,6 +927,60 @@ export function FseImportPracticeWizard({
 
           {step === 1 && detail && (
             <div className="space-y-4">
+              <p className="rounded-md border bg-muted p-3 text-sm font-medium">
+                {t(
+                  detail.modalita === "SALDO_INIZIALE"
+                    ? "blocco07.initialModeReview"
+                    : "blocco07.loadsModeReview",
+                )}
+              </p>
+              {detail.modalita === "SALDO_INIZIALE" && (
+                <div className="space-y-3 rounded-md border p-3">
+                  <p className="text-sm">{t("blocco07.referenceDateHelp")}</p>
+                  <p>
+                    {t("blocco07.detectedDate", {
+                      date: registryAcquired?.dataRiferimento ?? "—",
+                    })}
+                  </p>
+                  {dateMismatch && (
+                    <p role="alert" className="text-destructive">
+                      {t("blocco07.dateMismatch")}
+                    </p>
+                  )}
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <label>
+                      {t("caricoPratiche.fseReferenceDate")}
+                      <Input
+                        type="date"
+                        value={referenceDate}
+                        onChange={(e) => setReferenceDate(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {t("caricoPratiche.fseCorrectionReason")}
+                      <Input
+                        value={dateReason}
+                        onChange={(e) => setDateReason(e.target.value)}
+                      />
+                    </label>
+                    <Button
+                      disabled={pending || !referenceDate || !dateReason.trim()}
+                      onClick={() => void saveReferenceDate()}
+                    >
+                      {t("blocco07.saveDate")}
+                    </Button>
+                  </div>
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox
+                      checked={historicalCoverageConfirmed}
+                      onCheckedChange={(checked) =>
+                        setHistoricalCoverageConfirmed(checked === true)
+                      }
+                    />
+                    {t("caricoPratiche.fseHistoricalCoverageConfirmation")}
+                  </label>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
                 {[
                   ["fseReady", detail.summary.ready],
@@ -810,9 +1002,25 @@ export function FseImportPracticeWizard({
                 ))}
               </div>
 
+              {documentDateRows.length > 0 && (
+                <div className="space-y-2 rounded-md border border-amber-300 p-3">
+                  <p className="text-sm">{t("blocco07.documentDatesHelp")}</p>
+                  <Button
+                    variant="outline"
+                    className="h-auto whitespace-normal"
+                    disabled={pending}
+                    onClick={() => void confirmDocumentDates()}
+                  >
+                    {t("blocco07.confirmDocumentDates", {
+                      count: documentDateRows.length,
+                    })}
+                  </Button>
+                </div>
+              )}
               {descriptionsToMap.map((description) => (
                 <div
                   key={description}
+                  ref={remapping === description ? mappingPanel : undefined}
                   className="space-y-3 rounded-md border p-3"
                 >
                   <div>
@@ -1050,19 +1258,67 @@ export function FseImportPracticeWizard({
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
+                        {t("blocco07.rowNumber", { number: row.numeroRiga })} ·{" "}
                         {row.fondoOrigine ?? "—"} · {row.lottoFisico ?? "—"} ·{" "}
-                        {row.quantitaOperativa ?? "—"}
+                        {row.quantitaOperativa ?? "—"}{" "}
+                        {row.prodotto?.unitaMisura}
                       </p>
+                      <p className="text-sm">
+                        {t("blocco07.fileQuantities", {
+                          pieces:
+                            "tipoMovimento" in row
+                              ? (row.quantitaPezzi ?? "—")
+                              : (row.giacenzaPezzi ?? "—"),
+                          weight:
+                            "tipoMovimento" in row
+                              ? (row.quantitaKgLt ?? "—")
+                              : (row.giacenzaPesoVolume ?? "—"),
+                        })}
+                      </p>
+                      {"tipoMovimento" in row && (
+                        <p className="text-sm text-muted-foreground">
+                          {t("blocco07.rowDates", {
+                            document: row.dataDocumento ?? "—",
+                            operational: row.dataOperativaProposta ?? "—",
+                          })}
+                        </p>
+                      )}
                       {row.errorCodes.length > 0 && (
                         <p className="text-xs text-destructive">
-                          {row.errorCodes.join(", ")}
+                          {row.errorCodes
+                            .map((code) =>
+                              t(`blocco07.importIssues.${code}`, {
+                                defaultValue: code,
+                              }),
+                            )
+                            .join(" · ")}
                         </p>
                       )}
                       {"warningCodes" in row && row.warningCodes.length > 0 && (
                         <p className="text-xs text-amber-700 dark:text-amber-300">
-                          {row.warningCodes.join(", ")}
+                          {row.warningCodes
+                            .map((code) =>
+                              t(`blocco07.importIssues.${code}`, {
+                                defaultValue: code,
+                              }),
+                            )
+                            .join(" · ")}
                         </p>
                       )}
+                      {canManageMappings &&
+                        row.prodottoId != null &&
+                        ["PRONTO", "ERRORE", "DA_VERIFICARE"].includes(
+                          row.stato,
+                        ) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => setRemapping(row.prodottoEsterno)}
+                          >
+                            {t("blocco07.changeMapping")}
+                          </Button>
+                        )}
                       {detail.modalita === "NUOVI_CARICHI" &&
                         "tipoMovimento" in row &&
                         row.prodottoId != null &&
@@ -1087,132 +1343,201 @@ export function FseImportPracticeWizard({
               </div>
 
               {editingRowId != null && correction && (
-                <div className="grid gap-3 rounded-md border p-4 md:grid-cols-3">
-                  <Input
-                    value={correction.quantity}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        quantity: event.target.value,
-                      })
+                <Dialog
+                  open
+                  onOpenChange={(next) => {
+                    if (!next && !pending) {
+                      setEditingRowId(null);
+                      setCorrection(null);
                     }
-                    placeholder={t("caricoPratiche.fseCorrectionQuantity")}
-                  />
-                  <Input
-                    value={correction.documentNumber}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        documentNumber: event.target.value,
-                      })
-                    }
-                    placeholder={t("caricoPratiche.fseCorrectionDocument")}
-                  />
-                  <Input
-                    type="date"
-                    value={correction.documentDate}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        documentDate: event.target.value,
-                      })
-                    }
-                    aria-label={t("caricoPratiche.fseCorrectionDocumentDate")}
-                  />
-                  <Input
-                    type="date"
-                    value={correction.operationalDate}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        operationalDate: event.target.value,
-                      })
-                    }
-                    aria-label={t(
-                      "caricoPratiche.fseCorrectionOperationalDate",
+                  }}
+                >
+                  <DialogContent className="max-h-[85vh] overflow-y-auto max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {t("caricoPratiche.fseCorrect")}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {
+                          detail.rows.find((row) => row.id === editingRowId)
+                            ?.prodottoEsterno
+                        }{" "}
+                        ·{" "}
+                        {t("blocco07.rowNumber", {
+                          number: detail.rows.find(
+                            (row) => row.id === editingRowId,
+                          )?.numeroRiga,
+                        })}
+                      </DialogDescription>
+                    </DialogHeader>
+                    {inlineError && (
+                      <p role="alert" className="text-destructive">
+                        {inlineError}
+                      </p>
                     )}
-                  />
-                  <Input
-                    value={correction.physicalLot}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        physicalLot: event.target.value,
-                      })
-                    }
-                    placeholder={t("caricoPratiche.fseCorrectionLot")}
-                  />
-                  <Input
-                    type="date"
-                    value={correction.expiryDate}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        expiryDate: event.target.value,
-                      })
-                    }
-                    aria-label={t("caricoPratiche.fseCorrectionExpiry")}
-                  />
-                  <Input
-                    value={correction.factor}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        factor: event.target.value,
-                      })
-                    }
-                    placeholder={t("caricoPratiche.fseCorrectionFactor")}
-                  />
-                  <Input
-                    value={correction.disambiguator}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        disambiguator: event.target.value,
-                      })
-                    }
-                    placeholder={t("caricoPratiche.fseCorrectionDisambiguator")}
-                  />
-                  <Input
-                    value={correction.reason}
-                    onChange={(event) =>
-                      setCorrection({
-                        ...correction,
-                        reason: event.target.value,
-                      })
-                    }
-                    placeholder={t("caricoPratiche.fseCorrectionReason")}
-                  />
-                  <label className="flex items-center gap-2 text-sm md:col-span-2">
-                    <Checkbox
-                      checked={correction.acceptDateFallback}
-                      onCheckedChange={(checked) =>
-                        setCorrection({
-                          ...correction,
-                          acceptDateFallback: checked === true,
-                        })
-                      }
-                    />
-                    {t("caricoPratiche.fseAcceptDateFallback")}
-                  </label>
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={!correction.reason.trim() || pending}
-                      onClick={() => void saveCorrection()}
-                    >
-                      {t("caricoPratiche.fseSaveCorrection")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingRowId(null);
-                        setCorrection(null);
-                      }}
-                    >
-                      {t("barcodeScanner.cancel")}
-                    </Button>
-                  </div>
-                </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionQuantity")}
+                        <Input
+                          value={correction.quantity}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              quantity: event.target.value,
+                            })
+                          }
+                          placeholder={t(
+                            "caricoPratiche.fseCorrectionQuantity",
+                          )}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionDocument")}
+                        <Input
+                          value={correction.documentNumber}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              documentNumber: event.target.value,
+                            })
+                          }
+                          placeholder={t(
+                            "caricoPratiche.fseCorrectionDocument",
+                          )}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionDocumentDate")}
+                        <Input
+                          type="date"
+                          value={correction.documentDate}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              documentDate: event.target.value,
+                            })
+                          }
+                          aria-label={t(
+                            "caricoPratiche.fseCorrectionDocumentDate",
+                          )}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionOperationalDate")}
+                        <Input
+                          type="date"
+                          value={correction.operationalDate}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              operationalDate: event.target.value,
+                            })
+                          }
+                          aria-label={t(
+                            "caricoPratiche.fseCorrectionOperationalDate",
+                          )}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionLot")}
+                        <Input
+                          value={correction.physicalLot}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              physicalLot: event.target.value,
+                            })
+                          }
+                          placeholder={t("caricoPratiche.fseCorrectionLot")}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionExpiry")}
+                        <Input
+                          type="date"
+                          value={correction.expiryDate}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              expiryDate: event.target.value,
+                            })
+                          }
+                          aria-label={t("caricoPratiche.fseCorrectionExpiry")}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionFactor")}
+                        <Input
+                          value={correction.factor}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              factor: event.target.value,
+                            })
+                          }
+                          placeholder={t("caricoPratiche.fseCorrectionFactor")}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionDisambiguator")}
+                        <Input
+                          value={correction.disambiguator}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              disambiguator: event.target.value,
+                            })
+                          }
+                          placeholder={t(
+                            "caricoPratiche.fseCorrectionDisambiguator",
+                          )}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        {t("caricoPratiche.fseCorrectionReason")}
+                        <Input
+                          value={correction.reason}
+                          onChange={(event) =>
+                            setCorrection({
+                              ...correction,
+                              reason: event.target.value,
+                            })
+                          }
+                          placeholder={t("caricoPratiche.fseCorrectionReason")}
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-sm md:col-span-2">
+                        <Checkbox
+                          checked={correction.acceptDateFallback}
+                          onCheckedChange={(checked) =>
+                            setCorrection({
+                              ...correction,
+                              acceptDateFallback: checked === true,
+                            })
+                          }
+                        />
+                        {t("caricoPratiche.fseAcceptDateFallback")}
+                      </label>
+                      <div className="flex gap-2">
+                        <Button
+                          disabled={!correction.reason.trim() || pending}
+                          onClick={() => void saveCorrection()}
+                        >
+                          {t("caricoPratiche.fseSaveCorrection")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingRowId(null);
+                            setCorrection(null);
+                          }}
+                        >
+                          {t("barcodeScanner.cancel")}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
             </div>
           )}
@@ -1241,6 +1566,13 @@ export function FseImportPracticeWizard({
                       pieces: detail.summary.stockPieces,
                     })}
               </p>
+              <p className="text-sm">
+                {t(
+                  detail.modalita === "SALDO_INIZIALE"
+                    ? "blocco07.initialModeReview"
+                    : "blocco07.loadsModeReview",
+                )}
+              </p>
               <p className="font-medium text-amber-700 dark:text-amber-300">
                 {t("caricoPratiche.fseNoStockChange")}
               </p>
@@ -1254,6 +1586,18 @@ export function FseImportPracticeWizard({
           </p>
         )}
         <DialogFooter>
+          {step < 3 && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => {
+                onOpenChange(false);
+                reset();
+              }}
+            >
+              {t("blocco07.suspendImport")}
+            </Button>
+          )}
           {step === 3 && (
             <Button
               onClick={() => {
@@ -1297,7 +1641,9 @@ export function FseImportPracticeWizard({
                 (detail.modalita === "NUOVI_CARICHI" &&
                   selectedRows.size === 0) ||
                 (detail.modalita === "SALDO_INIZIALE" &&
-                  !historicalCoverageConfirmed)
+                  (!historicalCoverageConfirmed ||
+                    Boolean(dateMismatch) ||
+                    referenceDate !== detail.dataRiferimentoSaldo))
               }
             >
               {t("caricoPratiche.fseReviewSummary")}

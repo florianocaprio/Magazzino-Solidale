@@ -1584,6 +1584,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/FseImportSessionDetail"
 
+  /fse-importazioni/sessioni/{id}/data-riferimento:
+    patch:
+      operationId: reviseFseReferenceDate
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseReferenceDateInput"
+      responses:
+        "200":
+          description: Data verificata e corretta senza variazione di stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSession"
+        "409":
+          description: Data incoerente, versione superata o sessione già presa in carico
+
   /fse-importazioni/sessioni/{id}/associa-prodotto:
     post:
       operationId: mapFseImportProduct
@@ -14043,6 +14068,15 @@ components:
       properties:
         magazzinoId: { type: integer, minimum: 1 }
       required: [magazzinoId]
+
+    FseReferenceDateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+      required: [versione, dataRiferimento, motivo]
 
     FseImportSourceInput:
       type: object

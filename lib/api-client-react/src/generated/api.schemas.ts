@@ -2255,6 +2255,17 @@ export interface FseAutomaticSourceInput {
   magazzinoId: number;
 }
 
+export interface FseReferenceDateInput {
+  /** @minimum 1 */
+  versione: number;
+  dataRiferimento: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  motivo: string;
+}
+
 export interface FseImportSourceInput {
   /**
    * @minLength 1

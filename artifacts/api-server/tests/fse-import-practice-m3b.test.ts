@@ -2611,6 +2611,14 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         sessionId: registry.body.sessionId,
         referenceDate: caseId === "data-diversa" ? "2026-09-18" : "2026-09-17",
       });
+      if (caseId === "data-diversa") {
+        expect(stock.status).toBe(409);
+        expect(stock.body.code).toBe(expectedCode);
+        const remaining = await request(app).get(`/fse-importazioni/sessioni/${registry.body.sessionId}`);
+        expect(remaining.body.files).toHaveLength(1);
+        expect(remaining.body.stockRows).toHaveLength(0);
+        return;
+      }
       const mapped = await mapProduct(
         app,
         registry.body.sessionId,
@@ -3345,6 +3353,78 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       .from(caricoPraticheTable)
       .where(eq(caricoPraticheTable.id, created.body.id));
     expect(persistedPractice.stato).toBe("aperta");
+  });
+
+  it("recupera una data errata già salvata, conserva mapping e impedisce modifiche dopo la presa in carico", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("recupero-data");
+    const { practice, registry, detail } = await prepareInitialBalance(app, { ...context, document: `REC-DATA-${suffix}` });
+    const sessionId = registry.body.sessionId;
+    // Reproduce the metadata saved by the old UI; never change production data.
+    await db.update(fseImportFilesTable).set({ dataRiferimento: "2026-09-01" }).where(and(eq(fseImportFilesTable.sessioneId, sessionId), eq(fseImportFilesTable.profilo, "GIACENZE")));
+    await db.update(fseImportSessionsTable).set({ dataRiferimentoSaldo: "2026-09-01" }).where(eq(fseImportSessionsTable.id, sessionId));
+    const endpoint = `/fse-importazioni/sessioni/${sessionId}/data-riferimento`;
+    const payload = { versione: detail.body.versione, dataRiferimento: "2026-09-17", motivo: "Confrontata la data del Registro con le Giacenze" };
+    expect((await request(app).patch(endpoint).send({ ...payload, dataRiferimento: "2026-09-02" })).status).toBe(409);
+    expect((await request(app).patch(endpoint).send({ ...payload, versione: 1 })).status).toBe(409);
+    const saved = await request(app).patch(endpoint).send(payload);
+    expect(saved.status).toBe(200);
+    const recovered = await request(app).get(`/fse-importazioni/sessioni/${sessionId}`);
+    expect(recovered.body.dataRiferimentoSaldo).toBe("2026-09-17");
+    expect(recovered.body.stockRows).toEqual(detail.body.stockRows);
+    expect(recovered.body.files.find((f: { profilo: string }) => f.profilo === "GIACENZE").dataRiferimento).toBe("2026-09-17");
+    expect(recovered.body.summary.ready).toBe(1);
+    const attached = await request(app).post(`/fse-importazioni/sessioni/${sessionId}/aggiungi-pratica`).send({
+      versione: recovered.body.versione, versionePratica: practice.body.versione, confermaCoperturaStorica: true, idempotencyKey: `REC-DATA-${suffix}`,
+    });
+    expect(attached.status).toBe(201);
+    expect((await request(app).patch(endpoint).send({ ...payload, versione: recovered.body.versione + 1 })).status).toBe(409);
+    expect(await db.select().from(movimentiTable).where(eq(movimentiTable.magazzinoId, context.warehouseId))).toHaveLength(0);
+  });
+
+  it("conserva le dimensioni nel saldo anche se il fattore è ricavato da pezzi e peso", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("saldo-rapporto");
+    const practice = await createEmptyPractice(app, context.warehouseId);
+    const regRow = registryRow(`BAL-RATIO-${suffix}`, 10, 10); regRow[3] = 5; regRow[9] = 5;
+    const registry = await upload(app, { bytes: workbook(registryHeaders, [regRow]), ...context, practiceId: practice.body.id, mode: "SALDO_INIZIALE", profile: "REGISTRO" });
+    const stockValues = stockRow(10); stockValues[9] = 5;
+    const stock = await upload(app, { bytes: workbook(stockHeaders, [stockValues]), ...context, practiceId: practice.body.id, mode: "SALDO_INIZIALE", profile: "GIACENZE", sessionId: registry.body.sessionId });
+    expect(stock.status).toBe(201);
+    const mapping = await mapProduct(app, registry.body.sessionId, stock.body.versione);
+    expect(mapping.status).toBe(200);
+    const attached = await request(app).post(`/fse-importazioni/sessioni/${registry.body.sessionId}/aggiungi-pratica`).send({ versione: mapping.body.versione, versionePratica: practice.body.versione, confermaCoperturaStorica: true, idempotencyKey: `BAL-RATIO-${suffix}` });
+    expect(attached.status).toBe(201);
+    const ready = await request(app).get(`/carico-pratiche/${practice.body.id}`);
+    expect(Number(ready.body.righe[0].fattoreKgLtPezzo)).toBe(0.5);
+    const registered = await request(app).post(`/carico-pratiche/${practice.body.id}/registra`).send({ versione: ready.body.versione, rigaIds: ready.body.righe.map((row: { id: number }) => row.id), idempotencyKey: `BAL-RATIO-REG-${suffix}` });
+    expect(registered.status).toBe(201);
+    const [movement] = await db.select().from(movimentiTable).where(eq(movimentiTable.magazzinoId, context.warehouseId));
+    expect(Number(movement.quantitaPezzi)).toBe(10); expect(Number(movement.quantitaKgLt)).toBe(5);
+  });
+
+  it("ricava il fattore del movimento dal Registro e permette la conferma data senza inventare quantità", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("rapporto-registro");
+    const practice = await createEmptyPractice(app, context.warehouseId);
+    const row = registryRow(`RATIO-${suffix}`, 150, 150);
+    row[9] = 75; row[3] = 75;
+    const registry = await upload(app, { bytes: workbook(registryHeaders, [row]), ...context, practiceId: practice.body.id, profile: "REGISTRO", mode: "NUOVI_CARICHI" });
+    const mapped = await request(app).post(`/fse-importazioni/sessioni/${registry.body.sessionId}/associa-prodotto`).send({ versione: registry.body.versione, prodottoId: productId, descrizioneEsterna: "Prodotto sintetico M3B", motivo: "Controllo pezzi e peso", accettaFallbackData: false });
+    expect(mapped.status).toBe(200);
+    const detail = await request(app).get(`/fse-importazioni/sessioni/${registry.body.sessionId}`);
+    expect(detail.body.rows[0]).toMatchObject({ stato: "DA_VERIFICARE", errorCodes: [] });
+    expect(Number(detail.body.rows[0].quantitaOperativa)).toBe(150);
+    expect(Number(detail.body.rows[0].fattoreKgLtPezzo)).toBe(0.5);
+    const invalidQuantity = await request(app).patch(`/fse-importazioni/sessioni/${registry.body.sessionId}/righe/${detail.body.rows[0].id}`).send({ versione: detail.body.versione, quantita: "1.5", accettaFallbackData: true, motivo: "Verifica controllo quantità" });
+    expect(invalidQuantity.status).toBe(400);
+    expect(invalidQuantity.body.code).toBe("QUANTITA_NON_COMPATIBILE");
+    const corrected = await request(app).patch(`/fse-importazioni/sessioni/${registry.body.sessionId}/righe/${detail.body.rows[0].id}`).send({ versione: detail.body.versione, accettaFallbackData: true, motivo: "Confermo la data del documento" });
+    expect(corrected.status).toBe(200);
+    const ready = await request(app).get(`/fse-importazioni/sessioni/${registry.body.sessionId}`);
+    expect(ready.body.rows[0].stato).toBe("PRONTO");
+    const attached = await request(app).post(`/fse-importazioni/sessioni/${registry.body.sessionId}/aggiungi-pratica`).send({ versione: ready.body.versione, versionePratica: practice.body.versione, rigaIds: [ready.body.rows[0].id], idempotencyKey: `RATIO-${suffix}` });
+    expect(attached.status).toBe(201);
   });
 
   it.runIf(originalsAvailable)(

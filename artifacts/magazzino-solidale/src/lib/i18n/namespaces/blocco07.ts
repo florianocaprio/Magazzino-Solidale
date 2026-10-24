@@ -1,6 +1,32 @@
 import type { i18n } from "i18next";
 export const blocco07 = {
   it: {
+    initialModeReview: "Giacenza iniziale: vengono caricate solo le quantità disponibili del file Giacenze. Il Registro serve a verificare lo storico e non viene sommato.",
+    loadsModeReview: "Nuovi carichi: vengono aggiunti i carichi selezionati del Registro, non le giacenze attuali. Gli scarichi storici non vengono importati. Per iniziare dalle quantità disponibili, torna indietro e scegli Imposta giacenza iniziale in una nuova pratica.",
+    documentDatesHelp: "Queste righe hanno quantità valide ma nel file manca la data di carico. Puoi confermare l’uso della data documento mostrata per ciascuna riga, oppure correggerla singolarmente. La conferma viene salvata riga per riga; in caso di interruzione puoi riprendere dalle rimanenti.",
+    confirmDocumentDates: "Conferma la data documento per {{count}} righe",
+    documentDatesReason: "Conferma esplicita dell’operatore: usa la data documento delle righe verificate",
+    rowDates: "Data documento: {{document}} · Data di carico proposta: {{operational}}",
+    resumeOtherHelp: "Questi file sono già salvati in un’altra pratica. Riprendi quella pratica per conservare le associazioni ed evitare duplicati.",
+    resumePractice: "Riprendi pratica #{{id}}",
+    pendingImports: "Importazioni FSE+ da completare",
+    savedSession: "Importazione #{{id}} salvata nella pratica #{{practice}}. Puoi sospenderla e riprenderla da Carico Merce.",
+    referenceDateHelp: "È il giorno a cui si riferiscono le quantità del file Giacenze, non il giorno del caricamento. Se lasci vuoto, viene proposta la data letta nel Registro. I due file devono riferirsi allo stesso giorno.",
+    detectedDate: "Data letta nel Registro: {{date}}",
+    dateMismatch: "La data delle Giacenze manca o non coincide con il Registro. Correggila qui prima di continuare.",
+    saveDate: "Salva data di riferimento",
+    rowNumber: "Riga {{number}}",
+    fileQuantities: "Dati del file: {{pieces}} pezzi · {{weight}} kg/l",
+    changeMapping: "Cambia prodotto associato",
+    suspendImport: "Sospendi importazione",
+    importIssues: {
+      DATA_DOCUMENTO_FALLBACK: "Manca la data di carico: verifica e conferma l’uso della data del documento.",
+      QUANTITA_NON_COMPATIBILE: "Quantità, unità o fattore pezzi/kg non coerenti. Verifica il prodotto associato e correggi i dati.",
+      SCADENZA_OBBLIGATORIA: "Il prodotto richiede una scadenza: inseriscila oppure verifica l’associazione.",
+      LOTTO_FISICO_OBBLIGATORIO: "Il prodotto richiede il lotto del produttore.",
+      GIACENZA_AMBIGUA: "Più giacenze corrispondono a questa riga: verifica lotto e scadenza.",
+      MOLTEPLICITA_AMBIGUA: "Righe con la stessa identità: assegna un riferimento distintivo dopo la verifica.",
+    },
     noProductSuggestions:
       "Nessuna proposta sufficientemente simile nel catalogo attuale: scegli un prodotto esistente oppure creane uno.",
     fileFormat: { ELENCO: "Elenco semplice (XLSX)", MASSIVO: "Massivo (XLSM)" },

@@ -41,6 +41,7 @@ import {
   RaccolteTab,
 } from "@/components/carico-merce-tabs";
 import { parseCaricoMerceTab } from "@/lib/carico-merce-location";
+import { FsePendingImports } from "@/components/fse-pending-imports";
 import { FseImportPracticeWizard } from "@/components/fse-import-practice-wizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,13 @@ function CarichiContent() {
   const [registrationUncertain, setRegistrationUncertain] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [fseImportOpen, setFseImportOpen] = useState(false);
+  const [resumeFseSession, setResumeFseSession] = useState<number | null>(null);
+  const resumeFse = (practiceId: number, sessionId: number) => {
+    setSelectedId(practiceId);
+    setCreating(false);
+    setResumeFseSession(sessionId);
+    setFseImportOpen(true);
+  };
   const [openImportAfterSave, setOpenImportAfterSave] = useState(false);
   const registrationKey = useRef<string | null>(null);
   const registrationAttemptedRows = useRef<number[]>([]);
@@ -1086,6 +1094,21 @@ function CarichiContent() {
             />
           </CardContent>
         </Card>
+        {canImportFse &&
+          warehouses
+            .filter(
+              (warehouse) =>
+                (filterAreaId == null || warehouse.areaOperativaId === filterAreaId) &&
+                (filterWarehouse === "all" || warehouse.id === Number(filterWarehouse)),
+            )
+            .map((warehouse) => (
+              <FsePendingImports
+                key={warehouse.id}
+                warehouseId={warehouse.id}
+                warehouseName={warehouse.nome}
+                onResume={resumeFse}
+              />
+            ))}
         <div className="grid gap-3">
           {practicesQuery.isLoading && (
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -2414,7 +2437,13 @@ function CarichiContent() {
       {practice && (
         <FseImportPracticeWizard
           open={fseImportOpen}
-          onOpenChange={setFseImportOpen}
+          key={practice.id}
+          onOpenChange={(open) => {
+            setFseImportOpen(open);
+            if (!open) setResumeFseSession(null);
+          }}
+          initialSessionId={resumeFseSession}
+          onResumePractice={resumeFse}
           practice={practice}
           products={products}
           onPracticeReady={(practiceId) => {

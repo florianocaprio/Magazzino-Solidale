@@ -3615,6 +3615,43 @@ export const GetFseImportSessionResponse = zod
     }),
   );
 
+export const ReviseFseReferenceDateParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const reviseFseReferenceDateBodyMotivoMax = 1000;
+
+export const ReviseFseReferenceDateBody = zod.object({
+  versione: zod.number().min(1),
+  dataRiferimento: zod.coerce.date(),
+  motivo: zod.string().min(1).max(reviseFseReferenceDateBodyMotivoMax),
+});
+
+export const ReviseFseReferenceDateResponse = zod.object({
+  id: zod.number(),
+  sourceRegistryId: zod.number(),
+  areaOperativaId: zod.number(),
+  magazzinoId: zod.number(),
+  lottoLogicoId: zod.number(),
+  caricoPraticaId: zod.number().nullish(),
+  modalita: zod.enum(["NUOVI_CARICHI", "SALDO_INIZIALE"]),
+  stato: zod.enum([
+    "IN_ANALISI",
+    "DA_COMPLETARE",
+    "PRONTA",
+    "IN_PRATICA",
+    "REGISTRATA",
+    "ANNULLATA",
+  ]),
+  versione: zod.number(),
+  dataRiferimentoSaldo: zod.coerce.date().nullish(),
+  coperturaConfermata: zod.union([zod.literal(0), zod.literal(1)]),
+  creatoDa: zod.number(),
+  aggiornatoDa: zod.number(),
+  dataCreazione: zod.coerce.date(),
+  dataAggiornamento: zod.coerce.date(),
+});
+
 export const MapFseImportProductParams = zod.object({
   id: zod.coerce.number().min(1),
 });

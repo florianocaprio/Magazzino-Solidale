@@ -425,7 +425,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     const context = await ensureContext(page, suffix);
     const source = await createSource(page, context.area, `RESUME-SUGGEST-${suffix}`);
     const description = `Pratica riaperta ${suffix}`, external = `Alimento riapertura ${suffix}`;
-    await createPractice(page, context, description);
+    const practice = await createPractice(page, context, description);
     await page.goto("/carico-merce"); await openPractice(page, context.area, description);
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(page, page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }), source.descrizione);
@@ -434,11 +434,13 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByRole("paragraph").filter({ hasText: external })).toBeVisible();
     await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toBeEnabled();
     // Session already exists before the catalog product is added.
-    await page.getByRole("dialog").last().getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Sospendi importazione", exact: true }).click();
     const created = await page.request.post("/api/prodotti", { data: { nome: external, tipoProdotto: "alimentare", unitaMisura: "pz", quantitaFrazionabile: false, lottoFisicoObbligatorio: false, gestioneScadenza: false } });
     expect(created.status()).toBe(201); const product = await created.json();
-    await page.getByRole("button", { name: "Importa file FSE+" }).click();
-    await page.getByRole("button", { name: /#\d+ · DA_COMPLETARE/ }).click();
+    // A fresh page has no in-memory practice/session: use the persisted recovery entry.
+    await page.goto("/carico-merce");
+    const pendingImport = page.getByRole("region", { name: "Importazioni FSE+ da completare" }).filter({ hasText: context.warehouse.nome });
+    await pendingImport.getByRole("button", { name: `Riprendi pratica #${practice.id}`, exact: true }).click();
     await page.getByRole("button", { name: `Associa a ${external} · ${product.codice} · pz`, exact: true }).click();
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
   });
@@ -841,7 +843,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: stockBytes,
     });
-    await page.getByLabel("Data di riferimento").fill(referenceDate);
+    await expect(page.getByLabel("Data di riferimento")).toHaveValue("");
     await page
       .getByText(/Confermo che il Registro copre lo storico necessario/)
       .click();
@@ -859,6 +861,14 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       );
       await card.getByRole("button", { name: "Associa", exact: true }).click();
     }
+    await expect(page.getByLabel("Data di riferimento")).toHaveValue(referenceDate);
+    await page.getByRole("button", { name: "Sospendi importazione", exact: true }).click();
+    await page.goto("/carico-merce");
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa" }), base.area.nome);
+    await page.getByRole("button", { name: `Riprendi pratica #${practice.id}`, exact: true }).click();
+    // Persistence does not silently carry over the operator's accounting confirmation.
+    await expect(page.getByRole("button", { name: "Vai al riepilogo" })).toBeDisabled();
+    await page.getByText(/Confermo che il Registro copre lo storico necessario/).click();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
     await expect(page.getByText(new RegExp(String(expectedPieces)))).toBeVisible();
     const balanceAttach = page.waitForResponse(

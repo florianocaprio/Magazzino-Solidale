@@ -225,6 +225,7 @@ import type {
   FseReconciliationRowsPage,
   FseRecord,
   FseRecordPage,
+  FseReferenceDateInput,
   FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
@@ -5618,6 +5619,88 @@ export function useGetFseImportSession<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getReviseFseReferenceDateUrl = (id: number) => {
+  return `/api/fse-importazioni/sessioni/${id}/data-riferimento`;
+};
+
+export const reviseFseReferenceDate = async (
+  id: number,
+  fseReferenceDateInput: FseReferenceDateInput,
+  options?: RequestInit,
+): Promise<FseImportSession> => {
+  return customFetch<FseImportSession>(getReviseFseReferenceDateUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fseReferenceDateInput),
+  });
+};
+
+export const getReviseFseReferenceDateMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    TError,
+    { id: number; data: BodyType<FseReferenceDateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+  TError,
+  { id: number; data: BodyType<FseReferenceDateInput> },
+  TContext
+> => {
+  const mutationKey = ["reviseFseReferenceDate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    { id: number; data: BodyType<FseReferenceDateInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reviseFseReferenceDate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviseFseReferenceDateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>
+>;
+export type ReviseFseReferenceDateMutationBody =
+  BodyType<FseReferenceDateInput>;
+export type ReviseFseReferenceDateMutationError = ErrorType<void>;
+
+export const useReviseFseReferenceDate = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    TError,
+    { id: number; data: BodyType<FseReferenceDateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+  TError,
+  { id: number; data: BodyType<FseReferenceDateInput> },
+  TContext
+> => {
+  return useMutation(getReviseFseReferenceDateMutationOptions(options));
+};
 
 export const getMapFseImportProductUrl = (id: number) => {
   return `/api/fse-importazioni/sessioni/${id}/associa-prodotto`;

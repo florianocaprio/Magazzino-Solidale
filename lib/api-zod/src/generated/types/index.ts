@@ -398,6 +398,7 @@ export * from "./fseReconciliationRowsPage";
 export * from "./fseRecord";
 export * from "./fseRecordList";
 export * from "./fseRecordPage";
+export * from "./fseReferenceDateInput";
 export * from "./fseReportingPreview";
 export * from "./fseResolutionInput";
 export * from "./fseResolutionInputAzione";

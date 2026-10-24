@@ -30,10 +30,15 @@ import {
   addFseRowsToPractice,
   mapFseProduct,
   reviseFseImportRow,
+  reviseFseReferenceDate,
   totalStockPieces,
 } from "../lib/fsePracticeImportService";
 import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
+
+import { InventoryQuantityDimensionsError } from "../lib/inventoryQuantityDimensions";
+import { InventoryDecimalError } from "../lib/inventoryDecimal";
+import { ProductOperationalQuantityError } from "../lib/productQuantity";
 
 const router: IRouter = Router();
 router.use("/fse-importazioni", requireAllModuli(["CARICHI", "LOTTI"]));
@@ -69,6 +74,16 @@ function text(value: unknown, field: string, max: number): string {
 }
 
 function sendKnownError(res: Response, error: unknown) {
+  if (
+    error instanceof InventoryQuantityDimensionsError ||
+    error instanceof InventoryDecimalError ||
+    error instanceof ProductOperationalQuantityError
+  ) {
+    res
+      .status(400)
+      .json({ error: error.message, code: "QUANTITA_NON_COMPATIBILE" });
+    return true;
+  }
   if (error instanceof CurrentCommandActorError) {
     res.status(403).json({ error: error.message, code: "FSE_SCOPE_REVOKED" });
     return true;
@@ -529,6 +544,8 @@ router.get(
             ? null
             : (productMap.get(row.prodottoId) ?? null),
       });
+      const actionableRows =
+        session.modalita === "SALDO_INIZIALE" ? stockRows : rows;
       res.json({
         ...session,
         files,
@@ -536,13 +553,14 @@ router.get(
         stockRows: stockRows.map(decorate),
         summary: {
           total: rows.length,
-          ready: rows.filter((row) => row.stato === "PRONTO").length,
-          needsMapping: rows.filter((row) => row.stato === "DA_ASSOCIARE")
-            .length,
-          needsReview: rows.filter((row) =>
+          ready: actionableRows.filter((row) => row.stato === "PRONTO").length,
+          needsMapping: actionableRows.filter(
+            (row) => row.stato === "DA_ASSOCIARE",
+          ).length,
+          needsReview: actionableRows.filter((row) =>
             ["DA_VERIFICARE", "DATO_MODIFICATO"].includes(row.stato),
           ).length,
-          errors: rows.filter((row) => row.stato === "ERRORE").length,
+          errors: actionableRows.filter((row) => row.stato === "ERRORE").length,
           known: rows.filter((row) =>
             ["GIA_REGISTRATO", "GIA_NELLA_PRATICA", "COPERTO_SALDO"].includes(
               row.stato,
@@ -554,6 +572,33 @@ router.get(
           stockPieces: totalStockPieces(stockRows),
         },
       });
+    } catch (error) {
+      if (!sendKnownError(res, error)) throw error;
+    }
+  },
+);
+
+router.patch(
+  "/fse-importazioni/sessioni/:id/data-riferimento",
+  requirePermission("magazzino.agea.import"),
+  async (req, res) => {
+    try {
+      const session = await accessibleSession(
+        req,
+        positiveId(req.params.id, "id"),
+      );
+      assertInitialBalancePermission(req, session);
+      const result = await db.transaction((tx) =>
+        reviseFseReferenceDate(tx, {
+          sessionId: session.id,
+          version: positiveId(req.body?.versione, "versione"),
+          date: text(req.body?.dataRiferimento, "dataRiferimento", 10),
+          reason: text(req.body?.motivo, "motivo", 1000),
+          actorId: req.user!.id,
+          audit: auditContextFromRequest(req),
+        }),
+      );
+      res.json(result);
     } catch (error) {
       if (!sendKnownError(res, error)) throw error;
     }
