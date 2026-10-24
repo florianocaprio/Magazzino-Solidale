@@ -61,6 +61,7 @@ import {
 } from "@/lib/fse-import-attach-intent";
 import {
   AlertTriangle,
+  CheckCircle2,
   FileSpreadsheet,
   Loader2,
   PackagePlus,
@@ -189,6 +190,7 @@ export function FseImportPracticeWizard({
   const [registryFile, setRegistryFile] = useState<File | null>(null);
   const [stockFile, setStockFile] = useState<File | null>(null);
   const [referenceDate, setReferenceDate] = useState("");
+  const [editingReferenceDate, setEditingReferenceDate] = useState(false);
   const [historicalCoverageConfirmed, setHistoricalCoverageConfirmed] =
     useState(false);
   const [busy, setBusy] = useState(false);
@@ -290,6 +292,7 @@ export function FseImportPracticeWizard({
       ),
     );
     if (initialize) {
+      setEditingReferenceDate(false);
       if (!busy)
         setReferenceDate(
           detail.dataRiferimentoSaldo ??
@@ -653,6 +656,7 @@ export function FseImportPracticeWizard({
       await detailQuery.refetch();
       setInlineError("");
       setDateReason("");
+      setEditingReferenceDate(false);
       attachIntent.current = null;
     } catch (error) {
       showError(error);
@@ -666,6 +670,13 @@ export function FseImportPracticeWizard({
     (!stockAcquired?.dataRiferimento ||
       (registryAcquired?.dataRiferimento != null &&
         registryAcquired.dataRiferimento !== stockAcquired.dataRiferimento));
+  const referenceDateConfirmed = Boolean(
+    detail?.dataRiferimentoSaldo &&
+    referenceDate === detail.dataRiferimentoSaldo &&
+    stockAcquired?.dataRiferimento === detail.dataRiferimentoSaldo &&
+    !stockAcquired?.warningsJson?.includes("DATA_RIFERIMENTO_DA_CONFERMARE") &&
+    !dateMismatch,
+  );
   const reset = () => {
     setOtherPractice(null);
     setRemapping(null);
@@ -680,6 +691,7 @@ export function FseImportPracticeWizard({
     setRegistryFile(null);
     setStockFile(null);
     setReferenceDate("");
+    setEditingReferenceDate(false);
     setHistoricalCoverageConfirmed(false);
     setSelectedRows(new Set());
     selectedSession.current = null;
@@ -981,17 +993,30 @@ export function FseImportPracticeWizard({
                 )}
               </p>
               {detail.modalita === "SALDO_INIZIALE" && (
-                <div className="space-y-3 rounded-md border p-3">
-                  <p className="text-sm">{t("blocco07.referenceDateHelp")}</p>
-                  <p>
-                    {t("blocco07.detectedDate", {
-                      date: registryAcquired?.dataRiferimento ?? "—",
-                    })}
-                  </p>
-                  {dateMismatch && (
-                    <p role="alert" className="text-destructive">
-                      {t("blocco07.dateMismatch")}
-                    </p>
+                <div className="space-y-3">
+                  {referenceDateConfirmed && !editingReferenceDate ? (
+                    <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      <span className="flex-1 text-sm font-medium">
+                        {t("blocco07.confirmedDate", { date: detail.dataRiferimentoSaldo?.split("-").reverse().join("/") })}
+                        {historicalCoverageConfirmed && ` · ${t("blocco07.confirmedCoverage")}`}
+                      </span>
+                      <Button variant="ghost" size="sm" disabled={pending} onClick={() => setEditingReferenceDate(true)}>
+                        {t("blocco07.editDate")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 rounded-md border p-3">
+                      <p className="text-sm">{t("blocco07.referenceDateHelp")}</p>
+                      <p>
+                        {t("blocco07.detectedDate", {
+                          date: registryAcquired?.dataRiferimento ?? "—",
+                        })}
+                      </p>
+                      {dateMismatch && (
+                        <p role="alert" className="text-destructive">
+                          {t("blocco07.dateMismatch")}
+                      </p>
                   )}
                   <div className="grid gap-2 md:grid-cols-3">
                     <label>
@@ -1016,15 +1041,19 @@ export function FseImportPracticeWizard({
                       {t("blocco07.saveDate")}
                     </Button>
                   </div>
-                  <label className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                      checked={historicalCoverageConfirmed}
-                      onCheckedChange={(checked) =>
-                        setHistoricalCoverageConfirmed(checked === true)
-                      }
-                    />
-                    {t("caricoPratiche.fseHistoricalCoverageConfirmation")}
-                  </label>
+                  </div>
+                  )}
+                  {(!referenceDateConfirmed || editingReferenceDate || !historicalCoverageConfirmed) && (
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={historicalCoverageConfirmed}
+                        onCheckedChange={(checked) =>
+                          setHistoricalCoverageConfirmed(checked === true)
+                        }
+                      />
+                      {t("caricoPratiche.fseHistoricalCoverageConfirmation")}
+                    </label>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
