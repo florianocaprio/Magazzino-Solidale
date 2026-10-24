@@ -1529,6 +1529,37 @@ paths:
         "409":
           description: Scelta esplicita necessaria o registro disattivato
 
+  /fse-importazioni/confronta-giacenze:
+    post:
+      operationId: compareFseWarehouseStock
+      tags: [fse-importazioni]
+      description: Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+      parameters:
+        - in: query
+          name: sourceRegistryId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: magazzinoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Risultato del confronto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseStockComparison"
+        "400":
+          description: File vuoto o non valido
+        "403":
+          description: Magazzino o sorgente non autorizzati
+
   /fse-importazioni/analizza:
     post:
       operationId: analyzeFsePracticeImport
@@ -14089,6 +14120,33 @@ components:
       type: string
       enum:
         [IN_ANALISI, DA_COMPLETARE, PRONTA, IN_PRATICA, REGISTRATA, ANNULLATA]
+
+    FseStockDifference:
+      type: object
+      properties:
+        prodotto: { type: string }
+        lotto: { type: [string, "null"] }
+        fondo: { type: [string, "null"] }
+        quantitaFile: { type: [string, "null"] }
+        quantitaLocale: { type: [string, "null"] }
+        unita: { type: string }
+        motivo: { type: string }
+      required:
+        [prodotto, lotto, fondo, quantitaFile, quantitaLocale, unita, motivo]
+
+    FseStockComparison:
+      type: object
+      properties:
+        allineato: { type: boolean }
+        righeFile: { type: integer }
+        righeCoincidenti: { type: integer }
+        verificatoAt: { type: string, format: date-time }
+        differenze:
+          type: array
+          items:
+            $ref: "#/components/schemas/FseStockDifference"
+      required:
+        [allineato, righeFile, righeCoincidenti, verificatoAt, differenze]
 
     FseImportSource:
       type: object

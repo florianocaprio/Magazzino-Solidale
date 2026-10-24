@@ -60,3 +60,31 @@ Le prove API e browser usano database Docker temporanei creati dal runner canoni
 6. Nel Catalogo creare un prodotto di prova senza utilizzi e usare “Elimina definitivamente”. Su un prodotto già caricato o associato a un import la conferma deve restare bloccata con una spiegazione.
 
 Le pratiche annullate rimangono annullate. Un nuovo import può riutilizzare le associazioni della stessa sorgente. Rimangono attivi i controlli contro saldo iniziale su magazzini con storia, file incoerenti, duplicati e modifiche concorrenti. Nessun merge o deploy produttivo è incluso in questa verifica locale.
+
+## Confronto delle sole Giacenze e ripartenza autorizzata
+
+Il confronto delle Giacenze è distinto dalla registrazione di nuovi carichi. Un saldo corrente non permette di ricostruire i carichi intervenuti fra due esportazioni: possono esserci stati anche scarichi. Per registrare nuovi carichi resta necessario il Registro; per verificare l'allineamento basta il file Giacenze.
+
+In Carico Merce, selezionare Area e un singolo Magazzino, poi **Verifica giacenze FSE+**. Il selettore Registro è disabilitato. Il file viene confrontato con le giacenze fisiche attuali dei fondi FSE+, Nazionale e Nazionale Cofinanziato del magazzino, usando le associazioni della sorgente selezionata. Non vengono creati sessioni, pratiche, prodotti, carichi o movimenti.
+
+L'esito **Magazzino allineato**, in verde, richiede un file non vuoto, tutte le righe riconosciute, quantità coincidenti per prodotto/fondo/lotto e assenza di giacenze locali ulteriori. Vengono confrontate anche le scadenze fornite e la seconda dimensione fisica se presente. Conversioni mancanti, unità incompatibili, duplicati o righe non associate impediscono l'esito verde. Le differenze sono mostrate con quantità nel file e in magazzino, senza rettifiche automatiche. Il risultato indica il momento della verifica e viene azzerato cambiando file o sorgente.
+
+Endpoint aggiuntivo `POST /fse-importazioni/confronta-giacenze`, con permesso importazione e verifica autorevole di ruolo, territorio, magazzino e sorgente. Il confronto usa una transazione con snapshot coerente. Nessuna modifica allo schema. OpenAPI e tipi client/Zod rigenerati con il comando canonico; il postprocessore Orval conserva il corpo binario del file.
+
+File applicativi aggiuntivi: `src/lib/fseStockComparison.ts` e `src/routes/fse-importazioni.ts` nel server; `src/components/fse-stock-comparison.tsx` e `src/pages/carico-merce.tsx` nel frontend. Test dedicati `fse-stock-comparison.test.ts`, `fse-stock-comparison.test.tsx`; estesi i test API e browser `fse-import-practice-m3b` per ripetere il confronto dopo l'importazione dei due file originali.
+
+### Pulizia produttiva del 24 ottobre, separata dal deploy
+
+Dopo conferma esplicita dell'utente sono stati eliminati i soli 33 prodotti creati nei due tentativi annullati e le 56 associazioni FSE+ corrispondenti. Prima della transazione è stato creato un backup PostgreSQL completo, verificato con `pg_restore --list` e checksum SHA-256. La transazione ha ricontrollato tutte le chiavi esterne verso i prodotti, le evidenze di creazione e lo stato annullato delle due sessioni, bloccando i record interessati.
+
+Nessun prodotto eliminato aveva lotti, movimenti, documenti o altri impieghi operativi. Sono rimasti invariati i tre prodotti preesistenti. Conservati due sessioni annullate, quattro file, 512 righe Registro e 22 righe Giacenze: solo 118 riferimenti Registro e 22 riferimenti Giacenze ai prodotti eliminati sono stati azzerati. L'audit conserva 33 eventi di eliminazione con anagrafica precedente, associazioni rimosse e identificativi delle righe scollegate. Non sono stati azzerati contatori o cancellati altri dati. Questa manutenzione autorizzata non modifica la regola applicativa che impedisce di cancellare prodotti con collegamenti.
+
+Il codice su Hetzner non è stato aggiornato da questa operazione. La nuova procedura va validata sulla 8082 prima di concordare merge e rilascio.
+
+### Verifiche del confronto Giacenze
+
+- Installazione con lockfile e typecheck superati; nessuna modifica al lockfile.
+- API su database temporaneo: 151 file, 1.634 test superati, 5 esclusioni previste. Compresi confronto degli originali ripetuto due volte senza variazioni di lotti, movimenti e sessioni; unità kg/pz, conversioni mancanti, lotti/fondi/scadenze diversi, duplicati e stock locale assente dal file.
+- Frontend: 135 file, 900 test superati, inclusi invio del solo file Giacenze, esito verde, differenze, errore e cancellazione del risultato cambiando file.
+- Browser su ambiente temporaneo: 12 test superati e 23 esclusioni previste per viewport. Il caso con gli originali importa le 11 giacenze, confronta due volte lo stesso file dalla nuova interfaccia, verifica il messaggio verde e controlla che i movimenti non aumentino.
+- Build frontend e budget superati, entry iniziale 394,9 KiB gzip. La prima prova browser ha individuato un selettore errato del test (Area invece di Magazzino), corretto usando il nome accessibile del controllo; la successiva esecuzione completa è passata.

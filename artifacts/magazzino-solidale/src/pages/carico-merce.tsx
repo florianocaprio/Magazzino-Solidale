@@ -41,6 +41,7 @@ import {
   RaccolteTab,
 } from "@/components/carico-merce-tabs";
 import { parseCaricoMerceTab } from "@/lib/carico-merce-location";
+import { FseStockComparison } from "@/components/fse-stock-comparison";
 import { FsePendingImports } from "@/components/fse-pending-imports";
 import { FseImportPracticeWizard } from "@/components/fse-import-practice-wizard";
 import { Badge } from "@/components/ui/badge";
@@ -973,7 +974,16 @@ function CarichiContent() {
               {t("caricoPratiche.subtitle")}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {canImportFse && (
+              <FseStockComparison
+                key={`${filterArea}-${filterWarehouse}`}
+                areaId={filterAreaId ?? null}
+                warehouseId={
+                  filterWarehouse === "all" ? null : Number(filterWarehouse)
+                }
+              />
+            )}
             <Button asChild variant="outline">
               <Link href="/carico-merce?tab=lotti">
                 <History className="mr-2 h-4 w-4" />

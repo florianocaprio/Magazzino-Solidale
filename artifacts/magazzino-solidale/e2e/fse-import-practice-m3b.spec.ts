@@ -986,6 +986,21 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     const sources = await (await page.request.get("/api/fse-importazioni/sorgenti")).json();
     const source = sources.find((row: { areaOperativaId: number }) => row.areaOperativaId === area.id);
     expect(source).toBeTruthy();
+    await page.goto("/carico-merce");
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa" }), area.nome);
+    await selectOption(page, page.getByRole("combobox", { name: "Magazzino destinazione", exact: true }), warehouse.nome);
+    await page.getByRole("button", { name: "Verifica giacenze FSE+" }).click();
+    await expect(page.locator("#fse-comparison-registry")).toBeDisabled();
+    await page.getByLabel("File Giacenze FSE+", { exact: true }).setInputFiles({ name: "Giacenze confronto.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: stockBytes });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const comparisonResponse = page.waitForResponse((response) => response.url().includes("/api/fse-importazioni/confronta-giacenze") && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Confronta giacenze" }).click();
+      expect((await comparisonResponse).status()).toBe(200);
+      await expect(page.getByRole("heading", { name: "Magazzino allineato", exact: true })).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("status")).toHaveClass(/bg-emerald-50/);
+    }
+    await page.getByRole("button", { name: "Chiudi", exact: true }).click();
+    expect(await (await page.request.get(`/api/movimenti?magazzinoId=${warehouse.id}`)).json()).toHaveLength(expectedRows);
     const replayQuery = new URLSearchParams({
       sourceRegistryId: String(source.id),
       areaOperativaId: String(base.area.id),

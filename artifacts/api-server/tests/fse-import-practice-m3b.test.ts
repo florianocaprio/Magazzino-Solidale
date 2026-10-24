@@ -3597,6 +3597,52 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
           (movement) => movement.naturaContabile === "SALDO_INIZIALE",
         ),
       ).toBe(true);
+      // Re-uploading only Giacenze is a read-only comparison, never another load.
+      const comparePath = `/fse-importazioni/confronta-giacenze?magazzinoId=${warehouseId}&sourceRegistryId=${sourceId}`;
+      const beforeCompare = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.magazzinoId, warehouseId));
+      const sessionsBeforeCompare = await db
+        .select()
+        .from(fseImportSessionsTable)
+        .where(eq(fseImportSessionsTable.magazzinoId, warehouseId));
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const comparison = await request(app)
+          .post(comparePath)
+          .set("Content-Type", "application/octet-stream")
+          .send(readFileSync(originalStockPath!));
+        expect(comparison.status).toBe(200);
+        expect(comparison.body).toMatchObject({
+          allineato: true,
+          righeFile: rawStock.length,
+          righeCoincidenti: rawStock.length,
+          differenze: [],
+        });
+      }
+      expect(
+        await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.magazzinoId, warehouseId)),
+      ).toEqual(beforeCompare);
+      expect(
+        await db
+          .select()
+          .from(fseImportSessionsTable)
+          .where(eq(fseImportSessionsTable.magazzinoId, warehouseId)),
+      ).toEqual(sessionsBeforeCompare);
+      expect(
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.magazzinoId, warehouseId)),
+      ).toEqual(movements);
+      const deniedCompare = await request(appFor({ permissions: [] }))
+        .post(comparePath)
+        .set("Content-Type", "application/octet-stream")
+        .send(readFileSync(originalStockPath!));
+      expect(deniedCompare.status).toBe(403);
       const physicalBalances = await db
         .select({
           lot: lottiTable.codiceLotto,

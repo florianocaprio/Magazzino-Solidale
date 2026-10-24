@@ -2232,6 +2232,28 @@ export const FseImportSessionState = {
   ANNULLATA: "ANNULLATA",
 } as const;
 
+export interface FseStockDifference {
+  prodotto: string;
+  /** @nullable */
+  lotto: string | null;
+  /** @nullable */
+  fondo: string | null;
+  /** @nullable */
+  quantitaFile: string | null;
+  /** @nullable */
+  quantitaLocale: string | null;
+  unita: string;
+  motivo: string;
+}
+
+export interface FseStockComparison {
+  allineato: boolean;
+  righeFile: number;
+  righeCoincidenti: number;
+  verificatoAt: string;
+  differenze: FseStockDifference[];
+}
+
 export type FseImportSourceAttiva =
   (typeof FseImportSourceAttiva)[keyof typeof FseImportSourceAttiva];
 
@@ -11739,6 +11761,17 @@ export type ListCaricoPraticheParams = {
   q?: string;
   da?: string;
   a?: string;
+};
+
+export type CompareFseWarehouseStockParams = {
+  /**
+   * @minimum 1
+   */
+  sourceRegistryId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
 };
 
 export type AnalyzeFsePracticeImportParams = {

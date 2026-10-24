@@ -3303,6 +3303,33 @@ export const ResolveAutomaticFseImportSourceResponse = zod.object({
   dataCreazione: zod.coerce.date(),
 });
 
+/**
+ * Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+ */
+
+export const CompareFseWarehouseStockQueryParams = zod.object({
+  sourceRegistryId: zod.coerce.number().min(1),
+  magazzinoId: zod.coerce.number().min(1),
+});
+
+export const CompareFseWarehouseStockResponse = zod.object({
+  allineato: zod.boolean(),
+  righeFile: zod.number(),
+  righeCoincidenti: zod.number(),
+  verificatoAt: zod.coerce.date(),
+  differenze: zod.array(
+    zod.object({
+      prodotto: zod.string(),
+      lotto: zod.string().nullable(),
+      fondo: zod.string().nullable(),
+      quantitaFile: zod.string().nullable(),
+      quantitaLocale: zod.string().nullable(),
+      unita: zod.string(),
+      motivo: zod.string(),
+    }),
+  ),
+});
+
 export const analyzeFsePracticeImportQueryNomeFileMax = 255;
 
 export const analyzeFsePracticeImportQuerySheetNameMax = 100;

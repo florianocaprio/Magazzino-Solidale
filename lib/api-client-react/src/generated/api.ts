@@ -135,6 +135,7 @@ import type {
   CercaBeneficiariSimiliParams,
   ChangePasswordInput,
   ComandoVersionatoInput,
+  CompareFseWarehouseStockParams,
   ConfermaRicezione,
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
@@ -228,6 +229,7 @@ import type {
   FseReferenceDateInput,
   FseReportingPreview,
   FseResolutionInput,
+  FseStockComparison,
   FseVersionInput,
   GetBollaBeneficiarioConsegnaParams,
   GetCaricoVolontariOperativo200Item,
@@ -5518,6 +5520,110 @@ export const useResolveAutomaticFseImportSource = <
   return useMutation(
     getResolveAutomaticFseImportSourceMutationOptions(options),
   );
+};
+
+export const getCompareFseWarehouseStockUrl = (
+  params: CompareFseWarehouseStockParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fse-importazioni/confronta-giacenze?${stringifiedParams}`
+    : `/api/fse-importazioni/confronta-giacenze`;
+};
+
+/**
+ * Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+ */
+export const compareFseWarehouseStock = async (
+  compareFseWarehouseStockBody: Blob,
+  params: CompareFseWarehouseStockParams,
+  options?: RequestInit,
+): Promise<FseStockComparison> => {
+  return customFetch<FseStockComparison>(
+    getCompareFseWarehouseStockUrl(params),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...options?.headers,
+      },
+      body: compareFseWarehouseStockBody,
+    },
+  );
+};
+
+export const getCompareFseWarehouseStockMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    TError,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+  TError,
+  { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+  TContext
+> => {
+  const mutationKey = ["compareFseWarehouseStock"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams }
+  > = (props) => {
+    const { data, params } = props ?? {};
+
+    return compareFseWarehouseStock(data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompareFseWarehouseStockMutationResult = NonNullable<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>
+>;
+export type CompareFseWarehouseStockMutationBody = BodyType<Blob>;
+export type CompareFseWarehouseStockMutationError = ErrorType<void>;
+
+export const useCompareFseWarehouseStock = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    TError,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+  TError,
+  { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+  TContext
+> => {
+  return useMutation(getCompareFseWarehouseStockMutationOptions(options));
 };
 
 export const getAnalyzeFsePracticeImportUrl = (
