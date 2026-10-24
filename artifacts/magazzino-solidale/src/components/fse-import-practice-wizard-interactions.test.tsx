@@ -316,3 +316,22 @@ it("spiega che non ci sono nuovi carichi senza mostrare avvisi storici da correg
   expect([...document.querySelectorAll("button")].some(button => button.textContent === i18n.t("caricoPratiche.fseReviewSummary"))).toBe(false);
   expect(api.attach).not.toHaveBeenCalled();
 });
+
+it("mostra la data salvata in verde e riapre la correzione solo con Modifica", async () => {
+  api.detail.modalita = "SALDO_INIZIALE";
+  api.detail.dataRiferimentoSaldo = "2026-10-20";
+  api.detail.files = [
+    { profilo: "REGISTRO", nomeFile: "Registro.xlsx", dataRiferimento: "2026-10-20" },
+    { profilo: "GIACENZE", nomeFile: "Giacenze.xlsx", dataRiferimento: "2026-10-20" },
+  ];
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  const status = [...document.querySelectorAll('[role="status"]')].find((node) => node.textContent?.includes("Data di riferimento confermata"));
+  expect(status?.textContent).toContain("20/10/2026");
+  expect(status?.className).toContain("bg-emerald-50");
+  expect(document.body.textContent).not.toContain("Salva data di riferimento");
+  expect(document.body.textContent).toContain(i18n.t("caricoPratiche.fseHistoricalCoverageConfirmation"));
+  await click("Modifica");
+  expect(document.body.textContent).toContain("Salva data di riferimento");
+  expect(api.reviseDate).not.toHaveBeenCalled();
+});
