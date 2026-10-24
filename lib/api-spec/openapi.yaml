@@ -989,6 +989,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkImportResult"
 
+  /prodotti/{id}/eliminazione:
+    get:
+      operationId: getProdottoEliminazione
+      tags: [prodotti]
+      summary: Check whether a product has no dependencies and can be permanently deleted
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deletion eligibility (rechecked on delete)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eliminabile, motivo]
+                properties:
+                  eliminabile:
+                    type: boolean
+                  motivo:
+                    type: string
+                    nullable: true
+        "403":
+          description: Product management permission required
+        "404":
+          description: Product not found
+    delete:
+      operationId: permanentlyDeleteProdotto
+      tags: [prodotti]
+      summary: Permanently delete an unused product; preserve any dependency and history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Product deleted and audit retained
+        "403":
+          description: Product management permission required
+        "404":
+          description: Product not found
+        "409":
+          description: Product has history or dependencies; deactivate instead
+
   /prodotti/{id}:
     get:
       operationId: getProdotto
@@ -14241,6 +14290,9 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
+        unitaMisuraPeso:
+          type: [string, "null"]
+          description: Unità di peso/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.
         pesoUnita:
           oneOf:
             - $ref: "#/components/schemas/FattoreContabile"

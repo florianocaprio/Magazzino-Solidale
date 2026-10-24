@@ -50,6 +50,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
 import { suggestFseProducts } from "@/lib/fse-product-suggestions";
+import { suggestFseUnit, type FseUnit } from "@/lib/fse-unit-suggestion";
 import { useAuth } from "@/lib/auth";
 import { newCommandKey } from "@/lib/carico-merce";
 import {
@@ -77,7 +78,7 @@ type Props = {
 
 type NewProduct = {
   name: string;
-  unit: "pz" | "kg" | "l";
+  unit: FseUnit | "";
   barcode: string;
   fractional: boolean;
   physicalLot: boolean;
@@ -119,7 +120,7 @@ function correctionFromRow(row: FseImportRow): CorrectionDraft {
 
 const emptyProduct: NewProduct = {
   name: "",
-  unit: "pz",
+  unit: "",
   barcode: "",
   fractional: false,
   physicalLot: false,
@@ -243,6 +244,31 @@ export function FseImportPracticeWizard({
     createProduct.isPending ||
     reviseRow.isPending ||
     reviseDate.isPending;
+  const editingRow = detail?.rows.find((row) => row.id === editingRowId);
+  const fileWeightUnit = (description: string) => {
+    if (!detail) return "kg/l";
+    const proposal = suggestFseUnit(description, detail.stockRows, detail.rows);
+    return proposal.source === "file" ? proposal.unit : "kg/l";
+  };
+  const editingUnit = editingRow?.prodotto?.unitaMisura;
+  const editingFileQuantity =
+    editingUnit === "pz"
+      ? editingRow?.quantitaPezzi
+      : ["kg", "l", "lt"].includes(editingUnit ?? "")
+        ? editingRow?.quantitaKgLt
+        : null;
+  const unitProposal =
+    detail && newProductFor
+      ? suggestFseUnit(newProductFor, detail.stockRows, detail.rows)
+      : null;
+  const editingUnitProposal =
+    detail && editingRow
+      ? suggestFseUnit(
+          editingRow.prodottoEsterno,
+          detail.stockRows,
+          detail.rows,
+        )
+      : null;
   useEffect(() => {
     if (!detail) return;
     setMode(detail.modalita);
@@ -462,7 +488,7 @@ export function FseImportPracticeWizard({
   };
 
   const createAndMapProduct = async () => {
-    if (!newProductFor || !newProduct.name.trim()) return;
+    if (!newProductFor || !newProduct.name.trim() || !newProduct.unit) return;
     try {
       const created = createdProducts.current[`${detail?.id}:${newProductFor}`]
         ? { id: createdProducts.current[`${detail?.id}:${newProductFor}`] }
@@ -1079,9 +1105,17 @@ export function FseImportPracticeWizard({
                         }
                         onClick={() => {
                           if (newProductFor !== description) {
+                            const proposal = suggestFseUnit(
+                              description,
+                              detail.stockRows,
+                              detail.rows,
+                            );
                             setNewProduct({
                               ...emptyProduct,
                               name: description,
+                              unit: proposal.unit ?? "",
+                              fractional:
+                                proposal.unit === "kg" || proposal.unit === "l",
                             });
                           }
                           setNewProductFor(description);
@@ -1138,6 +1172,12 @@ export function FseImportPracticeWizard({
                   )}
                   {newProductFor === description && (
                     <div className="grid gap-2 rounded bg-muted/40 p-3 md:grid-cols-3">
+                      <p className="text-sm text-muted-foreground md:col-span-3">
+                        {t(
+                          `blocco07.unitSuggestion.${unitProposal?.source ?? "unknown"}`,
+                          { unit: unitProposal?.unit },
+                        )}
+                      </p>
                       <Input
                         value={newProduct.name}
                         onChange={(event) =>
@@ -1158,8 +1198,10 @@ export function FseImportPracticeWizard({
                           }))
                         }
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger aria-label={t("blocco07.productUnit")}>
+                          <SelectValue
+                            placeholder={t("blocco07.productUnit")}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pz">pz</SelectItem>
@@ -1212,7 +1254,9 @@ export function FseImportPracticeWizard({
                         {t("caricoPratiche.fseExpiryManaged")}
                       </label>
                       <Button
-                        disabled={!newProduct.name.trim() || pending}
+                        disabled={
+                          !newProduct.name.trim() || !newProduct.unit || pending
+                        }
                         onClick={() => void createAndMapProduct()}
                       >
                         {t("caricoPratiche.fseCreateAndAssociate")}
@@ -1265,6 +1309,7 @@ export function FseImportPracticeWizard({
                       </p>
                       <p className="text-sm">
                         {t("blocco07.fileQuantities", {
+                          unit: fileWeightUnit(row.prodottoEsterno),
                           pieces:
                             "tipoMovimento" in row
                               ? (row.quantitaPezzi ?? "—")
@@ -1370,6 +1415,53 @@ export function FseImportPracticeWizard({
                         })}
                       </DialogDescription>
                     </DialogHeader>
+                    <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
+                      <p>
+                        {t("blocco07.correctionUnit", {
+                          unit: editingUnit ?? "—",
+                        })}
+                      </p>
+                      {editingUnitProposal?.source === "file" && (
+                        <p>
+                          {t("blocco07.unitSuggestion.file", {
+                            unit: editingUnitProposal.unit,
+                          })}
+                        </p>
+                      )}
+                      {editingFileQuantity != null && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() =>
+                            setCorrection({
+                              ...correction,
+                              quantity: editingFileQuantity,
+                            })
+                          }
+                        >
+                          {t("blocco07.useRowQuantity", {
+                            quantity: editingFileQuantity,
+                            unit: editingUnit,
+                          })}
+                        </Button>
+                      )}
+                      {canManageMappings && editingRow && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="ml-2"
+                          disabled={pending}
+                          onClick={() => {
+                            setRemapping(editingRow.prodottoEsterno);
+                            setEditingRowId(null);
+                            setCorrection(null);
+                          }}
+                        >
+                          {t("blocco07.changeMapping")}
+                        </Button>
+                      )}
+                    </div>
                     {inlineError && (
                       <p role="alert" className="text-destructive">
                         {inlineError}
@@ -1377,7 +1469,8 @@ export function FseImportPracticeWizard({
                     )}
                     <div className="grid gap-3 md:grid-cols-3">
                       <label className="space-y-1 text-sm">
-                        {t("caricoPratiche.fseCorrectionQuantity")}
+                        {t("caricoPratiche.fseCorrectionQuantity")} (
+                        {editingUnit ?? "—"})
                         <Input
                           value={correction.quantity}
                           onChange={(event) =>

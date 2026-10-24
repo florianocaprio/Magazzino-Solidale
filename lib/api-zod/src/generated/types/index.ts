@@ -425,6 +425,7 @@ export * from "./getMaterialeDaPrepararePeriodo";
 export * from "./getMensaAbilitazioniRiepilogoBeneficiariParams";
 export * from "./getMensaReportParams";
 export * from "./getPreparazioneConsegneParams";
+export * from "./getProdottoEliminazione200";
 export * from "./getReportCentroAscoltoParams";
 export * from "./getReportDashboardGeneraleParams";
 export * from "./getReportDrilldownParams";

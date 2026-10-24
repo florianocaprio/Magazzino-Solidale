@@ -1261,6 +1261,25 @@ export const BulkProdottiResponse = zod.object({
   ),
 });
 
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+export const GetProdottoEliminazioneParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProdottoEliminazioneResponse = zod.object({
+  eliminabile: zod.boolean(),
+  motivo: zod.string().nullable(),
+});
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const PermanentlyDeleteProdottoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
 export const GetProdottoParams = zod.object({
   id: zod.coerce.number(),
 });
@@ -3552,6 +3571,12 @@ export const GetFseImportSessionResponse = zod
               zod.null(),
             ])
             .optional(),
+          unitaMisuraPeso: zod
+            .string()
+            .nullish()
+            .describe(
+              "Unità di peso\/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.",
+            ),
           pesoUnita: zod
             .union([
               zod

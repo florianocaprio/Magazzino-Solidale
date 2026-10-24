@@ -2394,6 +2394,11 @@ export interface FseImportStockRow {
   lottoFisico?: string | null;
   giacenzaPezzi?: QuantitaContabile | null;
   giacenzaPesoVolume?: QuantitaContabile | null;
+  /**
+   * Unità di peso/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.
+   * @nullable
+   */
+  unitaMisuraPeso?: string | null;
   pesoUnita?: FattoreContabile | null;
   /** @nullable */
   dataScadenza?: string | null;
@@ -11707,6 +11712,11 @@ export type ListProdottiParams = {
   categoria?: string;
   tipo?: string;
   search?: string;
+};
+
+export type GetProdottoEliminazione200 = {
+  eliminabile: boolean;
+  motivo: string | null;
 };
 
 export type ListCarichiParams = {

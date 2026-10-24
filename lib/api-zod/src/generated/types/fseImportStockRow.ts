@@ -19,6 +19,11 @@ export interface FseImportStockRow {
   lottoFisico?: string | null;
   giacenzaPezzi?: QuantitaContabile | null;
   giacenzaPesoVolume?: QuantitaContabile | null;
+  /**
+   * Unità di peso/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.
+   * @nullable
+   */
+  unitaMisuraPeso?: string | null;
   pesoUnita?: FattoreContabile | null;
   /** @nullable */
   dataScadenza?: Date | null;

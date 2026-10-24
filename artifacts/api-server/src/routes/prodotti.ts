@@ -24,6 +24,11 @@ import {
 import type { InventoryTransaction } from "../lib/scaricoInventory";
 import { defaultProductFractionalQuantity } from "../lib/productQuantity";
 
+import {
+  hasProdottoHistory,
+  PRODUCT_HISTORY_MESSAGE,
+} from "../lib/prodottoRemoval";
+
 const router: IRouter = Router();
 
 const CODICE_DUPLICATO_MSG =
@@ -661,6 +666,83 @@ router.delete(
       return;
     }
     res.json(fmtProdotto(row));
+  },
+);
+
+// The existing DELETE remains a reversible deactivation for all current clients.
+router.get(
+  "/prodotti/:id/eliminazione",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      res.status(400).json({ error: "Prodotto non valido" });
+      return;
+    }
+    const result = await db.transaction(async (tx) => {
+      const [product] = await tx
+        .select({ id: prodottiTable.id })
+        .from(prodottiTable)
+        .where(eq(prodottiTable.id, id))
+        .for("update");
+      if (!product) return null;
+      const blocked = await hasProdottoHistory(tx, id);
+      return {
+        eliminabile: !blocked,
+        motivo: blocked ? PRODUCT_HISTORY_MESSAGE : null,
+      };
+    });
+    if (!result) {
+      res.status(404).json({ error: "Prodotto non trovato" });
+      return;
+    }
+    res.json(result);
+  },
+);
+
+router.delete(
+  "/prodotti/:id/eliminazione",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      res.status(400).json({ error: "Prodotto non valido" });
+      return;
+    }
+    const command = auditContextFromRequest(req);
+    const status = await db.transaction(async (tx) => {
+      const [product] = await tx
+        .select()
+        .from(prodottiTable)
+        .where(eq(prodottiTable.id, id))
+        .for("update");
+      if (!product) return 404;
+      // Recheck here: the preview is advisory and may have become stale.
+      if (await hasProdottoHistory(tx, id)) return 409;
+      await tx.delete(prodottiTable).where(eq(prodottiTable.id, id));
+      await recordAuditEvent(tx, {
+        command,
+        azione: "PRODOTTO_ELIMINATO",
+        entitaTipo: "prodotto",
+        entitaId: id,
+        changes: auditFields(product, [
+          "codice",
+          "nome",
+          "unitaMisura",
+          "attivo",
+        ]),
+      });
+      return 204;
+    });
+    if (status === 404) {
+      res.status(404).json({ error: "Prodotto non trovato" });
+      return;
+    }
+    if (status === 409) {
+      res.status(409).json({ error: PRODUCT_HISTORY_MESSAGE });
+      return;
+    }
+    res.status(204).end();
   },
 );
 

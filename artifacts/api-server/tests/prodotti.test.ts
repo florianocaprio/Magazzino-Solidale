@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, afterAll, beforeAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, prodottiTable, utentiTable } from "@workspace/db";
+import { db, pool, prodottiTable, utentiTable, magazziniTable, areeOperativeTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import prodottiRouter from "../src/routes/prodotti";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
@@ -25,6 +25,8 @@ function makeApp(): Express {
 const app = makeApp();
 const prodottoIds: number[] = [];
 let testUserId: number;
+let testWarehouseId: number;
+let testAreaId: number;
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
@@ -40,6 +42,10 @@ beforeAll(async () => {
     })
     .returning({ id: utentiTable.id });
   testUserId = testUser.id;
+  const [area] = await db.insert(areeOperativeTable).values({ nome: `Prodotti ${rnd()}` }).returning();
+  testAreaId = area.id;
+  const [warehouse] = await db.insert(magazziniTable).values({ nome: `Prodotti ${rnd()}`, codice: `PR-${rnd()}`, areaOperativaId: area.id }).returning();
+  testWarehouseId = warehouse.id;
 });
 
 afterEach(async () => {
@@ -52,6 +58,8 @@ afterEach(async () => {
 
 afterAll(async () => {
   await db.delete(utentiTable).where(eq(utentiTable.id, testUserId));
+  await db.delete(magazziniTable).where(eq(magazziniTable.id, testWarehouseId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, testAreaId));
   await pool.end();
 });
 
@@ -172,5 +180,86 @@ describe("GET /prodotti — ordinamento e ricerca", () => {
     );
     expect(byBarcode.body.map((p: { id: number }) => p.id)).toContain(created.body.id,
     );
+  });
+});
+
+describe("Eliminazione definitiva dei soli prodotti inutilizzati", () => {
+  async function product() {
+    const res = await request(app).post("/prodotti").send({ nome: `Unused ${rnd()}`, tipoProdotto: "altro", unitaMisura: "pz" });
+    expect(res.status).toBe(201);
+    prodottoIds.push(res.body.id);
+    return res.body.id as number;
+  }
+
+  it.each([true, false])("elimina un prodotto senza dipendenze (attivo=%s), mantenendo audit e vecchia disattivazione", async (active) => {
+    const id = await product();
+    if (!active) {
+      expect((await request(app).delete(`/prodotti/${id}`)).status).toBe(200);
+      expect((await request(app).get(`/prodotti/${id}`)).status).toBe(200);
+    }
+    const preview = await request(app).get(`/prodotti/${id}/eliminazione`);
+    expect(preview.body).toEqual({ eliminabile: true, motivo: null });
+    expect((await request(app).delete(`/prodotti/${id}/eliminazione`)).status).toBe(204);
+    expect((await request(app).get(`/prodotti/${id}`)).status).toBe(404);
+    const audit = await pool.query("SELECT azione FROM audit_eventi WHERE entita_tipo='prodotto' AND entita_id=$1 AND azione='PRODOTTO_ELIMINATO'", [id]);
+    expect(audit.rows).toHaveLength(1);
+    expect((await request(app).delete(`/prodotti/${id}/eliminazione`)).status).toBe(404);
+  });
+
+  it("rifiuta anche un lotto esaurito creato dopo la verifica iniziale", async () => {
+    const id = await product();
+    expect((await request(app).get(`/prodotti/${id}/eliminazione`)).body.eliminabile).toBe(true);
+    const lot = await pool.query("INSERT INTO lotti (prodotto_id,data_carico,quantita_caricata,quantita_residua,magazzino_id) VALUES ($1,CURRENT_DATE,10,0,$2) RETURNING id", [id, testWarehouseId]);
+    try {
+      expect((await request(app).get(`/prodotti/${id}/eliminazione`)).body.eliminabile).toBe(false);
+      expect((await request(app).delete(`/prodotti/${id}/eliminazione`)).status).toBe(409);
+      expect((await request(app).get(`/prodotti/${id}`)).status).toBe(200);
+    } finally { await pool.query("DELETE FROM lotti WHERE id=$1", [lot.rows[0].id]); }
+  });
+
+  it("protegge i movimenti anche senza una partita residua", async () => {
+    const id = await product();
+    const movement = await pool.query("INSERT INTO movimenti (prodotto_id,tipo_movimento,tipo_dettaglio,data_movimento,magazzino_id,quantita,unita_misura) VALUES ($1,'CARICO','TEST',CURRENT_DATE,$2,1,'pz') RETURNING id", [id, testWarehouseId]);
+    try { expect((await request(app).delete(`/prodotti/${id}/eliminazione`)).status).toBe(409); }
+    finally { await pool.query("DELETE FROM movimenti WHERE id=$1", [movement.rows[0].id]); }
+  });
+
+  it("non consente eliminazione o verifica senza permesso di gestione", async () => {
+    const id = await product();
+    const restricted = express();
+    restricted.use((req, _res, next) => {
+      req.user = { id: testUserId, username: 'readonly', isAdmin: false, permessi: [] } as NonNullable<typeof req.user>;
+      next();
+    });
+    restricted.use(prodottiRouter);
+    expect((await request(restricted).get(`/prodotti/${id}/eliminazione`)).status).toBe(403);
+    expect((await request(restricted).delete(`/prodotti/${id}/eliminazione`)).status).toBe(403);
+    expect((await request(app).get(`/prodotti/${id}`)).status).toBe(200);
+  });
+
+  it("serializza un carico concorrente prima di rivalutare l'eliminazione", async () => {
+    const id = await product();
+    const writer = await pool.connect();
+    let lotId: number | undefined;
+    let deletion: Promise<request.Response> | undefined;
+    try {
+      await writer.query('BEGIN');
+      lotId = (await writer.query("INSERT INTO lotti (prodotto_id,data_carico,quantita_caricata,quantita_residua,magazzino_id) VALUES ($1,CURRENT_DATE,1,1,$2) RETURNING id", [id, testWarehouseId])).rows[0].id;
+      deletion = request(app).delete(`/prodotti/${id}/eliminazione`).then(r => r);
+      let waiting = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const locks = await pool.query("SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))", [writer.processID]);
+        if (locks.rowCount) { waiting = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      await writer.query('COMMIT');
+      expect((await deletion).status).toBe(409);
+    } finally {
+      await writer.query('ROLLBACK');
+      writer.release();
+      if (deletion) await deletion;
+      if (lotId) await pool.query('DELETE FROM lotti WHERE id=$1', [lotId]);
+    }
   });
 });

@@ -504,6 +504,7 @@ router.get(
             giacenzaPezzi: fseImportStockRowsTable.giacenzaPezzi,
             giacenzaPesoVolume: fseImportStockRowsTable.giacenzaPesoVolume,
             pesoUnita: fseImportStockRowsTable.pesoUnita,
+            unitaMisuraPeso: fseImportStockRowsTable.unitaMisuraPeso,
             dataScadenza: fseImportStockRowsTable.dataScadenza,
             prodottoId: fseImportStockRowsTable.prodottoId,
             quantitaOperativa: fseImportStockRowsTable.quantitaOperativa,

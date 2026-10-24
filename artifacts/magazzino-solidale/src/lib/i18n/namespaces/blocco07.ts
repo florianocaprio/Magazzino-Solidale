@@ -1,6 +1,14 @@
 import type { i18n } from "i18next";
 export const blocco07 = {
   it: {
+    productUnit: "Unità di misura del prodotto",
+    unitSuggestion: {
+      file: "Unità rilevata nel file Giacenze: {{unit}}. La proposta per un nuovo prodotto è modificabile.",
+      pieces: "Il file contiene quantità in pezzi: proponiamo pz. Puoi cambiare l’unità prima di creare il prodotto.",
+      unknown: "Il file non indica un’unità univoca: scegli pz, kg oppure l. La colonna KgLt da sola non distingue chili e litri.",
+    },
+    correctionUnit: "La quantità da correggere è espressa in {{unit}}, l’unità del prodotto associato. Per usare un’altra unità scegli un altro prodotto o creane uno con l’unità corretta.",
+    useRowQuantity: "Usa quantità della riga: {{quantity}} {{unit}}",
     initialModeReview: "Giacenza iniziale: vengono caricate solo le quantità disponibili del file Giacenze. Il Registro serve a verificare lo storico e non viene sommato.",
     loadsModeReview: "Nuovi carichi: vengono aggiunti i carichi selezionati del Registro, non le giacenze attuali. Gli scarichi storici non vengono importati. Per iniziare dalle quantità disponibili, torna indietro e scegli Imposta giacenza iniziale in una nuova pratica.",
     documentDatesHelp: "Queste righe hanno quantità valide ma nel file manca la data di carico. Puoi confermare l’uso della data documento mostrata per ciascuna riga, oppure correggerla singolarmente. La conferma viene salvata riga per riga; in caso di interruzione puoi riprendere dalle rimanenti.",
@@ -16,7 +24,7 @@ export const blocco07 = {
     dateMismatch: "La data delle Giacenze manca o non coincide con il Registro. Correggila qui prima di continuare.",
     saveDate: "Salva data di riferimento",
     rowNumber: "Riga {{number}}",
-    fileQuantities: "Dati del file: {{pieces}} pezzi · {{weight}} kg/l",
+    fileQuantities: "Quantità della riga: {{pieces}} pezzi · {{weight}} {{unit}}",
     changeMapping: "Cambia prodotto associato",
     suspendImport: "Sospendi importazione",
     importIssues: {

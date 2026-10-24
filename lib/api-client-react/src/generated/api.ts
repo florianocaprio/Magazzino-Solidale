@@ -248,6 +248,7 @@ import type {
   GetMensaAbilitazioniRiepilogoBeneficiariParams,
   GetMensaReportParams,
   GetPreparazioneConsegneParams,
+  GetProdottoEliminazione200,
   GetReportCentroAscoltoParams,
   GetReportDashboardGeneraleParams,
   GetReportDrilldownParams,
@@ -3527,6 +3528,182 @@ export const useBulkProdotti = <
   TContext
 > => {
   return useMutation(getBulkProdottiMutationOptions(options));
+};
+
+export const getGetProdottoEliminazioneUrl = (id: number) => {
+  return `/api/prodotti/${id}/eliminazione`;
+};
+
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+export const getProdottoEliminazione = async (
+  id: number,
+  options?: RequestInit,
+): Promise<GetProdottoEliminazione200> => {
+  return customFetch<GetProdottoEliminazione200>(
+    getGetProdottoEliminazioneUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProdottoEliminazioneQueryKey = (id: number) => {
+  return [`/api/prodotti/${id}/eliminazione`] as const;
+};
+
+export const getGetProdottoEliminazioneQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProdottoEliminazione>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProdottoEliminazione>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProdottoEliminazioneQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProdottoEliminazione>>
+  > = ({ signal }) =>
+    getProdottoEliminazione(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProdottoEliminazione>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProdottoEliminazioneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProdottoEliminazione>>
+>;
+export type GetProdottoEliminazioneQueryError = ErrorType<void>;
+
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+
+export function useGetProdottoEliminazione<
+  TData = Awaited<ReturnType<typeof getProdottoEliminazione>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProdottoEliminazione>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProdottoEliminazioneQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPermanentlyDeleteProdottoUrl = (id: number) => {
+  return `/api/prodotti/${id}/eliminazione`;
+};
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const permanentlyDeleteProdotto = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getPermanentlyDeleteProdottoUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getPermanentlyDeleteProdottoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["permanentlyDeleteProdotto"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return permanentlyDeleteProdotto(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PermanentlyDeleteProdottoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>
+>;
+
+export type PermanentlyDeleteProdottoMutationError = ErrorType<void>;
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const usePermanentlyDeleteProdotto = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getPermanentlyDeleteProdottoMutationOptions(options));
 };
 
 export const getGetProdottoUrl = (id: number) => {

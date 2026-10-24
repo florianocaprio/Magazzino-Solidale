@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   resume: vi.fn(),
   reviseDate: vi.fn(),
   reviseRow: vi.fn(),
+  createProduct: vi.fn(),
+  mapProduct: vi.fn(),
   attach: vi.fn(),
   invalidate: vi.fn().mockResolvedValue(undefined),
   ready: vi.fn(),
@@ -65,8 +67,8 @@ vi.mock("@workspace/api-client-react", () => ({
     isPending: false,
   }),
   resolveAutomaticFseImportSource: vi.fn().mockResolvedValue({ id: 1 }),
-  useMapFseImportProduct: () => ({ isPending: false }),
-  useCreateProdotto: () => ({ isPending: false }),
+  useMapFseImportProduct: () => ({ isPending: false, mutateAsync: api.mapProduct }),
+  useCreateProdotto: () => ({ isPending: false, mutateAsync: api.createProduct }),
   useReviseFseImportRow: () => ({ isPending: false, mutateAsync: api.reviseRow }),
 }));
 vi.mock("@tanstack/react-query", () => ({
@@ -104,6 +106,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   Object.assign(api.detail, structuredClone(initialDetail));
   api.analyze.mockReset();
+  api.createProduct.mockReset().mockResolvedValue({ id: 99 });
+  api.mapProduct.mockReset().mockResolvedValue({ versione: 3 });
   api.fetchDetail.mockReset().mockImplementation(async () => api.detail);
   api.detail.modalita = "NUOVI_CARICHI";
   api.detail.files = [];
@@ -272,4 +276,32 @@ it("conferma in sequenza solo le date senza altri errori e usa la versione resti
   expect(api.reviseRow.mock.calls.map(call => [call[0].rigaId, call[0].data.versione])).toEqual([[21, 2], [22, 3]]);
   expect(api.reviseRow.mock.calls.every(call => call[0].data.accettaFallbackData === true)).toBe(true);
   expect(api.attach).not.toHaveBeenCalled();
+});
+
+it.each(["kg", "l"])("propone e invia %s del file alla creazione del prodotto", async (unit) => {
+  Object.assign(api.detail, {
+    rows: [{ ...api.detail.rows[0], stato: "DA_ASSOCIARE", tipoMovimento: "CARICO", quantitaPezzi: "10", quantitaKgLt: "5" }],
+    stockRows: [{ id: 30, prodottoEsterno: "Pasta", stato: "DA_ASSOCIARE", unitaMisuraPeso: unit, giacenzaPezzi: "10", giacenzaPesoVolume: "5", errorCodes: [], warningCodes: [] }],
+  });
+  api.analyze.mockResolvedValueOnce({ sessionId: 10 });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  await click(i18n.t("caricoPratiche.fseCreateProduct"));
+  expect(document.querySelector('[aria-label="Unità di misura del prodotto"]')?.textContent).toBe(unit);
+  await click(i18n.t("caricoPratiche.fseCreateAndAssociate"));
+  expect(api.createProduct.mock.calls[0][0].data).toMatchObject({ nome: "Pasta", unitaMisura: unit, quantitaFrazionabile: true });
+});
+
+it("in correzione mantiene l'unità del catalogo e permette di riprendere la quantità corrispondente", async () => {
+  Object.assign(api.detail, { rows: [{ ...api.detail.rows[0], stato: "DA_VERIFICARE", tipoMovimento: "CARICO", prodottoId: 7, prodotto: { id: 7, unitaMisura: "kg" }, quantitaOperativa: null, quantitaPezzi: "10", quantitaKgLt: "5", warningCodes: [] }] });
+  api.analyze.mockResolvedValueOnce({ sessionId: 10 });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  await click(i18n.t("caricoPratiche.fseCorrect"));
+  expect(document.body.textContent).toContain("La quantità da correggere è espressa in kg");
+  await click("Usa quantità della riga: 5 kg");
+  const quantity = document.querySelector(`input[placeholder="${i18n.t("caricoPratiche.fseCorrectionQuantity")}"]`) as HTMLInputElement;
+  expect(quantity.value).toBe("5");
+  expect(api.createProduct).not.toHaveBeenCalled();
+  expect(api.mapProduct).not.toHaveBeenCalled();
 });

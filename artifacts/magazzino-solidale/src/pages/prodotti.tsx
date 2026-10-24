@@ -4,9 +4,13 @@ import {
   useCreateProdotto,
   useUpdateProdotto,
   useDeleteProdotto,
+  useGetProdottoEliminazione,
+  getGetProdottoEliminazioneQueryKey,
+  usePermanentlyDeleteProdotto,
   useListFornitoriOperativi,
   useBulkProdotti,
   getListProdottiQueryKey,
+  getListProdottiOperativiQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -81,7 +85,11 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { EMPORIO_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import {
+  EMPORIO_DISABLED_MESSAGE,
+  useModuloFlags,
+  useConfigurazioneAmbienteFlags,
+} from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -171,8 +179,52 @@ export default function Prodotti() {
   const createProdotto = useCreateProdotto();
   const updateProdotto = useUpdateProdotto();
   const deleteProdotto = useDeleteProdotto();
+  const [removingProduct, setRemovingProduct] = useState<{
+    id: number;
+    nome: string;
+  } | null>(null);
+  const [removalError, setRemovalError] = useState<string | null>(null);
+  const removeProdotto = usePermanentlyDeleteProdotto();
+  const removalCheck = useGetProdottoEliminazione(removingProduct?.id ?? 0, {
+    query: {
+      queryKey: getGetProdottoEliminazioneQueryKey(removingProduct?.id ?? 0),
+      enabled: !!removingProduct && canManageProducts,
+      staleTime: 0,
+    },
+  });
+  const handlePermanentDelete = () => {
+    if (
+      !removingProduct ||
+      !removalCheck.data?.eliminabile ||
+      removalCheck.isFetching ||
+      removeProdotto.isPending
+    )
+      return;
+    setRemovalError(null);
+    removeProdotto.mutate(
+      { id: removingProduct.id },
+      {
+        onSuccess: () => {
+          setRemovingProduct(null);
+          queryClient.invalidateQueries({
+            queryKey: getListProdottiQueryKey(),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListProdottiOperativiQueryKey(),
+          });
+          toast({ title: t("prodotti.removed") });
+        },
+        onError: (error) => {
+          setRemovalError(apiErrorMessage(error));
+          void removalCheck.refetch();
+        },
+      },
+    );
+  };
   const bulkProdotti = useBulkProdotti();
-  const { data: fornitori } = useListFornitoriOperativi({ contesto: "magazzino" });
+  const { data: fornitori } = useListFornitoriOperativi({
+    contesto: "magazzino",
+  });
   const { emporioAbilitato } = useModuloFlags();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -396,7 +448,9 @@ export default function Prodotti() {
             type="button"
             variant="outline"
             className="gap-2"
-            disabled={!isModuloAttivo("BARCODE") || (prodotti ?? []).length === 0}
+            disabled={
+              !isModuloAttivo("BARCODE") || (prodotti ?? []).length === 0
+            }
             onClick={() =>
               generateProdottiBarcodePdf(
                 (prodotti ?? []).map((p) => ({
@@ -811,6 +865,21 @@ export default function Prodotti() {
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               {t("prodotti.deactivate")}
+                            </DropdownMenuItem>
+                          )}
+                          {canManageProducts && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => {
+                                setRemovalError(null);
+                                setRemovingProduct({
+                                  id: prodotto.id,
+                                  nome: prodotto.nome,
+                                });
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              {t("prodotti.removePermanently")}
                             </DropdownMenuItem>
                           )}
                           {canManageProducts && !prodotto.attivo && (
@@ -1284,6 +1353,55 @@ export default function Prodotti() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!removingProduct}
+        onOpenChange={(open) => {
+          if (!open && !removeProdotto.isPending) setRemovingProduct(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("prodotti.removePermanently")} — {removingProduct?.nome}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {removalCheck.isFetching
+                ? t("prodotti.checkingHistory")
+                : removalCheck.isError
+                  ? t("prodotti.historyCheckError")
+                  : removalCheck.data?.eliminabile
+                    ? t("prodotti.removeDescription")
+                    : removalCheck.data?.motivo}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {removalError && (
+            <p role="alert" className="text-sm text-destructive">
+              {removalError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeProdotto.isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={
+                removeProdotto.isPending ||
+                removalCheck.isFetching ||
+                removalCheck.isError ||
+                !removalCheck.data?.eliminabile
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                handlePermanentDelete();
+              }}
+            >
+              {t("prodotti.removePermanently")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!deletingId}

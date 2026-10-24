@@ -456,6 +456,15 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await createPractice(page, context, description);
     const externalProduct = `Prodotto esterno nuovo ${suffix}`;
     const barcode = validEan13(suffix);
+    const registryBook = XLSX.read(registryFixture(externalProduct, `DOC-NEW-${suffix}`));
+    const registrySheet = registryBook.Sheets[registryBook.SheetNames[0]];
+    registrySheet.D2 = { t: "n", v: 5 };
+    registrySheet.J2 = { t: "n", v: 5 };
+    const stockBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(stockBook, XLSX.utils.aoa_to_sheet([
+      ["Denominazione OpN", "Denominazione OpC", "Denominazione OpT", "CodiceAccesso", "Fondo", "Prodotto", "Lotto", "PesoUnita", "UnitaMisuraPeso", "GiacenzaPesoVolume", "GiacenzaPezzi", "PezziPerCollo", "GiacenzaColli", "CheckModificaGiacenza", "Scadenza"],
+      ["OpN", "OpC", "OpT", "sintetico", "Fondo Nazionale", externalProduct, "006544", 0.5, "LT", 5, 10, null, 0, false, null],
+    ]), "Giacenze");
 
     await page.goto("/carico-merce");
     await openPractice(page, context.area, description);
@@ -469,7 +478,12 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       name: "prodotto-nuovo.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: registryFixture(externalProduct, `DOC-NEW-${suffix}`),
+      buffer: Buffer.from(XLSX.write(registryBook, { type: "buffer", bookType: "xlsx" })),
+    });
+    await page.locator("#fse-stock-file").setInputFiles({
+      name: "giacenze-prodotto-nuovo.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from(XLSX.write(stockBook, { type: "buffer", bookType: "xlsx" })),
     });
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await page
@@ -478,6 +492,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByPlaceholder("Nome del prodotto")).toHaveValue(
       externalProduct,
     );
+    await expect(page.getByRole("combobox", { name: "Unità di misura del prodotto" })).toHaveText("l");
     await page
       .getByPlaceholder("Nome del prodotto")
       .fill(`Catalogo da FSE ${suffix}`);
@@ -493,6 +508,36 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       >
     ).find((product) => product.nome === `Catalogo da FSE ${suffix}`);
     expect(createdProduct?.codiceBarre).toBe(barcode);
+    expect(createdProduct?.unitaMisura).toBe("l");
+    const sessions = await (await page.request.get(`/api/fse-importazioni/sessioni?magazzinoId=${context.warehouse.id}`)).json();
+    const session = sessions.find((item: { sourceRegistryId: number }) => item.sourceRegistryId === source.id);
+    const imported = await (await page.request.get(`/api/fse-importazioni/sessioni/${session.id}`)).json();
+    expect(imported.stockRows[0].unitaMisuraPeso).toBe("l");
+    expect(Number(imported.rows[0].quantitaOperativa)).toBe(5);
+    expect(Number(imported.rows[0].quantitaPezzi)).toBe(10);
+
+    // A mapped import is a dependency even before stock is loaded.
+    await page.goto("/prodotti");
+    await page.getByPlaceholder("Cerca per nome o codice...").fill(createdProduct!.nome);
+    await page.getByRole("row").filter({ hasText: createdProduct!.nome }).getByRole("button", { name: "Apri menu" }).click();
+    await page.getByRole("menuitem", { name: "Elimina definitivamente", exact: true }).click();
+    const removalDialog = page.getByRole("alertdialog");
+    await expect(removalDialog.getByText(/non può essere eliminato/)).toBeVisible();
+    await expect(removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true })).toBeDisabled();
+    await removalDialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    expect((await page.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(409);
+
+    const unusedResponse = await page.request.post("/api/prodotti", { data: { nome: `Inutilizzato ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "pz" } });
+    expect(unusedResponse.status()).toBe(201);
+    const unused = await unusedResponse.json();
+    await page.reload();
+    await page.getByPlaceholder("Cerca per nome o codice...").fill(unused.nome);
+    await page.getByRole("row").filter({ hasText: unused.nome }).getByRole("button", { name: "Apri menu" }).click();
+    await page.getByRole("menuitem", { name: "Elimina definitivamente", exact: true }).click();
+    await expect(removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true })).toBeEnabled();
+    await removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true }).click();
+    await expect(removalDialog).toBeHidden();
+    expect((await page.request.get(`/api/prodotti/${unused.id}`)).status()).toBe(404);
 
     const roleResponse = await page.request.post("/api/ruoli", {
       data: {
@@ -576,6 +621,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       },
     });
     expect(forbidden.status()).toBe(403);
+    expect((await deniedPage.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(403);
     await deniedContext.close();
   });
 
