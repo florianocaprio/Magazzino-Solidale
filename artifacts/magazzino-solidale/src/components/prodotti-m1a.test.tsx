@@ -1,3 +1,4 @@
+vi.mock("@/lib/i18n", () => ({ default: { addResourceBundle: vi.fn() } }));
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

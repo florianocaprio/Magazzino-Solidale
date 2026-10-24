@@ -21,6 +21,8 @@ export const prodottiTable = pgTable(
     descrizione: text("descrizione"),
     tipoProdotto: varchar("tipo_prodotto", { length: 20 }).notNull(),
     unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
+    fattoreKgLtPezzo: decimal("fattore_kg_lt_pezzo", { precision: 18, scale: 9 }),
+    unitaMisuraPeso: varchar("unita_misura_peso", { length: 2 }),
     codiceBarre: varchar("codice_barre", { length: 50 }),
     quantitaFrazionabile: boolean("quantita_frazionabile")
       .notNull()

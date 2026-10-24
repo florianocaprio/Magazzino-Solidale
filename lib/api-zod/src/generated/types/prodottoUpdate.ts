@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProdottoUpdateUnitaMisuraPeso } from "./prodottoUpdateUnitaMisuraPeso";
 
 export interface ProdottoUpdate {
   codice?: string;
@@ -12,6 +13,14 @@ export interface ProdottoUpdate {
   descrizione?: string;
   tipoProdotto?: string;
   unitaMisura?: string;
+  /**
+   * Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+   * @exclusiveMinimum 0
+   * @nullable
+   */
+  fattoreKgLtPezzo?: number | null;
+  /** @nullable */
+  unitaMisuraPeso?: ProdottoUpdateUnitaMisuraPeso;
   codiceBarre?: string;
   quantitaFrazionabile?: boolean;
   lottoFisicoObbligatorio?: boolean;

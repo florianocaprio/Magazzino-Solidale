@@ -1,3 +1,6 @@
+import { registerBlocco07 } from "@/lib/i18n/namespaces/blocco07";
+import i18n from "@/lib/i18n";
+registerBlocco07(i18n);
 import { useRef, useState } from "react";
 import {
   useListProdotti,
@@ -112,6 +115,8 @@ const makeFormSchema = (
     descrizione: z.string().optional(),
     tipoProdotto: z.string().trim().min(1, t("common.requiredField")),
     unitaMisura: z.string().trim().min(1, t("common.requiredField")),
+    fattoreKgLtPezzo: optionalNonNegativeNumber,
+    unitaMisuraPeso: z.enum(["kg", "l"]).nullable(),
     codiceBarre: z.string().optional(),
     quantitaFrazionabile: z.boolean().default(false),
     lottoFisicoObbligatorio: z.boolean().default(false),
@@ -242,6 +247,8 @@ export default function Prodotti() {
       descrizione: "",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
+      fattoreKgLtPezzo: null,
+      unitaMisuraPeso: null,
       quantitaFrazionabile: false,
       lottoFisicoObbligatorio: false,
       gestioneScadenza: false,
@@ -267,6 +274,8 @@ export default function Prodotti() {
       descrizione: prodotto.descrizione || "",
       tipoProdotto: prodotto.tipoProdotto,
       unitaMisura: prodotto.unitaMisura,
+      fattoreKgLtPezzo: prodotto.fattoreKgLtPezzo ?? null,
+      unitaMisuraPeso: prodotto.unitaMisuraPeso ?? null,
       codiceBarre: prodotto.codiceBarre || "",
       quantitaFrazionabile: prodotto.quantitaFrazionabile,
       lottoFisicoObbligatorio: prodotto.lottoFisicoObbligatorio,
@@ -292,6 +301,8 @@ export default function Prodotti() {
       descrizione: "",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
+      fattoreKgLtPezzo: null,
+      unitaMisuraPeso: null,
       quantitaFrazionabile: false,
       lottoFisicoObbligatorio: false,
       gestioneScadenza: false,
@@ -1068,6 +1079,26 @@ export default function Prodotti() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                <div className="rounded-md border p-3 space-y-3">
+                  <p className="text-sm text-muted-foreground">{t("blocco07.packHelp")}</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="fattoreKgLtPezzo" render={({ field }) => (
+                      <FormItem><FormLabel>{t("blocco07.packContent")}</FormLabel><FormControl>
+                        <Input type="number" min="0.000000001" step="any" {...field} value={field.value ?? ""}
+                          onChange={event => { field.onChange(event.target.value); if (!event.target.value) form.setValue("unitaMisuraPeso", null); }} />
+                      </FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="unitaMisuraPeso" render={({ field }) => (
+                      <FormItem><FormLabel>{t("blocco07.packUnit")}</FormLabel>
+                        <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="kg / l" /></SelectTrigger></FormControl>
+                          <SelectContent><SelectItem value="kg">kg</SelectItem><SelectItem value="l">l</SelectItem></SelectContent>
+                        </Select><FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

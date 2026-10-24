@@ -1119,6 +1119,8 @@ export const DeleteMagazzinoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const deleteMagazzinoResponseFattoreKgLtPezzoExclusiveMin = 0;
+
 export const DeleteMagazzinoResponse = zod.object({
   id: zod.number(),
   codice: zod.string(),
@@ -1126,6 +1128,16 @@ export const DeleteMagazzinoResponse = zod.object({
   descrizione: zod.string().nullish(),
   tipoProdotto: zod.string(),
   unitaMisura: zod.string(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(deleteMagazzinoResponseFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().nullish(),
   quantitaFrazionabile: zod.boolean(),
   lottoFisicoObbligatorio: zod.boolean(),
@@ -1157,6 +1169,8 @@ export const ListProdottiQueryParams = zod.object({
   search: zod.coerce.string().optional(),
 });
 
+export const listProdottiResponseFattoreKgLtPezzoExclusiveMin = 0;
+
 export const ListProdottiResponseItem = zod.object({
   id: zod.number(),
   codice: zod.string(),
@@ -1164,6 +1178,16 @@ export const ListProdottiResponseItem = zod.object({
   descrizione: zod.string().nullish(),
   tipoProdotto: zod.string(),
   unitaMisura: zod.string(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(listProdottiResponseFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().nullish(),
   quantitaFrazionabile: zod.boolean(),
   lottoFisicoObbligatorio: zod.boolean(),
@@ -1187,12 +1211,24 @@ export const ListProdottiResponseItem = zod.object({
 });
 export const ListProdottiResponse = zod.array(ListProdottiResponseItem);
 
+export const createProdottoBodyFattoreKgLtPezzoExclusiveMin = 0;
+
 export const CreateProdottoBody = zod.object({
   codice: zod.string().optional(),
   nome: zod.string(),
   descrizione: zod.string().optional(),
   tipoProdotto: zod.string(),
   unitaMisura: zod.string(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(createProdottoBodyFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().optional(),
   quantitaFrazionabile: zod
     .boolean()
@@ -1216,6 +1252,8 @@ export const CreateProdottoBody = zod.object({
   fornitoreId: zod.number().optional(),
 });
 
+export const bulkProdottiBodyRigheItemFattoreKgLtPezzoExclusiveMin = 0;
+
 export const BulkProdottiBody = zod.object({
   righe: zod.array(
     zod.object({
@@ -1224,6 +1262,16 @@ export const BulkProdottiBody = zod.object({
       descrizione: zod.string().optional(),
       tipoProdotto: zod.string(),
       unitaMisura: zod.string(),
+      fattoreKgLtPezzo: zod
+        .number()
+        .gt(bulkProdottiBodyRigheItemFattoreKgLtPezzoExclusiveMin)
+        .nullish()
+        .describe(
+          "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+        ),
+      unitaMisuraPeso: zod
+        .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+        .nullish(),
       codiceBarre: zod.string().optional(),
       quantitaFrazionabile: zod
         .boolean()
@@ -1284,6 +1332,8 @@ export const GetProdottoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getProdottoResponseFattoreKgLtPezzoExclusiveMin = 0;
+
 export const GetProdottoResponse = zod.object({
   id: zod.number(),
   codice: zod.string(),
@@ -1291,6 +1341,16 @@ export const GetProdottoResponse = zod.object({
   descrizione: zod.string().nullish(),
   tipoProdotto: zod.string(),
   unitaMisura: zod.string(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(getProdottoResponseFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().nullish(),
   quantitaFrazionabile: zod.boolean(),
   lottoFisicoObbligatorio: zod.boolean(),
@@ -1317,12 +1377,24 @@ export const UpdateProdottoParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateProdottoBodyFattoreKgLtPezzoExclusiveMin = 0;
+
 export const UpdateProdottoBody = zod.object({
   codice: zod.string().optional(),
   nome: zod.string().optional(),
   descrizione: zod.string().optional(),
   tipoProdotto: zod.string().optional(),
   unitaMisura: zod.string().optional(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(updateProdottoBodyFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().optional(),
   quantitaFrazionabile: zod.boolean().optional(),
   lottoFisicoObbligatorio: zod.boolean().optional(),
@@ -1344,6 +1416,8 @@ export const UpdateProdottoBody = zod.object({
   fornitoreId: zod.number().optional(),
 });
 
+export const updateProdottoResponseFattoreKgLtPezzoExclusiveMin = 0;
+
 export const UpdateProdottoResponse = zod.object({
   id: zod.number(),
   codice: zod.string(),
@@ -1351,6 +1425,16 @@ export const UpdateProdottoResponse = zod.object({
   descrizione: zod.string().nullish(),
   tipoProdotto: zod.string(),
   unitaMisura: zod.string(),
+  fattoreKgLtPezzo: zod
+    .number()
+    .gt(updateProdottoResponseFattoreKgLtPezzoExclusiveMin)
+    .nullish()
+    .describe(
+      "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+    ),
+  unitaMisuraPeso: zod
+    .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+    .nullish(),
   codiceBarre: zod.string().nullish(),
   quantitaFrazionabile: zod.boolean(),
   lottoFisicoObbligatorio: zod.boolean(),
@@ -3760,6 +3844,12 @@ export const ReviseFseImportRowParams = zod.object({
 export const reviseFseImportRowBodyQuantitaRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
+export const reviseFseImportRowBodyQuantitaPezziRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const reviseFseImportRowBodyQuantitaKgLtRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
 export const reviseFseImportRowBodyNumeroDocumentoMax = 100;
 
 export const reviseFseImportRowBodyLottoFisicoMax = 80;
@@ -3777,6 +3867,20 @@ export const ReviseFseImportRowBody = zod.object({
   quantita: zod
     .string()
     .regex(reviseFseImportRowBodyQuantitaRegExp)
+    .optional()
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  quantitaPezzi: zod
+    .string()
+    .regex(reviseFseImportRowBodyQuantitaPezziRegExp)
+    .optional()
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  quantitaKgLt: zod
+    .string()
+    .regex(reviseFseImportRowBodyQuantitaKgLtRegExp)
     .optional()
     .describe(
       "Decimale esatto; non convertire in number JavaScript per i calcoli.",
@@ -4621,6 +4725,8 @@ export const CancelAgeaImportazioneResponse = zod.object({
   noteAudit: zod.record(zod.string(), zod.unknown()).nullish(),
 });
 
+export const listAgeaMappatureProdottiResponseProdottoFattoreKgLtPezzoExclusiveMin = 0;
+
 export const ListAgeaMappatureProdottiResponseItem = zod.object({
   id: zod.number(),
   fonte: zod.enum(["AGEA_SIFEAD"]),
@@ -4637,6 +4743,18 @@ export const ListAgeaMappatureProdottiResponseItem = zod.object({
       descrizione: zod.string().nullish(),
       tipoProdotto: zod.string(),
       unitaMisura: zod.string(),
+      fattoreKgLtPezzo: zod
+        .number()
+        .gt(
+          listAgeaMappatureProdottiResponseProdottoFattoreKgLtPezzoExclusiveMin,
+        )
+        .nullish()
+        .describe(
+          "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+        ),
+      unitaMisuraPeso: zod
+        .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+        .nullish(),
       codiceBarre: zod.string().nullish(),
       quantitaFrazionabile: zod.boolean(),
       lottoFisicoObbligatorio: zod.boolean(),
@@ -4679,6 +4797,8 @@ export const UpdateAgeaMappaturaProdottoBody = zod.object({
   versione: zod.number().min(1),
 });
 
+export const updateAgeaMappaturaProdottoResponseProdottoFattoreKgLtPezzoExclusiveMin = 0;
+
 export const UpdateAgeaMappaturaProdottoResponse = zod.object({
   id: zod.number(),
   fonte: zod.enum(["AGEA_SIFEAD"]),
@@ -4695,6 +4815,18 @@ export const UpdateAgeaMappaturaProdottoResponse = zod.object({
       descrizione: zod.string().nullish(),
       tipoProdotto: zod.string(),
       unitaMisura: zod.string(),
+      fattoreKgLtPezzo: zod
+        .number()
+        .gt(
+          updateAgeaMappaturaProdottoResponseProdottoFattoreKgLtPezzoExclusiveMin,
+        )
+        .nullish()
+        .describe(
+          "Contenuto predefinito per pezzo, senza modificare i lotti esistenti.",
+        ),
+      unitaMisuraPeso: zod
+        .union([zod.literal("kg"), zod.literal("l"), zod.literal(null)])
+        .nullish(),
       codiceBarre: zod.string().nullish(),
       quantitaFrazionabile: zod.boolean(),
       lottoFisicoObbligatorio: zod.boolean(),

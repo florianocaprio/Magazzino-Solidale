@@ -263,3 +263,16 @@ describe("Eliminazione definitiva dei soli prodotti inutilizzati", () => {
     }
   });
 });
+
+describe("Contenuto fisico per pezzo", () => {
+  it("crea in pezzi, aggiorna il default e rifiuta coppie incomplete", async () => {
+    const created = await request(app).post("/prodotti").send({ nome: "Pasta 500g", tipoProdotto: "alimentare", unitaMisura: "pz", fattoreKgLtPezzo: 0.5, unitaMisuraPeso: "kg" });
+    expect(created.status).toBe(201);
+    prodottoIds.push(created.body.id);
+    expect(created.body).toMatchObject({ unitaMisura: "pz", fattoreKgLtPezzo: 0.5, unitaMisuraPeso: "kg" });
+    expect((await request(app).patch(`/prodotti/${created.body.id}`).send({ fattoreKgLtPezzo: 1 })).status).toBe(200);
+    expect((await request(app).patch(`/prodotti/${created.body.id}`).send({ unitaMisuraPeso: null })).status).toBe(400);
+    expect((await request(app).patch(`/prodotti/${created.body.id}`).send({ fattoreKgLtPezzo: 0 })).status).toBe(400);
+    expect((await request(app).patch(`/prodotti/${created.body.id}`).send({ fattoreKgLtPezzo: null, unitaMisuraPeso: null })).status).toBe(200);
+  });
+});

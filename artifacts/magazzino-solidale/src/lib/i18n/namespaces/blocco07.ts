@@ -1,6 +1,16 @@
 import type { i18n } from "i18next";
 export const blocco07 = {
   it: {
+    showHistory: "Mostra {{count}} righe storiche / di riferimento",
+    hideHistory: "Nascondi righe storiche / di riferimento",
+    correctDimensionsHelp: "Verifica pezzi e peso/volume totali. Modificando una quantità il fattore viene ricalcolato al salvataggio; puoi indicarlo esplicitamente, purché coerente. I valori originali del file restano conservati con il motivo della correzione.",
+    secondaryQuantity: "Quantità fisica aggiuntiva",
+    packContent: "Contenuto per pezzo (facoltativo)",
+    packUnit: "Unità del contenuto",
+    packHelp: "Il magazzino consegna pezzi. Esempio: 1 pezzo di pasta contiene 0,5 kg; 1 bottiglia contiene 1 l. Il contenuto è una proposta per i nuovi carichi: peso, volume e pezzi già registrati restano invariati.",
+    bothFilesHelp: "Carica sempre Registro e Giacenze, anche negli aggiornamenti. Il Registro identifica i nuovi carichi evitando duplicati; le Giacenze descrivono pezzi, peso/volume, lotti e scadenze disponibili. Poiché FSE+ registra anche gli scarichi, la sola differenza di giacenza non identifica la merce ricevuta.",
+    noNewLoads: "Registro allineato: nessun nuovo carico da importare",
+    noNewLoadsHelp: "Tutti i carichi di questo Registro sono già acquisiti o compresi nel saldo iniziale. Non devi correggere i movimenti storici e non verranno aggiunte quantità. Per confrontare anche lo stock attuale usa Confronta giacenze.",
     productUnit: "Unità di misura del prodotto",
     unitSuggestion: {
       file: "Unità rilevata nel file Giacenze: {{unit}}. La proposta per un nuovo prodotto è modificabile.",
@@ -164,6 +174,16 @@ export const blocco07 = {
     associated: "Associazione tecnica",
   },
   en: {
+    showHistory: "Show {{count}} historical / reference rows",
+    hideHistory: "Hide historical / reference rows",
+    correctDimensionsHelp: "Check pieces and total weight/volume. Changing a quantity recalculates the factor on save. An explicit factor must be consistent. Original file values and the correction reason are retained.",
+    secondaryQuantity: "Additional physical quantity",
+    packContent: "Content per piece (optional)",
+    packUnit: "Content unit",
+    packHelp: "Inventory issues pieces. For example, one pack contains 0.5 kg or one bottle contains 1 l. This default is for new receipts and does not alter recorded quantities.",
+    bothFilesHelp: "Upload both Register and Stock for initial and subsequent imports. The Register identifies new receipts without duplicates; Stock supplies pieces, weight/volume, lots and expiry dates. Stock differences cannot identify incoming goods when FSE+ also records issues.",
+    noNewLoads: "Register aligned: no new receipts to import",
+    noNewLoadsHelp: "All receipts are already recorded or covered by the opening balance. Historical movements need no corrections. Use Compare stock to check current inventory quantities.",
     noProductSuggestions:
       "No sufficiently similar match in the current catalogue: select an existing product or create one.",
     fileFormat: { ELENCO: "Simple list (XLSX)", MASSIVO: "Massivo (XLSM)" },

@@ -1702,6 +1702,8 @@ export async function reviseFseImportRow(
     rowId: number;
     version: number;
     quantity?: string;
+    pieces?: string;
+    kgLt?: string;
     documentNumber?: string | null;
     documentDate?: string | null;
     operationalDate?: string | null;
@@ -1847,8 +1849,13 @@ export async function reviseFseImportRow(
       ? (row.quantitaOperativa ??
         (unit === "pz" ? row.quantitaPezzi : row.quantitaKgLt))
       : InventoryDecimal.parse(input.quantity).toDb();
-  const pieces = unit === "pz" ? quantity : row.quantitaPezzi;
-  const kgLt = ["kg", "l", "lt"].includes(unit) ? quantity : row.quantitaKgLt;
+  const revisedPieces = input.pieces === undefined ? row.quantitaPezzi : InventoryDecimal.parse(input.pieces).toDb();
+  const revisedWeight = input.kgLt === undefined ? row.quantitaKgLt : InventoryDecimal.parse(input.kgLt).toDb();
+  const pieces = unit === "pz" ? quantity : revisedPieces;
+  const kgLt = ["kg", "l", "lt"].includes(unit) ? quantity : revisedWeight;
+  if ((unit === "pz" && input.pieces !== undefined && revisedPieces !== quantity) ||
+      (["kg", "l", "lt"].includes(unit) && input.kgLt !== undefined && revisedWeight !== quantity))
+    throw new FsePracticeImportError(400, "QUANTITA_NON_COMPATIBILE", "La quantità operativa e la corrispondente dimensione devono coincidere");
   const dimensions = quantityForProduct(product, {
     pieces,
     kgLt,
@@ -1957,6 +1964,8 @@ export async function reviseFseImportRow(
     prodottoId: product.id,
     fondoOrigine: row.fondoOrigine,
     quantita: dimensions.quantitaOperativa,
+    quantitaPezzi: dimensions.quantitaPezzi,
+    quantitaKgLt: dimensions.quantitaKgLt,
     lottoFisico: physicalLot,
     dataScadenza: expiryDate,
     numeroDocumento: documentNumber,

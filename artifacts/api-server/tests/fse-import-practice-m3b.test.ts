@@ -3698,3 +3698,20 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
     },
   );
 });
+
+it("corregge pezzi e peso con audit senza alterare i valori originali del file", async () => {
+  const app = appFor();
+  const context = await createIsolatedContext("dimensions");
+  const first = await prepareOrdinaryImport(app, { ...context, document: `DIM-${suffix}`, quantity: 10, finalBalance: 10, fileName: "dimensioni.xlsx" });
+  const rowId = first.detail.body.rows[0].id;
+  const [before] = await db.select().from(fseImportRowsTable).where(eq(fseImportRowsTable.id, rowId));
+  const revised = await request(app).patch(`/fse-importazioni/sessioni/${first.acquired.body.sessionId}/righe/${rowId}`).send({ versione: first.detail.body.versione, quantita: "12", quantitaKgLt: "6", fattoreKgLtPezzo: null, motivo: "Verifica confezioni da 500g", accettaFallbackData: true });
+  expect(revised.status, JSON.stringify(revised.body)).toBe(200);
+  const [after] = await db.select().from(fseImportRowsTable).where(eq(fseImportRowsTable.id, rowId));
+  expect(after.rawJson).toEqual(before.rawJson);
+  expect(Number(after.quantitaPezzi)).toBe(12);
+  expect(Number(after.quantitaKgLt)).toBe(6);
+  expect(Number(after.fattoreKgLtPezzo)).toBe(0.5);
+  const revisions = await db.select().from(fseImportRowRevisionsTable).where(eq(fseImportRowRevisionsTable.rigaId, rowId));
+  expect(revisions.some(revision => Number(revision.acceptedValuesJson.quantitaKgLt) === 6)).toBe(true);
+});

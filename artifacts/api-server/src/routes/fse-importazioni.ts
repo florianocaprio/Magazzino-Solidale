@@ -780,6 +780,8 @@ router.patch(
           rowId: positiveId(req.params.rigaId, "rigaId"),
           version: positiveId(req.body?.versione, "versione"),
           quantity: optionalString(req.body?.quantita, "quantita") ?? undefined,
+          pieces: optionalString(req.body?.quantitaPezzi, "quantitaPezzi") ?? undefined,
+          kgLt: optionalString(req.body?.quantitaKgLt, "quantitaKgLt") ?? undefined,
           documentNumber: optionalString(
             req.body?.numeroDocumento,
             "numeroDocumento",

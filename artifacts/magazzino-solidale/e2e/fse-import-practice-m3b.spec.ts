@@ -99,6 +99,15 @@ function registryFixtures(
   );
 }
 
+async function uploadStock(page: Page, product: string, pieces = 10) {
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+    ["Denominazione OpN", "Denominazione OpC", "Denominazione OpT", "CodiceAccesso", "Fondo", "Prodotto", "Lotto", "PesoUnita", "UnitaMisuraPeso", "GiacenzaPesoVolume", "GiacenzaPezzi", "PezziPerCollo", "GiacenzaColli", "CheckModificaGiacenza", "Scadenza"],
+    ["OpN", "OpC", "OpT", "sintetico", "Fondo Nazionale", product, "006544", null, null, null, pieces, null, 0, false, null],
+  ]), "Giacenze");
+  await page.locator("#fse-stock-file").setInputFiles({ name: "giacenze.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(XLSX.write(book, { type: "buffer", bookType: "xlsx" })) });
+}
+
 async function openPractice(page: Page, area: Area, description: string) {
   await selectOption(
     page,
@@ -321,6 +330,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: file,
     });
+    await uploadStock(page, product.nome, 10);
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await expect(
       page.getByText(product.nome, { exact: true }).first(),
@@ -430,6 +440,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(page, page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }), source.descrizione);
     await page.locator("#fse-registry-file").setInputFiles({ name: "registro-riaperto.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: registryFixture(external, `RESUME-${suffix}`) });
+    await uploadStock(page, external, 10);
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await expect(page.getByRole("paragraph").filter({ hasText: external })).toBeVisible();
     await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toBeEnabled();
@@ -492,7 +503,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByPlaceholder("Nome del prodotto")).toHaveValue(
       externalProduct,
     );
-    await expect(page.getByRole("combobox", { name: "Unità di misura del prodotto" })).toHaveText("l");
+    await expect(page.getByRole("combobox", { name: "Unità di misura del prodotto" })).toHaveText("pz");
     await page
       .getByPlaceholder("Nome del prodotto")
       .fill(`Catalogo da FSE ${suffix}`);
@@ -504,16 +515,18 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     const productsResponse = await page.request.get("/api/prodotti");
     const createdProduct = (
       (await productsResponse.json()) as Array<
-        Product & { codiceBarre?: string }
+        Product & { codiceBarre?: string; fattoreKgLtPezzo?: number; unitaMisuraPeso?: string }
       >
     ).find((product) => product.nome === `Catalogo da FSE ${suffix}`);
     expect(createdProduct?.codiceBarre).toBe(barcode);
-    expect(createdProduct?.unitaMisura).toBe("l");
+    expect(createdProduct?.unitaMisura).toBe("pz");
+    expect(createdProduct?.fattoreKgLtPezzo).toBe(0.5);
+    expect(createdProduct?.unitaMisuraPeso).toBe("l");
     const sessions = await (await page.request.get(`/api/fse-importazioni/sessioni?magazzinoId=${context.warehouse.id}`)).json();
     const session = sessions.find((item: { sourceRegistryId: number }) => item.sourceRegistryId === source.id);
     const imported = await (await page.request.get(`/api/fse-importazioni/sessioni/${session.id}`)).json();
     expect(imported.stockRows[0].unitaMisuraPeso).toBe("l");
-    expect(Number(imported.rows[0].quantitaOperativa)).toBe(5);
+    expect(Number(imported.rows[0].quantitaOperativa)).toBe(10);
     expect(Number(imported.rows[0].quantitaPezzi)).toBe(10);
 
     // A mapped import is a dependency even before stock is loaded.
@@ -609,6 +622,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         `DOC-NO-PERM-${suffix}`,
       ),
     });
+    await uploadStock(deniedPage, `Prodotto esterno non autorizzato ${suffix}`, 10);
     await deniedPage.getByRole("button", { name: "Carica e analizza" }).click();
     await expect(
       deniedPage.getByRole("button", { name: "Crea prodotto", exact: true }),
@@ -671,6 +685,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: file,
     });
+    await uploadStock(page, product.nome, 20);
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await selectOption(
       page,
@@ -1084,6 +1099,7 @@ test.describe("M3B — viewport tablet", () => {
         warehouseDate: null,
       }),
     });
+    await uploadStock(page, product.nome, 10);
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     const productSelect = page.getByRole("combobox", {
       name: new RegExp(`Associa a un prodotto esistente: ${product.nome}`),

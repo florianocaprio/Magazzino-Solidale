@@ -1885,12 +1885,32 @@ export interface FornitoriBulkInput {
   righe: FornitoreInput[];
 }
 
+/**
+ * @nullable
+ */
+export type ProdottoInputUnitaMisuraPeso =
+  | (typeof ProdottoInputUnitaMisuraPeso)[keyof typeof ProdottoInputUnitaMisuraPeso]
+  | null;
+
+export const ProdottoInputUnitaMisuraPeso = {
+  kg: "kg",
+  l: "l",
+} as const;
+
 export interface ProdottoInput {
   codice?: string;
   nome: string;
   descrizione?: string;
   tipoProdotto: string;
   unitaMisura: string;
+  /**
+   * Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+   * @exclusiveMinimum 0
+   * @nullable
+   */
+  fattoreKgLtPezzo?: number | null;
+  /** @nullable */
+  unitaMisuraPeso?: ProdottoInputUnitaMisuraPeso;
   codiceBarre?: string;
   /** Se omesso, il backend deriva il default dall'unità di misura */
   quantitaFrazionabile?: boolean;
@@ -2093,6 +2113,18 @@ export interface MagazzinoUpdate {
   note?: string;
 }
 
+/**
+ * @nullable
+ */
+export type ProdottoUnitaMisuraPeso =
+  | (typeof ProdottoUnitaMisuraPeso)[keyof typeof ProdottoUnitaMisuraPeso]
+  | null;
+
+export const ProdottoUnitaMisuraPeso = {
+  kg: "kg",
+  l: "l",
+} as const;
+
 export interface Prodotto {
   id: number;
   codice: string;
@@ -2101,6 +2133,14 @@ export interface Prodotto {
   descrizione?: string | null;
   tipoProdotto: string;
   unitaMisura: string;
+  /**
+   * Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+   * @exclusiveMinimum 0
+   * @nullable
+   */
+  fattoreKgLtPezzo?: number | null;
+  /** @nullable */
+  unitaMisuraPeso?: ProdottoUnitaMisuraPeso;
   /** @nullable */
   codiceBarre?: string | null;
   quantitaFrazionabile: boolean;
@@ -2133,12 +2173,32 @@ export interface Prodotto {
   fornitoreId?: number | null;
 }
 
+/**
+ * @nullable
+ */
+export type ProdottoUpdateUnitaMisuraPeso =
+  | (typeof ProdottoUpdateUnitaMisuraPeso)[keyof typeof ProdottoUpdateUnitaMisuraPeso]
+  | null;
+
+export const ProdottoUpdateUnitaMisuraPeso = {
+  kg: "kg",
+  l: "l",
+} as const;
+
 export interface ProdottoUpdate {
   codice?: string;
   nome?: string;
   descrizione?: string;
   tipoProdotto?: string;
   unitaMisura?: string;
+  /**
+   * Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+   * @exclusiveMinimum 0
+   * @nullable
+   */
+  fattoreKgLtPezzo?: number | null;
+  /** @nullable */
+  unitaMisuraPeso?: ProdottoUpdateUnitaMisuraPeso;
   codiceBarre?: string;
   quantitaFrazionabile?: boolean;
   lottoFisicoObbligatorio?: boolean;
@@ -2494,6 +2554,8 @@ export interface FseImportRowRevisionInput {
   /** @minimum 1 */
   versione: number;
   quantita?: QuantitaContabile;
+  quantitaPezzi?: QuantitaContabile;
+  quantitaKgLt?: QuantitaContabile;
   /**
    * @maxLength 100
    * @nullable

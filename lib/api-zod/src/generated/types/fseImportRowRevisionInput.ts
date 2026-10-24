@@ -12,6 +12,8 @@ export interface FseImportRowRevisionInput {
   /** @minimum 1 */
   versione: number;
   quantita?: QuantitaContabile;
+  quantitaPezzi?: QuantitaContabile;
+  quantitaKgLt?: QuantitaContabile;
   /**
    * @maxLength 100
    * @nullable

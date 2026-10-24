@@ -50,7 +50,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
 import { suggestFseProducts } from "@/lib/fse-product-suggestions";
-import { suggestFseUnit, type FseUnit } from "@/lib/fse-unit-suggestion";
+import { suggestFseContent, suggestFseUnit, type FseUnit } from "@/lib/fse-unit-suggestion";
 import { useAuth } from "@/lib/auth";
 import { newCommandKey } from "@/lib/carico-merce";
 import {
@@ -77,6 +77,8 @@ type Props = {
 };
 
 type NewProduct = {
+  factor: string;
+  weightUnit: "kg" | "l" | "";
   name: string;
   unit: FseUnit | "";
   barcode: string;
@@ -86,6 +88,7 @@ type NewProduct = {
 };
 
 type CorrectionDraft = {
+  secondaryQuantity: string;
   quantity: string;
   documentNumber: string;
   documentDate: string;
@@ -100,6 +103,7 @@ type CorrectionDraft = {
 
 function correctionFromRow(row: FseImportRow): CorrectionDraft {
   return {
+    secondaryQuantity: (row.prodotto?.unitaMisura === "pz" ? row.quantitaKgLt : row.quantitaPezzi) ?? "",
     quantity:
       row.quantitaOperativa ??
       (row.prodotto?.unitaMisura === "pz"
@@ -119,6 +123,8 @@ function correctionFromRow(row: FseImportRow): CorrectionDraft {
 }
 
 const emptyProduct: NewProduct = {
+  factor: "",
+  weightUnit: "",
   name: "",
   unit: "",
   barcode: "",
@@ -150,6 +156,7 @@ export function FseImportPracticeWizard({
   const canManageMappings = hasPermission("magazzino.agea.mapping.manage");
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
   const [step, setStep] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
   const [otherPractice, setOtherPractice] = useState<{
     practiceId: number;
     sessionId: number;
@@ -247,8 +254,7 @@ export function FseImportPracticeWizard({
   const editingRow = detail?.rows.find((row) => row.id === editingRowId);
   const fileWeightUnit = (description: string) => {
     if (!detail) return "kg/l";
-    const proposal = suggestFseUnit(description, detail.stockRows, detail.rows);
-    return proposal.source === "file" ? proposal.unit : "kg/l";
+    return suggestFseContent(description, detail.stockRows).unitaMisuraPeso ?? "kg/l";
   };
   const editingUnit = editingRow?.prodotto?.unitaMisura;
   const editingFileQuantity =
@@ -339,7 +345,7 @@ export function FseImportPracticeWizard({
         ? t("blocco07.missingSource")
         : !registryFile && !registryAcquired
           ? t("blocco07.missingRegistry")
-          : mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired
+          : !stockFile && !stockAcquired
             ? t("blocco07.missingStock")
             : mode === "SALDO_INIZIALE" && !historicalCoverageConfirmed
               ? t("blocco07.missingCoverage")
@@ -365,7 +371,7 @@ export function FseImportPracticeWizard({
     if ((!registryFile && !registryAcquired) || disabledReason || pending)
       return;
     setInlineError("");
-    if (mode === "SALDO_INIZIALE" && !stockFile && !stockAcquired) return;
+    if (!stockFile && !stockAcquired) return;
     setBusy(true);
     try {
       const resolvedSourceId =
@@ -497,6 +503,8 @@ export function FseImportPracticeWizard({
               nome: newProduct.name.trim(),
               tipoProdotto: "alimentare",
               unitaMisura: newProduct.unit,
+              fattoreKgLtPezzo: newProduct.factor ? Number(newProduct.factor) : null,
+              unitaMisuraPeso: newProduct.factor ? (newProduct.weightUnit || null) : null,
               codiceBarre: newProduct.barcode.trim() || undefined,
               quantitaFrazionabile: newProduct.fractional,
               lottoFisicoObbligatorio: newProduct.physicalLot,
@@ -528,6 +536,9 @@ export function FseImportPracticeWizard({
         data: {
           versione: detail.versione,
           quantita: correction.quantity || undefined,
+          ...(editingUnit === "pz"
+            ? { quantitaKgLt: correction.secondaryQuantity || undefined }
+            : { quantitaPezzi: correction.secondaryQuantity || undefined }),
           numeroDocumento: correction.documentNumber || null,
           dataDocumento: correction.documentDate || null,
           dataOperativa: correction.operationalDate || null,
@@ -647,6 +658,9 @@ export function FseImportPracticeWizard({
       showError(error);
     }
   };
+  const historicalRows = detail?.rows.filter(row => ["COPERTO_SALDO", "GIA_REGISTRATO", "RIFERIMENTO"].includes(row.stato)) ?? [];
+  const noNewLoads = detail?.modalita === "NUOVI_CARICHI" && detail.rows.length > 0 &&
+    detail.rows.every(row => ["COPERTO_SALDO", "GIA_REGISTRATO", "RIFERIMENTO"].includes(row.stato));
   const dateMismatch =
     detail?.modalita === "SALDO_INIZIALE" &&
     (!stockAcquired?.dataRiferimento ||
@@ -658,6 +672,7 @@ export function FseImportPracticeWizard({
     setDateReason("");
     setSourceId("");
     setStep(0);
+    setShowHistory(false);
     setInlineError("");
     setAddedPracticeId(null);
     acquiredRegistry.current = null;
@@ -825,6 +840,7 @@ export function FseImportPracticeWizard({
                   {acquiredRegistry.current?.sessionId ?? sessionId}
                 </p>
               )}
+              <p className="rounded-md border bg-muted/40 p-3 text-sm">{t("blocco07.bothFilesHelp")}</p>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="fse-registry-file">
@@ -859,7 +875,7 @@ export function FseImportPracticeWizard({
                 <div className="space-y-2">
                   <Label htmlFor="fse-stock-file">
                     {t("caricoPratiche.fseStockFile", {
-                      required: mode === "SALDO_INIZIALE" ? "*" : "",
+                      required: "*",
                     })}
                   </Label>
                   <Input
@@ -953,6 +969,10 @@ export function FseImportPracticeWizard({
 
           {step === 1 && detail && (
             <div className="space-y-4">
+              {noNewLoads && <div role="status" className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+                <strong>{t("blocco07.noNewLoads")}</strong>
+                <p>{t("blocco07.noNewLoadsHelp")}</p>
+              </div>}
               <p className="rounded-md border bg-muted p-3 text-sm font-medium">
                 {t(
                   detail.modalita === "SALDO_INIZIALE"
@@ -1110,8 +1130,11 @@ export function FseImportPracticeWizard({
                               detail.stockRows,
                               detail.rows,
                             );
+                            const content = suggestFseContent(description, detail.stockRows);
                             setNewProduct({
                               ...emptyProduct,
+                              factor: content.fattoreKgLtPezzo?.toString() ?? "",
+                              weightUnit: content.unitaMisuraPeso ?? "",
                               name: description,
                               unit: proposal.unit ?? "",
                               fractional:
@@ -1178,6 +1201,19 @@ export function FseImportPracticeWizard({
                           { unit: unitProposal?.unit },
                         )}
                       </p>
+                      <label className="text-sm">
+                        {t("blocco07.packContent")}
+                        <Input type="number" min="0.000000001" step="any" value={newProduct.factor}
+                          onChange={event => setNewProduct(current => ({ ...current, factor: event.target.value }))} />
+                      </label>
+                      <label className="text-sm">
+                        {t("blocco07.packUnit")}
+                        <Select value={newProduct.weightUnit} onValueChange={value => setNewProduct(current => ({ ...current, weightUnit: value as "kg" | "l" }))}>
+                          <SelectTrigger><SelectValue placeholder="kg / l" /></SelectTrigger>
+                          <SelectContent><SelectItem value="kg">kg</SelectItem><SelectItem value="l">l</SelectItem></SelectContent>
+                        </Select>
+                      </label>
+                      <p className="text-xs text-muted-foreground">{t("blocco07.packHelp")}</p>
                       <Input
                         value={newProduct.name}
                         onChange={(event) =>
@@ -1266,9 +1302,14 @@ export function FseImportPracticeWizard({
                 </div>
               ))}
 
+              {detail.modalita === "NUOVI_CARICHI" && historicalRows.length > 0 && (
+                <Button variant="outline" onClick={() => setShowHistory(value => !value)} aria-expanded={showHistory}>
+                  {t(showHistory ? "blocco07.hideHistory" : "blocco07.showHistory", { count: historicalRows.length })}
+                </Button>
+              )}
               <div className="space-y-2">
                 {(detail.modalita === "NUOVI_CARICHI"
-                  ? detail.rows
+                  ? detail.rows.filter(row => showHistory || !historicalRows.includes(row))
                   : detail.stockRows
                 ).map((row) => (
                   <div
@@ -1339,7 +1380,8 @@ export function FseImportPracticeWizard({
                             .join(" · ")}
                         </p>
                       )}
-                      {"warningCodes" in row && row.warningCodes.length > 0 && (
+                      {"warningCodes" in row && row.warningCodes.length > 0 &&
+                        !["COPERTO_SALDO", "GIA_REGISTRATO", "RIFERIMENTO"].includes(row.stato) && (
                         <p className="text-xs text-amber-700 dark:text-amber-300">
                           {row.warningCodes
                             .map((code) =>
@@ -1467,7 +1509,12 @@ export function FseImportPracticeWizard({
                         {inlineError}
                       </p>
                     )}
+                    <p className="text-sm text-muted-foreground">{t("blocco07.correctDimensionsHelp")}</p>
                     <div className="grid gap-3 md:grid-cols-3">
+                      <label className="space-y-1 text-sm">
+                        {t("blocco07.secondaryQuantity")} ({editingUnit === "pz" ? fileWeightUnit(editingRow?.prodottoEsterno ?? "") : "pz"})
+                        <Input value={correction.secondaryQuantity} onChange={event => setCorrection({ ...correction, secondaryQuantity: event.target.value, factor: "" })} />
+                      </label>
                       <label className="space-y-1 text-sm">
                         {t("caricoPratiche.fseCorrectionQuantity")} (
                         {editingUnit ?? "—"})
@@ -1477,6 +1524,7 @@ export function FseImportPracticeWizard({
                             setCorrection({
                               ...correction,
                               quantity: event.target.value,
+                              factor: "",
                             })
                           }
                           placeholder={t(
@@ -1721,7 +1769,10 @@ export function FseImportPracticeWizard({
               {t("caricoPratiche.fseAnalyze")}
             </Button>
           )}
-          {step === 1 && (
+          {step === 1 && noNewLoads && (
+            <Button onClick={() => { onOpenChange(false); reset(); }}>{t("common.close")}</Button>
+          )}
+          {step === 1 && !noNewLoads && (
             <Button
               onClick={() => setStep(2)}
               disabled={

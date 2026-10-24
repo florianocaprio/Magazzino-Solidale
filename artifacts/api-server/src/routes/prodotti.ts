@@ -1,3 +1,4 @@
+import { parseProductContent } from "../lib/productContent";
 import { randomInt } from "node:crypto";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter } from "express";
@@ -89,6 +90,8 @@ const fmtProdotto = (r: typeof prodottiTable.$inferSelect) => ({
   descrizione: r.descrizione ?? null,
   tipoProdotto: r.tipoProdotto,
   unitaMisura: r.unitaMisura,
+  fattoreKgLtPezzo: r.fattoreKgLtPezzo == null ? null : Number(r.fattoreKgLtPezzo),
+  unitaMisuraPeso: r.unitaMisuraPeso ?? null,
   codiceBarre: r.codiceBarre ?? null,
   quantitaFrazionabile: r.quantitaFrazionabile,
   lottoFisicoObbligatorio: r.lottoFisicoObbligatorio,
@@ -276,6 +279,8 @@ async function createProdottoOne(
   | { error: string; status?: number }
 > {
   const b = body as Record<string, any>;
+  const content = parseProductContent(b);
+  if ("error" in content) return { error: content.error, status: 400 };
   const codice =
     trimOrUndefined(b.codice) ??
     (await generaCodiceProdotto(tx, b.tipoProdotto));
@@ -320,6 +325,7 @@ async function createProdottoOne(
         descrizione: b.descrizione,
         tipoProdotto: b.tipoProdotto,
         unitaMisura: b.unitaMisura,
+        ...content,
         codiceBarre,
         quantitaFrazionabile:
           b.quantitaFrazionabile ??
@@ -438,6 +444,8 @@ router.patch(
       "tipoProdotto",
       "unitaMisura",
       "codiceBarre",
+      "fattoreKgLtPezzo",
+      "unitaMisuraPeso",
       "quantitaFrazionabile",
       "lottoFisicoObbligatorio",
       "gestioneScadenza",
@@ -467,6 +475,11 @@ router.patch(
     const update: Record<string, unknown> = Object.fromEntries(
       Object.entries(body).filter(([key]) => allowed.has(key)),
     );
+    if ("fattoreKgLtPezzo" in body || "unitaMisuraPeso" in body) {
+      const content = parseProductContent({ ...existing, ...body });
+      if ("error" in content) { res.status(400).json({ error: content.error }); return; }
+      Object.assign(update, content);
+    }
     const sensitive = [
       "tipoProdotto",
       "unitaMisura",
