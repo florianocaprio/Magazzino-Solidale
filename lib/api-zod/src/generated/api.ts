@@ -1261,6 +1261,25 @@ export const BulkProdottiResponse = zod.object({
   ),
 });
 
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+export const GetProdottoEliminazioneParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProdottoEliminazioneResponse = zod.object({
+  eliminabile: zod.boolean(),
+  motivo: zod.string().nullable(),
+});
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const PermanentlyDeleteProdottoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
 export const GetProdottoParams = zod.object({
   id: zod.coerce.number(),
 });
@@ -3284,6 +3303,33 @@ export const ResolveAutomaticFseImportSourceResponse = zod.object({
   dataCreazione: zod.coerce.date(),
 });
 
+/**
+ * Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+ */
+
+export const CompareFseWarehouseStockQueryParams = zod.object({
+  sourceRegistryId: zod.coerce.number().min(1),
+  magazzinoId: zod.coerce.number().min(1),
+});
+
+export const CompareFseWarehouseStockResponse = zod.object({
+  allineato: zod.boolean(),
+  righeFile: zod.number(),
+  righeCoincidenti: zod.number(),
+  verificatoAt: zod.coerce.date(),
+  differenze: zod.array(
+    zod.object({
+      prodotto: zod.string(),
+      lotto: zod.string().nullable(),
+      fondo: zod.string().nullable(),
+      quantitaFile: zod.string().nullable(),
+      quantitaLocale: zod.string().nullable(),
+      unita: zod.string(),
+      motivo: zod.string(),
+    }),
+  ),
+});
+
 export const analyzeFsePracticeImportQueryNomeFileMax = 255;
 
 export const analyzeFsePracticeImportQuerySheetNameMax = 100;
@@ -3552,6 +3598,12 @@ export const GetFseImportSessionResponse = zod
               zod.null(),
             ])
             .optional(),
+          unitaMisuraPeso: zod
+            .string()
+            .nullish()
+            .describe(
+              "Unità di peso\/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.",
+            ),
           pesoUnita: zod
             .union([
               zod
@@ -3614,6 +3666,43 @@ export const GetFseImportSessionResponse = zod
       }),
     }),
   );
+
+export const ReviseFseReferenceDateParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const reviseFseReferenceDateBodyMotivoMax = 1000;
+
+export const ReviseFseReferenceDateBody = zod.object({
+  versione: zod.number().min(1),
+  dataRiferimento: zod.coerce.date(),
+  motivo: zod.string().min(1).max(reviseFseReferenceDateBodyMotivoMax),
+});
+
+export const ReviseFseReferenceDateResponse = zod.object({
+  id: zod.number(),
+  sourceRegistryId: zod.number(),
+  areaOperativaId: zod.number(),
+  magazzinoId: zod.number(),
+  lottoLogicoId: zod.number(),
+  caricoPraticaId: zod.number().nullish(),
+  modalita: zod.enum(["NUOVI_CARICHI", "SALDO_INIZIALE"]),
+  stato: zod.enum([
+    "IN_ANALISI",
+    "DA_COMPLETARE",
+    "PRONTA",
+    "IN_PRATICA",
+    "REGISTRATA",
+    "ANNULLATA",
+  ]),
+  versione: zod.number(),
+  dataRiferimentoSaldo: zod.coerce.date().nullish(),
+  coperturaConfermata: zod.union([zod.literal(0), zod.literal(1)]),
+  creatoDa: zod.number(),
+  aggiornatoDa: zod.number(),
+  dataCreazione: zod.coerce.date(),
+  dataAggiornamento: zod.coerce.date(),
+});
 
 export const MapFseImportProductParams = zod.object({
   id: zod.coerce.number().min(1),

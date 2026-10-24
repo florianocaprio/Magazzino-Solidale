@@ -989,6 +989,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkImportResult"
 
+  /prodotti/{id}/eliminazione:
+    get:
+      operationId: getProdottoEliminazione
+      tags: [prodotti]
+      summary: Check whether a product has no dependencies and can be permanently deleted
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deletion eligibility (rechecked on delete)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eliminabile, motivo]
+                properties:
+                  eliminabile:
+                    type: boolean
+                  motivo:
+                    type: string
+                    nullable: true
+        "403":
+          description: Product management permission required
+        "404":
+          description: Product not found
+    delete:
+      operationId: permanentlyDeleteProdotto
+      tags: [prodotti]
+      summary: Permanently delete an unused product; preserve any dependency and history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Product deleted and audit retained
+        "403":
+          description: Product management permission required
+        "404":
+          description: Product not found
+        "409":
+          description: Product has history or dependencies; deactivate instead
+
   /prodotti/{id}:
     get:
       operationId: getProdotto
@@ -1480,6 +1529,37 @@ paths:
         "409":
           description: Scelta esplicita necessaria o registro disattivato
 
+  /fse-importazioni/confronta-giacenze:
+    post:
+      operationId: compareFseWarehouseStock
+      tags: [fse-importazioni]
+      description: Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+      parameters:
+        - in: query
+          name: sourceRegistryId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: magazzinoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Risultato del confronto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseStockComparison"
+        "400":
+          description: File vuoto o non valido
+        "403":
+          description: Magazzino o sorgente non autorizzati
+
   /fse-importazioni/analizza:
     post:
       operationId: analyzeFsePracticeImport
@@ -1583,6 +1663,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FseImportSessionDetail"
+
+  /fse-importazioni/sessioni/{id}/data-riferimento:
+    patch:
+      operationId: reviseFseReferenceDate
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseReferenceDateInput"
+      responses:
+        "200":
+          description: Data verificata e corretta senza variazione di stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSession"
+        "409":
+          description: Data incoerente, versione superata o sessione già presa in carico
 
   /fse-importazioni/sessioni/{id}/associa-prodotto:
     post:
@@ -14016,6 +14121,33 @@ components:
       enum:
         [IN_ANALISI, DA_COMPLETARE, PRONTA, IN_PRATICA, REGISTRATA, ANNULLATA]
 
+    FseStockDifference:
+      type: object
+      properties:
+        prodotto: { type: string }
+        lotto: { type: [string, "null"] }
+        fondo: { type: [string, "null"] }
+        quantitaFile: { type: [string, "null"] }
+        quantitaLocale: { type: [string, "null"] }
+        unita: { type: string }
+        motivo: { type: string }
+      required:
+        [prodotto, lotto, fondo, quantitaFile, quantitaLocale, unita, motivo]
+
+    FseStockComparison:
+      type: object
+      properties:
+        allineato: { type: boolean }
+        righeFile: { type: integer }
+        righeCoincidenti: { type: integer }
+        verificatoAt: { type: string, format: date-time }
+        differenze:
+          type: array
+          items:
+            $ref: "#/components/schemas/FseStockDifference"
+      required:
+        [allineato, righeFile, righeCoincidenti, verificatoAt, differenze]
+
     FseImportSource:
       type: object
       properties:
@@ -14043,6 +14175,15 @@ components:
       properties:
         magazzinoId: { type: integer, minimum: 1 }
       required: [magazzinoId]
+
+    FseReferenceDateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+      required: [versione, dataRiferimento, motivo]
 
     FseImportSourceInput:
       type: object
@@ -14207,6 +14348,9 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
+        unitaMisuraPeso:
+          type: [string, "null"]
+          description: Unità di peso/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.
         pesoUnita:
           oneOf:
             - $ref: "#/components/schemas/FattoreContabile"

@@ -425,7 +425,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     const context = await ensureContext(page, suffix);
     const source = await createSource(page, context.area, `RESUME-SUGGEST-${suffix}`);
     const description = `Pratica riaperta ${suffix}`, external = `Alimento riapertura ${suffix}`;
-    await createPractice(page, context, description);
+    const practice = await createPractice(page, context, description);
     await page.goto("/carico-merce"); await openPractice(page, context.area, description);
     await page.getByRole("button", { name: "Importa file FSE+" }).click();
     await selectOption(page, page.getByRole("combobox", { name: "Registro FSE+ dell’Area" }), source.descrizione);
@@ -434,11 +434,13 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByRole("paragraph").filter({ hasText: external })).toBeVisible();
     await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toBeEnabled();
     // Session already exists before the catalog product is added.
-    await page.getByRole("dialog").last().getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Sospendi importazione", exact: true }).click();
     const created = await page.request.post("/api/prodotti", { data: { nome: external, tipoProdotto: "alimentare", unitaMisura: "pz", quantitaFrazionabile: false, lottoFisicoObbligatorio: false, gestioneScadenza: false } });
     expect(created.status()).toBe(201); const product = await created.json();
-    await page.getByRole("button", { name: "Importa file FSE+" }).click();
-    await page.getByRole("button", { name: /#\d+ · DA_COMPLETARE/ }).click();
+    // A fresh page has no in-memory practice/session: use the persisted recovery entry.
+    await page.goto("/carico-merce");
+    const pendingImport = page.getByRole("region", { name: "Importazioni FSE+ da completare" }).filter({ hasText: context.warehouse.nome });
+    await pendingImport.getByRole("button", { name: `Riprendi pratica #${practice.id}`, exact: true }).click();
     await page.getByRole("button", { name: `Associa a ${external} · ${product.codice} · pz`, exact: true }).click();
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
   });
@@ -454,6 +456,15 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await createPractice(page, context, description);
     const externalProduct = `Prodotto esterno nuovo ${suffix}`;
     const barcode = validEan13(suffix);
+    const registryBook = XLSX.read(registryFixture(externalProduct, `DOC-NEW-${suffix}`));
+    const registrySheet = registryBook.Sheets[registryBook.SheetNames[0]];
+    registrySheet.D2 = { t: "n", v: 5 };
+    registrySheet.J2 = { t: "n", v: 5 };
+    const stockBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(stockBook, XLSX.utils.aoa_to_sheet([
+      ["Denominazione OpN", "Denominazione OpC", "Denominazione OpT", "CodiceAccesso", "Fondo", "Prodotto", "Lotto", "PesoUnita", "UnitaMisuraPeso", "GiacenzaPesoVolume", "GiacenzaPezzi", "PezziPerCollo", "GiacenzaColli", "CheckModificaGiacenza", "Scadenza"],
+      ["OpN", "OpC", "OpT", "sintetico", "Fondo Nazionale", externalProduct, "006544", 0.5, "LT", 5, 10, null, 0, false, null],
+    ]), "Giacenze");
 
     await page.goto("/carico-merce");
     await openPractice(page, context.area, description);
@@ -467,7 +478,12 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       name: "prodotto-nuovo.xlsx",
       mimeType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: registryFixture(externalProduct, `DOC-NEW-${suffix}`),
+      buffer: Buffer.from(XLSX.write(registryBook, { type: "buffer", bookType: "xlsx" })),
+    });
+    await page.locator("#fse-stock-file").setInputFiles({
+      name: "giacenze-prodotto-nuovo.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from(XLSX.write(stockBook, { type: "buffer", bookType: "xlsx" })),
     });
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await page
@@ -476,6 +492,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByPlaceholder("Nome del prodotto")).toHaveValue(
       externalProduct,
     );
+    await expect(page.getByRole("combobox", { name: "Unità di misura del prodotto" })).toHaveText("l");
     await page
       .getByPlaceholder("Nome del prodotto")
       .fill(`Catalogo da FSE ${suffix}`);
@@ -491,6 +508,36 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       >
     ).find((product) => product.nome === `Catalogo da FSE ${suffix}`);
     expect(createdProduct?.codiceBarre).toBe(barcode);
+    expect(createdProduct?.unitaMisura).toBe("l");
+    const sessions = await (await page.request.get(`/api/fse-importazioni/sessioni?magazzinoId=${context.warehouse.id}`)).json();
+    const session = sessions.find((item: { sourceRegistryId: number }) => item.sourceRegistryId === source.id);
+    const imported = await (await page.request.get(`/api/fse-importazioni/sessioni/${session.id}`)).json();
+    expect(imported.stockRows[0].unitaMisuraPeso).toBe("l");
+    expect(Number(imported.rows[0].quantitaOperativa)).toBe(5);
+    expect(Number(imported.rows[0].quantitaPezzi)).toBe(10);
+
+    // A mapped import is a dependency even before stock is loaded.
+    await page.goto("/prodotti");
+    await page.getByPlaceholder("Cerca per nome o codice...").fill(createdProduct!.nome);
+    await page.getByRole("row").filter({ hasText: createdProduct!.nome }).getByRole("button", { name: "Apri menu" }).click();
+    await page.getByRole("menuitem", { name: "Elimina definitivamente", exact: true }).click();
+    const removalDialog = page.getByRole("alertdialog");
+    await expect(removalDialog.getByText(/non può essere eliminato/)).toBeVisible();
+    await expect(removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true })).toBeDisabled();
+    await removalDialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    expect((await page.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(409);
+
+    const unusedResponse = await page.request.post("/api/prodotti", { data: { nome: `Inutilizzato ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "pz" } });
+    expect(unusedResponse.status()).toBe(201);
+    const unused = await unusedResponse.json();
+    await page.reload();
+    await page.getByPlaceholder("Cerca per nome o codice...").fill(unused.nome);
+    await page.getByRole("row").filter({ hasText: unused.nome }).getByRole("button", { name: "Apri menu" }).click();
+    await page.getByRole("menuitem", { name: "Elimina definitivamente", exact: true }).click();
+    await expect(removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true })).toBeEnabled();
+    await removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true }).click();
+    await expect(removalDialog).toBeHidden();
+    expect((await page.request.get(`/api/prodotti/${unused.id}`)).status()).toBe(404);
 
     const roleResponse = await page.request.post("/api/ruoli", {
       data: {
@@ -574,6 +621,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       },
     });
     expect(forbidden.status()).toBe(403);
+    expect((await deniedPage.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(403);
     await deniedContext.close();
   });
 
@@ -841,7 +889,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: stockBytes,
     });
-    await page.getByLabel("Data di riferimento").fill(referenceDate);
+    await expect(page.getByLabel("Data di riferimento")).toHaveValue("");
     await page
       .getByText(/Confermo che il Registro copre lo storico necessario/)
       .click();
@@ -859,6 +907,14 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       );
       await card.getByRole("button", { name: "Associa", exact: true }).click();
     }
+    await expect(page.getByLabel("Data di riferimento")).toHaveValue(referenceDate);
+    await page.getByRole("button", { name: "Sospendi importazione", exact: true }).click();
+    await page.goto("/carico-merce");
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa" }), base.area.nome);
+    await page.getByRole("button", { name: `Riprendi pratica #${practice.id}`, exact: true }).click();
+    // Persistence does not silently carry over the operator's accounting confirmation.
+    await expect(page.getByRole("button", { name: "Vai al riepilogo" })).toBeDisabled();
+    await page.getByText(/Confermo che il Registro copre lo storico necessario/).click();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
     await expect(page.getByText(new RegExp(String(expectedPieces)))).toBeVisible();
     const balanceAttach = page.waitForResponse(
@@ -930,6 +986,21 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     const sources = await (await page.request.get("/api/fse-importazioni/sorgenti")).json();
     const source = sources.find((row: { areaOperativaId: number }) => row.areaOperativaId === area.id);
     expect(source).toBeTruthy();
+    await page.goto("/carico-merce");
+    await selectOption(page, page.getByRole("combobox", { name: "Area Operativa" }), area.nome);
+    await selectOption(page, page.getByRole("combobox", { name: "Magazzino destinazione", exact: true }), warehouse.nome);
+    await page.getByRole("button", { name: "Verifica giacenze FSE+" }).click();
+    await expect(page.locator("#fse-comparison-registry")).toBeDisabled();
+    await page.getByLabel("File Giacenze FSE+", { exact: true }).setInputFiles({ name: "Giacenze confronto.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: stockBytes });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const comparisonResponse = page.waitForResponse((response) => response.url().includes("/api/fse-importazioni/confronta-giacenze") && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Confronta giacenze" }).click();
+      expect((await comparisonResponse).status()).toBe(200);
+      await expect(page.getByRole("heading", { name: "Magazzino allineato", exact: true })).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("status")).toHaveClass(/bg-emerald-50/);
+    }
+    await page.getByRole("button", { name: "Chiudi", exact: true }).click();
+    expect(await (await page.request.get(`/api/movimenti?magazzinoId=${warehouse.id}`)).json()).toHaveLength(expectedRows);
     const replayQuery = new URLSearchParams({
       sourceRegistryId: String(source.id),
       areaOperativaId: String(base.area.id),

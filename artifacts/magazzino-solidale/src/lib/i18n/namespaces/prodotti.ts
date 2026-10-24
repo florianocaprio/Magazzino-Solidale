@@ -1,5 +1,10 @@
 export const prodotti = {
   it: {
+    removePermanently: "Elimina definitivamente",
+    removeDescription: "Il prodotto non ha carichi né collegamenti da conservare. L’eliminazione è definitiva; la traccia dell’operazione resta nello storico delle attività. Confermi?",
+    checkingHistory: "Verifica dello storico e dei collegamenti…",
+    historyCheckError: "Impossibile verificare lo storico. Chiudi e riprova: il prodotto non è stato eliminato.",
+    removed: "Prodotto eliminato definitivamente",
     title: "Catalogo Prodotti",
     exportBarcodes: "Scarica codici a barre",
     barcodeListTitle: "Catalogo Prodotti — Codici a Barre",

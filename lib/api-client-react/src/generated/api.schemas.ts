@@ -2232,6 +2232,28 @@ export const FseImportSessionState = {
   ANNULLATA: "ANNULLATA",
 } as const;
 
+export interface FseStockDifference {
+  prodotto: string;
+  /** @nullable */
+  lotto: string | null;
+  /** @nullable */
+  fondo: string | null;
+  /** @nullable */
+  quantitaFile: string | null;
+  /** @nullable */
+  quantitaLocale: string | null;
+  unita: string;
+  motivo: string;
+}
+
+export interface FseStockComparison {
+  allineato: boolean;
+  righeFile: number;
+  righeCoincidenti: number;
+  verificatoAt: string;
+  differenze: FseStockDifference[];
+}
+
 export type FseImportSourceAttiva =
   (typeof FseImportSourceAttiva)[keyof typeof FseImportSourceAttiva];
 
@@ -2253,6 +2275,17 @@ export interface FseImportSource {
 export interface FseAutomaticSourceInput {
   /** @minimum 1 */
   magazzinoId: number;
+}
+
+export interface FseReferenceDateInput {
+  /** @minimum 1 */
+  versione: number;
+  dataRiferimento: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  motivo: string;
 }
 
 export interface FseImportSourceInput {
@@ -2383,6 +2416,11 @@ export interface FseImportStockRow {
   lottoFisico?: string | null;
   giacenzaPezzi?: QuantitaContabile | null;
   giacenzaPesoVolume?: QuantitaContabile | null;
+  /**
+   * Unità di peso/volume letta nel file Giacenze (kg oppure l), senza deduzioni dal nome del prodotto.
+   * @nullable
+   */
+  unitaMisuraPeso?: string | null;
   pesoUnita?: FattoreContabile | null;
   /** @nullable */
   dataScadenza?: string | null;
@@ -11698,6 +11736,11 @@ export type ListProdottiParams = {
   search?: string;
 };
 
+export type GetProdottoEliminazione200 = {
+  eliminabile: boolean;
+  motivo: string | null;
+};
+
 export type ListCarichiParams = {
   magazzinoId?: number;
   origineCarico?: OrigineCarico;
@@ -11718,6 +11761,17 @@ export type ListCaricoPraticheParams = {
   q?: string;
   da?: string;
   a?: string;
+};
+
+export type CompareFseWarehouseStockParams = {
+  /**
+   * @minimum 1
+   */
+  sourceRegistryId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
 };
 
 export type AnalyzeFsePracticeImportParams = {

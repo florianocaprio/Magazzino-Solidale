@@ -8,6 +8,8 @@ import {
   fseImportStockRowsTable,
   fseSourceRegistriesTable,
   prodottiTable,
+  lottiTable,
+  mappatureProdottiEsterniTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -30,15 +32,131 @@ import {
   addFseRowsToPractice,
   mapFseProduct,
   reviseFseImportRow,
+  reviseFseReferenceDate,
   totalStockPieces,
 } from "../lib/fsePracticeImportService";
 import { requireModulo, requireAllModuli } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
+import { InventoryQuantityDimensionsError } from "../lib/inventoryQuantityDimensions";
+import { InventoryDecimalError } from "../lib/inventoryDecimal";
+import { ProductOperationalQuantityError } from "../lib/productQuantity";
+import { parseFseFile } from "../lib/fseImportParser";
+import { compareFseStock, FSE_STOCK_FUNDS } from "../lib/fseStockComparison";
+
 const router: IRouter = Router();
 router.use("/fse-importazioni", requireAllModuli(["CARICHI", "LOTTI"]));
 
 const binaryBody = express.raw({ type: () => true, limit: AGEA_MAX_BYTES });
+
+router.post(
+  "/fse-importazioni/confronta-giacenze",
+  requirePermission("magazzino.agea.import"),
+  binaryBody,
+  async (req, res) => {
+    try {
+      const warehouseId = positiveId(req.query.magazzinoId, "magazzinoId");
+      const sourceId = positiveId(
+        req.query.sourceRegistryId,
+        "sourceRegistryId",
+      );
+      if (!Buffer.isBuffer(req.body) || !req.body.length)
+        throw new FsePracticeImportError(
+          400,
+          "FILE_MANCANTE",
+          "Seleziona il file Giacenze.",
+        );
+      const parsed = parseFseFile(req.body, { profile: "GIACENZE" });
+      if (!parsed.stockRows.length)
+        throw new FsePracticeImportError(
+          400,
+          "GIACENZE_VUOTE",
+          "Il file non contiene righe di giacenza confrontabili.",
+        );
+      const result = await db.transaction(
+        async (tx) => {
+          await requireCurrentFseWarehouse(
+            tx,
+            req.user!.id,
+            "magazzino.agea.import",
+            warehouseId,
+          );
+          const [warehouse] = await tx
+            .select()
+            .from(magazziniTable)
+            .where(eq(magazziniTable.id, warehouseId));
+          const [source] = await tx
+            .select()
+            .from(fseSourceRegistriesTable)
+            .where(
+              and(
+                eq(fseSourceRegistriesTable.id, sourceId),
+                eq(
+                  fseSourceRegistriesTable.areaOperativaId,
+                  warehouse.areaOperativaId!,
+                ),
+                eq(fseSourceRegistriesTable.attiva, 1),
+              ),
+            );
+          if (!source)
+            throw new FsePracticeImportError(
+              403,
+              "SORGENTE_NON_ACCESSIBILE",
+              "Registro FSE+ non disponibile nell’Area del magazzino.",
+            );
+          const mappings = await tx
+            .select()
+            .from(mappatureProdottiEsterniTable)
+            .where(
+              and(
+                eq(mappatureProdottiEsterniTable.sourceRegistryId, sourceId),
+                eq(mappatureProdottiEsterniTable.attiva, true),
+              ),
+            );
+          const stock = await tx
+            .select()
+            .from(lottiTable)
+            .where(
+              and(
+                eq(lottiTable.magazzinoId, warehouseId),
+                inArray(lottiTable.fondoOrigine, FSE_STOCK_FUNDS),
+              ),
+            );
+          const ids = [
+            ...new Set([
+              ...mappings.map((m) => m.prodottoId),
+              ...stock.map((s) => s.prodottoId),
+            ]),
+          ];
+          const products = ids.length
+            ? await tx
+                .select()
+                .from(prodottiTable)
+                .where(inArray(prodottiTable.id, ids))
+            : [];
+          return {
+            ...compareFseStock(
+              parsed.stockRows,
+              new Map(
+                mappings.map((m) => [
+                  m.chiaveDescrizioneNormalizzata,
+                  m.prodottoId,
+                ]),
+              ),
+              products,
+              stock,
+            ),
+            verificatoAt: new Date().toISOString(),
+          };
+        },
+        { isolationLevel: "repeatable read" },
+      );
+      res.json(result);
+    } catch (error) {
+      if (!sendKnownError(res, error)) throw error;
+    }
+  },
+);
 
 function positiveId(value: unknown, field: string): number {
   const parsed = Number(value);
@@ -69,6 +187,16 @@ function text(value: unknown, field: string, max: number): string {
 }
 
 function sendKnownError(res: Response, error: unknown) {
+  if (
+    error instanceof InventoryQuantityDimensionsError ||
+    error instanceof InventoryDecimalError ||
+    error instanceof ProductOperationalQuantityError
+  ) {
+    res
+      .status(400)
+      .json({ error: error.message, code: "QUANTITA_NON_COMPATIBILE" });
+    return true;
+  }
   if (error instanceof CurrentCommandActorError) {
     res.status(403).json({ error: error.message, code: "FSE_SCOPE_REVOKED" });
     return true;
@@ -489,6 +617,7 @@ router.get(
             giacenzaPezzi: fseImportStockRowsTable.giacenzaPezzi,
             giacenzaPesoVolume: fseImportStockRowsTable.giacenzaPesoVolume,
             pesoUnita: fseImportStockRowsTable.pesoUnita,
+            unitaMisuraPeso: fseImportStockRowsTable.unitaMisuraPeso,
             dataScadenza: fseImportStockRowsTable.dataScadenza,
             prodottoId: fseImportStockRowsTable.prodottoId,
             quantitaOperativa: fseImportStockRowsTable.quantitaOperativa,
@@ -529,6 +658,8 @@ router.get(
             ? null
             : (productMap.get(row.prodottoId) ?? null),
       });
+      const actionableRows =
+        session.modalita === "SALDO_INIZIALE" ? stockRows : rows;
       res.json({
         ...session,
         files,
@@ -536,13 +667,14 @@ router.get(
         stockRows: stockRows.map(decorate),
         summary: {
           total: rows.length,
-          ready: rows.filter((row) => row.stato === "PRONTO").length,
-          needsMapping: rows.filter((row) => row.stato === "DA_ASSOCIARE")
-            .length,
-          needsReview: rows.filter((row) =>
+          ready: actionableRows.filter((row) => row.stato === "PRONTO").length,
+          needsMapping: actionableRows.filter(
+            (row) => row.stato === "DA_ASSOCIARE",
+          ).length,
+          needsReview: actionableRows.filter((row) =>
             ["DA_VERIFICARE", "DATO_MODIFICATO"].includes(row.stato),
           ).length,
-          errors: rows.filter((row) => row.stato === "ERRORE").length,
+          errors: actionableRows.filter((row) => row.stato === "ERRORE").length,
           known: rows.filter((row) =>
             ["GIA_REGISTRATO", "GIA_NELLA_PRATICA", "COPERTO_SALDO"].includes(
               row.stato,
@@ -554,6 +686,33 @@ router.get(
           stockPieces: totalStockPieces(stockRows),
         },
       });
+    } catch (error) {
+      if (!sendKnownError(res, error)) throw error;
+    }
+  },
+);
+
+router.patch(
+  "/fse-importazioni/sessioni/:id/data-riferimento",
+  requirePermission("magazzino.agea.import"),
+  async (req, res) => {
+    try {
+      const session = await accessibleSession(
+        req,
+        positiveId(req.params.id, "id"),
+      );
+      assertInitialBalancePermission(req, session);
+      const result = await db.transaction((tx) =>
+        reviseFseReferenceDate(tx, {
+          sessionId: session.id,
+          version: positiveId(req.body?.versione, "versione"),
+          date: text(req.body?.dataRiferimento, "dataRiferimento", 10),
+          reason: text(req.body?.motivo, "motivo", 1000),
+          actorId: req.user!.id,
+          audit: auditContextFromRequest(req),
+        }),
+      );
+      res.json(result);
     } catch (error) {
       if (!sendKnownError(res, error)) throw error;
     }

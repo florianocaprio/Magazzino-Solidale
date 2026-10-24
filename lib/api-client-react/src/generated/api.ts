@@ -135,6 +135,7 @@ import type {
   CercaBeneficiariSimiliParams,
   ChangePasswordInput,
   ComandoVersionatoInput,
+  CompareFseWarehouseStockParams,
   ConfermaRicezione,
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
@@ -225,8 +226,10 @@ import type {
   FseReconciliationRowsPage,
   FseRecord,
   FseRecordPage,
+  FseReferenceDateInput,
   FseReportingPreview,
   FseResolutionInput,
+  FseStockComparison,
   FseVersionInput,
   GetBollaBeneficiarioConsegnaParams,
   GetCaricoVolontariOperativo200Item,
@@ -247,6 +250,7 @@ import type {
   GetMensaAbilitazioniRiepilogoBeneficiariParams,
   GetMensaReportParams,
   GetPreparazioneConsegneParams,
+  GetProdottoEliminazione200,
   GetReportCentroAscoltoParams,
   GetReportDashboardGeneraleParams,
   GetReportDrilldownParams,
@@ -3528,6 +3532,182 @@ export const useBulkProdotti = <
   return useMutation(getBulkProdottiMutationOptions(options));
 };
 
+export const getGetProdottoEliminazioneUrl = (id: number) => {
+  return `/api/prodotti/${id}/eliminazione`;
+};
+
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+export const getProdottoEliminazione = async (
+  id: number,
+  options?: RequestInit,
+): Promise<GetProdottoEliminazione200> => {
+  return customFetch<GetProdottoEliminazione200>(
+    getGetProdottoEliminazioneUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProdottoEliminazioneQueryKey = (id: number) => {
+  return [`/api/prodotti/${id}/eliminazione`] as const;
+};
+
+export const getGetProdottoEliminazioneQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProdottoEliminazione>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProdottoEliminazione>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProdottoEliminazioneQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProdottoEliminazione>>
+  > = ({ signal }) =>
+    getProdottoEliminazione(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProdottoEliminazione>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProdottoEliminazioneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProdottoEliminazione>>
+>;
+export type GetProdottoEliminazioneQueryError = ErrorType<void>;
+
+/**
+ * @summary Check whether a product has no dependencies and can be permanently deleted
+ */
+
+export function useGetProdottoEliminazione<
+  TData = Awaited<ReturnType<typeof getProdottoEliminazione>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProdottoEliminazione>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProdottoEliminazioneQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPermanentlyDeleteProdottoUrl = (id: number) => {
+  return `/api/prodotti/${id}/eliminazione`;
+};
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const permanentlyDeleteProdotto = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getPermanentlyDeleteProdottoUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getPermanentlyDeleteProdottoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["permanentlyDeleteProdotto"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return permanentlyDeleteProdotto(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PermanentlyDeleteProdottoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>
+>;
+
+export type PermanentlyDeleteProdottoMutationError = ErrorType<void>;
+
+/**
+ * @summary Permanently delete an unused product; preserve any dependency and history
+ */
+export const usePermanentlyDeleteProdotto = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof permanentlyDeleteProdotto>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getPermanentlyDeleteProdottoMutationOptions(options));
+};
+
 export const getGetProdottoUrl = (id: number) => {
   return `/api/prodotti/${id}`;
 };
@@ -5342,6 +5522,110 @@ export const useResolveAutomaticFseImportSource = <
   );
 };
 
+export const getCompareFseWarehouseStockUrl = (
+  params: CompareFseWarehouseStockParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fse-importazioni/confronta-giacenze?${stringifiedParams}`
+    : `/api/fse-importazioni/confronta-giacenze`;
+};
+
+/**
+ * Confronto senza modifiche delle giacenze fisiche dei fondi FSE e nazionali nel magazzino. Non crea pratiche, prodotti o movimenti.
+ */
+export const compareFseWarehouseStock = async (
+  compareFseWarehouseStockBody: Blob,
+  params: CompareFseWarehouseStockParams,
+  options?: RequestInit,
+): Promise<FseStockComparison> => {
+  return customFetch<FseStockComparison>(
+    getCompareFseWarehouseStockUrl(params),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...options?.headers,
+      },
+      body: compareFseWarehouseStockBody,
+    },
+  );
+};
+
+export const getCompareFseWarehouseStockMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    TError,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+  TError,
+  { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+  TContext
+> => {
+  const mutationKey = ["compareFseWarehouseStock"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams }
+  > = (props) => {
+    const { data, params } = props ?? {};
+
+    return compareFseWarehouseStock(data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompareFseWarehouseStockMutationResult = NonNullable<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>
+>;
+export type CompareFseWarehouseStockMutationBody = BodyType<Blob>;
+export type CompareFseWarehouseStockMutationError = ErrorType<void>;
+
+export const useCompareFseWarehouseStock = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+    TError,
+    { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof compareFseWarehouseStock>>,
+  TError,
+  { data: BodyType<Blob>; params: CompareFseWarehouseStockParams },
+  TContext
+> => {
+  return useMutation(getCompareFseWarehouseStockMutationOptions(options));
+};
+
 export const getAnalyzeFsePracticeImportUrl = (
   params: AnalyzeFsePracticeImportParams,
 ) => {
@@ -5618,6 +5902,88 @@ export function useGetFseImportSession<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getReviseFseReferenceDateUrl = (id: number) => {
+  return `/api/fse-importazioni/sessioni/${id}/data-riferimento`;
+};
+
+export const reviseFseReferenceDate = async (
+  id: number,
+  fseReferenceDateInput: FseReferenceDateInput,
+  options?: RequestInit,
+): Promise<FseImportSession> => {
+  return customFetch<FseImportSession>(getReviseFseReferenceDateUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fseReferenceDateInput),
+  });
+};
+
+export const getReviseFseReferenceDateMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    TError,
+    { id: number; data: BodyType<FseReferenceDateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+  TError,
+  { id: number; data: BodyType<FseReferenceDateInput> },
+  TContext
+> => {
+  const mutationKey = ["reviseFseReferenceDate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    { id: number; data: BodyType<FseReferenceDateInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reviseFseReferenceDate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviseFseReferenceDateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>
+>;
+export type ReviseFseReferenceDateMutationBody =
+  BodyType<FseReferenceDateInput>;
+export type ReviseFseReferenceDateMutationError = ErrorType<void>;
+
+export const useReviseFseReferenceDate = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+    TError,
+    { id: number; data: BodyType<FseReferenceDateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviseFseReferenceDate>>,
+  TError,
+  { id: number; data: BodyType<FseReferenceDateInput> },
+  TContext
+> => {
+  return useMutation(getReviseFseReferenceDateMutationOptions(options));
+};
 
 export const getMapFseImportProductUrl = (id: number) => {
   return `/api/fse-importazioni/sessioni/${id}/associa-prodotto`;

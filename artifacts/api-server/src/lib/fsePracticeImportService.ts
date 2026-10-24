@@ -34,7 +34,11 @@ import {
   type ParsedFseFile,
 } from "./fseImportParser";
 import { normalizeAgeaKey } from "./ageaSifeadParser";
-import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
+import {
+  canonicalInventoryFactor,
+  resolveInventoryQuantityDimensions,
+} from "./inventoryQuantityDimensions";
+import { inferFseUnitFactor } from "./fseImportQuantity";
 import { InventoryDecimal } from "./inventoryDecimal";
 import { validateProductOperationalQuantity } from "./productQuantity";
 import type { InventoryTransaction } from "./scaricoInventory";
@@ -373,7 +377,8 @@ function quantityForProduct(
     unitaMisura: product.unitaMisura,
     quantitaPezzi: values.pieces,
     quantitaKgLt: values.kgLt,
-    fattoreKgLtPezzo: values.factor,
+    fattoreKgLtPezzo:
+      values.factor ?? inferFseUnitFactor(values.pieces, values.kgLt),
   });
   return dimensions;
 }
@@ -1186,6 +1191,32 @@ export async function acquireFseFile(
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-session:${session.id}`}, 0))`,
   );
+  if (input.profile === "GIACENZE") {
+    const [registry] = await tx
+      .select()
+      .from(fseImportFilesTable)
+      .where(
+        and(
+          eq(fseImportFilesTable.sessioneId, session.id),
+          eq(fseImportFilesTable.profilo, "REGISTRO"),
+        ),
+      );
+    parsed.dataRiferimento ??= registry?.dataRiferimento ?? null;
+    if (
+      session.modalita === "SALDO_INIZIALE" &&
+      registry?.dataRiferimento &&
+      parsed.dataRiferimento !== registry.dataRiferimento
+    )
+      throw new FsePracticeImportError(
+        409,
+        "DATE_RIFERIMENTO_INCOERENTI",
+        `Il Registro riporta giacenze al ${registry.dataRiferimento}. La data delle Giacenze deve coincidere: correggi la data o scegli due file riferiti allo stesso giorno.`,
+      );
+    if (parsed.dataRiferimento)
+      parsed.warnings = parsed.warnings.filter(
+        (code) => code !== "DATA_RIFERIMENTO_DA_CONFERMARE",
+      );
+  }
   const [existing] = await tx
     .select()
     .from(fseImportFilesTable)
@@ -1283,6 +1314,117 @@ export async function acquireFseFile(
     formato: parsed.format,
     sha256File: parsed.sha256File,
   };
+}
+
+/** Correct metadata only while the balance has not been taken into a practice. */
+export async function reviseFseReferenceDate(
+  tx: InventoryTransaction,
+  input: {
+    sessionId: number;
+    version: number;
+    date: string;
+    reason: string;
+    actorId: number;
+    audit: AuditCommandContext;
+  },
+) {
+  await lockFseSourceForSession(tx, input.sessionId);
+  const [session] = await tx
+    .select()
+    .from(fseImportSessionsTable)
+    .where(eq(fseImportSessionsTable.id, input.sessionId))
+    .for("update");
+  if (!session)
+    throw new FsePracticeImportError(
+      404,
+      "SESSIONE_NON_TROVATA",
+      "Procedura non trovata",
+    );
+  await authorizeImport(tx, input.actorId, "magazzino.agea.import", session);
+  if (session.versione !== input.version)
+    throw new FsePracticeImportError(
+      409,
+      "VERSIONE_SESSIONE",
+      "La procedura è stata modificata da un altro operatore: ricaricala.",
+    );
+  if (
+    session.modalita !== "SALDO_INIZIALE" ||
+    !["IN_ANALISI", "DA_COMPLETARE", "PRONTA"].includes(session.stato)
+  )
+    throw new FsePracticeImportError(
+      409,
+      "SESSIONE_NON_MODIFICABILE",
+      "La data è modificabile solo prima di aggiungere la giacenza iniziale alla pratica.",
+    );
+  const date = parseFseDate(input.date);
+  if (!date)
+    throw new FsePracticeImportError(
+      400,
+      "DATA_NON_VALIDA",
+      "Indica una data valida.",
+    );
+  const files = await tx
+    .select()
+    .from(fseImportFilesTable)
+    .where(eq(fseImportFilesTable.sessioneId, session.id));
+  const registry = files.find((file) => file.profilo === "REGISTRO");
+  if (!registry)
+    throw new FsePracticeImportError(
+      409,
+      "COPPIA_FILE_INCOMPLETA",
+      "Acquisisci prima il Registro.",
+    );
+  if (registry.dataRiferimento && registry.dataRiferimento !== date)
+    throw new FsePracticeImportError(
+      409,
+      "DATE_RIFERIMENTO_INCOERENTI",
+      `Il Registro riporta giacenze al ${registry.dataRiferimento}: usa la stessa data per le Giacenze.`,
+    );
+  const [coverage] = await tx
+    .select({ id: fseInitialBalanceCoverageTable.id })
+    .from(fseInitialBalanceCoverageTable)
+    .where(
+      and(
+        eq(fseInitialBalanceCoverageTable.sessioneId, session.id),
+        ne(fseInitialBalanceCoverageTable.stato, "ANNULLATA"),
+      ),
+    );
+  if (coverage)
+    throw new FsePracticeImportError(
+      409,
+      "SESSIONE_NON_MODIFICABILE",
+      "La giacenza iniziale è già stata presa in carico.",
+    );
+  for (const file of files.filter((file) => file.profilo === "GIACENZE")) {
+    await tx
+      .update(fseImportFilesTable)
+      .set({
+        dataRiferimento: date,
+        warningsJson: file.warningsJson.filter(
+          (code) => code !== "DATA_RIFERIMENTO_DA_CONFERMARE",
+        ),
+      })
+      .where(eq(fseImportFilesTable.id, file.id));
+  }
+  await tx
+    .update(fseImportSessionsTable)
+    .set({ dataRiferimentoSaldo: date })
+    .where(eq(fseImportSessionsTable.id, session.id));
+  const updated = await refreshSessionState(tx, session.id, input.actorId);
+  await recordAuditEvent(tx, {
+    command: input.audit,
+    azione: "FSE_IMPORT_DATA_CORRETTA",
+    entitaTipo: "fse_import_session",
+    entitaId: session.id,
+    areaOperativaIdSnapshot: session.areaOperativaId,
+    magazzinoIdSnapshot: session.magazzinoId,
+    motivo: input.reason,
+    changes: auditFields({ prima: session.dataRiferimentoSaldo, dopo: date }, [
+      "prima",
+      "dopo",
+    ]),
+  });
+  return updated;
 }
 
 export async function mapFseProduct(
@@ -1405,7 +1547,13 @@ export async function mapFseProduct(
     mutableImportState(item.stato),
   )) {
     const errors = row.errorCodesJson.filter(
-      (item) => item !== "QUANTITA_NON_COMPATIBILE",
+      (item) =>
+        ![
+          "QUANTITA_NON_COMPATIBILE",
+          "LOTTO_FISICO_OBBLIGATORIO",
+          "SCADENZA_OBBLIGATORIA",
+          "GIACENZA_AMBIGUA",
+        ].includes(item),
     );
     let dimensions;
     try {
@@ -1692,13 +1840,12 @@ export async function reviseFseImportRow(
   const factor =
     input.factor === undefined
       ? row.fattoreKgLtPezzo
-      : input.factor == null || input.factor.trim() === ""
-        ? null
-        : InventoryDecimal.parse(input.factor).toDb();
+      : canonicalInventoryFactor(input.factor);
   const unit = product.unitaMisura.trim().toLowerCase();
   const quantity =
     input.quantity == null
-      ? row.quantitaOperativa
+      ? (row.quantitaOperativa ??
+        (unit === "pz" ? row.quantitaPezzi : row.quantitaKgLt))
       : InventoryDecimal.parse(input.quantity).toDb();
   const pieces = unit === "pz" ? quantity : row.quantitaPezzi;
   const kgLt = ["kg", "l", "lt"].includes(unit) ? quantity : row.quantitaKgLt;
@@ -2279,7 +2426,9 @@ export async function addFseRowsToPractice(
       quantity: row.quantitaOperativa!,
       lot: row.lottoFisico,
       expiry: row.dataScadenza,
-      factor: row.pesoUnita,
+      factor:
+        row.pesoUnita ??
+        inferFseUnitFactor(row.giacenzaPezzi, row.giacenzaPesoVolume),
       document: null,
       documentDate: null,
       operationalDate: session.dataRiferimentoSaldo,
