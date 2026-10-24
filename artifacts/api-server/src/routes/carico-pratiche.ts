@@ -356,7 +356,8 @@ async function normalizeDraftLine(
       throw error;
     }
   }
-  let fattoreKgLtPezzo: string | null = null;
+  let fattoreKgLtPezzo: string | null = input.fattoreKgLtPezzo === undefined
+    ? prodotto.fattoreKgLtPezzo : null;
   if (input.fattoreKgLtPezzo != null && input.fattoreKgLtPezzo !== "") {
     try {
       fattoreKgLtPezzo = canonicalInventoryFactor(

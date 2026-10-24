@@ -105,7 +105,7 @@ async function file(id: string, value: File) {
 beforeEach(async () => {
   vi.clearAllMocks();
   Object.assign(api.detail, structuredClone(initialDetail));
-  api.analyze.mockReset();
+  api.analyze.mockReset().mockResolvedValue({ sessionId: 10 });
   api.createProduct.mockReset().mockResolvedValue({ id: 99 });
   api.mapProduct.mockReset().mockResolvedValue({ versione: 3 });
   api.fetchDetail.mockReset().mockImplementation(async () => api.detail);
@@ -140,6 +140,7 @@ beforeEach(async () => {
       />,
     );
   });
+  await file("fse-stock-file", new File(["stock"], "Giacenze.csv"));
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -278,18 +279,18 @@ it("conferma in sequenza solo le date senza altri errori e usa la versione resti
   expect(api.attach).not.toHaveBeenCalled();
 });
 
-it.each(["kg", "l"])("propone e invia %s del file alla creazione del prodotto", async (unit) => {
+it.each(["kg", "l"])("crea in pezzi e propone il contenuto %s del file", async (unit) => {
   Object.assign(api.detail, {
     rows: [{ ...api.detail.rows[0], stato: "DA_ASSOCIARE", tipoMovimento: "CARICO", quantitaPezzi: "10", quantitaKgLt: "5" }],
-    stockRows: [{ id: 30, prodottoEsterno: "Pasta", stato: "DA_ASSOCIARE", unitaMisuraPeso: unit, giacenzaPezzi: "10", giacenzaPesoVolume: "5", errorCodes: [], warningCodes: [] }],
+    stockRows: [{ id: 30, prodottoEsterno: "Pasta", stato: "DA_ASSOCIARE", unitaMisuraPeso: unit, pesoUnita: "0.5", giacenzaPezzi: "10", giacenzaPesoVolume: "5", errorCodes: [], warningCodes: [] }],
   });
   api.analyze.mockResolvedValueOnce({ sessionId: 10 });
   await file("fse-registry-file", new File(["registro"], "Registro.csv"));
   await click(i18n.t("caricoPratiche.fseAnalyze"));
   await click(i18n.t("caricoPratiche.fseCreateProduct"));
-  expect(document.querySelector('[aria-label="Unità di misura del prodotto"]')?.textContent).toBe(unit);
+  expect(document.querySelector('[aria-label="Unità di misura del prodotto"]')?.textContent).toBe("pz");
   await click(i18n.t("caricoPratiche.fseCreateAndAssociate"));
-  expect(api.createProduct.mock.calls[0][0].data).toMatchObject({ nome: "Pasta", unitaMisura: unit, quantitaFrazionabile: true });
+  expect(api.createProduct.mock.calls[0][0].data).toMatchObject({ nome: "Pasta", unitaMisura: "pz", quantitaFrazionabile: false, fattoreKgLtPezzo: 0.5, unitaMisuraPeso: unit });
 });
 
 it("in correzione mantiene l'unità del catalogo e permette di riprendere la quantità corrispondente", async () => {
@@ -304,4 +305,14 @@ it("in correzione mantiene l'unità del catalogo e permette di riprendere la qua
   expect(quantity.value).toBe("5");
   expect(api.createProduct).not.toHaveBeenCalled();
   expect(api.mapProduct).not.toHaveBeenCalled();
+});
+
+it("spiega che non ci sono nuovi carichi senza mostrare avvisi storici da correggere", async () => {
+  Object.assign(api.detail, { rows: [{ ...api.detail.rows[0], stato: "COPERTO_SALDO", tipoMovimento: "CARICO", warningCodes: ["DATA_DOCUMENTO_FALLBACK"] }] });
+  await file("fse-registry-file", new File(["registro"], "Registro.csv"));
+  await click(i18n.t("caricoPratiche.fseAnalyze"));
+  expect(document.body.textContent).toContain("Registro allineato: nessun nuovo carico da importare");
+  expect(document.body.textContent).not.toContain("Manca la data di carico");
+  expect([...document.querySelectorAll("button")].some(button => button.textContent === i18n.t("caricoPratiche.fseReviewSummary"))).toBe(false);
+  expect(api.attach).not.toHaveBeenCalled();
 });

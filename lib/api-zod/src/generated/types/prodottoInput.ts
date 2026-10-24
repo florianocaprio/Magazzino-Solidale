@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProdottoInputUnitaMisuraPeso } from "./prodottoInputUnitaMisuraPeso";
 
 export interface ProdottoInput {
   codice?: string;
@@ -12,6 +13,14 @@ export interface ProdottoInput {
   descrizione?: string;
   tipoProdotto: string;
   unitaMisura: string;
+  /**
+   * Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+   * @exclusiveMinimum 0
+   * @nullable
+   */
+  fattoreKgLtPezzo?: number | null;
+  /** @nullable */
+  unitaMisuraPeso?: ProdottoInputUnitaMisuraPeso;
   codiceBarre?: string;
   /** Se omesso, il backend deriva il default dall'unità di misura */
   quantitaFrazionabile?: boolean;

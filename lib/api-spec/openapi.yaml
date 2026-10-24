@@ -13911,6 +13911,13 @@ components:
           type: string
         unitaMisura:
           type: string
+        fattoreKgLtPezzo:
+          type: ["number", "null"]
+          exclusiveMinimum: 0
+          description: Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+        unitaMisuraPeso:
+          type: ["string", "null"]
+          enum: [kg, l, null]
         codiceBarre:
           type: ["string", "null"]
         quantitaFrazionabile:
@@ -13985,6 +13992,13 @@ components:
           type: string
         unitaMisura:
           type: string
+        fattoreKgLtPezzo:
+          type: ["number", "null"]
+          exclusiveMinimum: 0
+          description: Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+        unitaMisuraPeso:
+          type: ["string", "null"]
+          enum: [kg, l, null]
         codiceBarre:
           type: string
         quantitaFrazionabile:
@@ -14037,6 +14051,13 @@ components:
           type: string
         unitaMisura:
           type: string
+        fattoreKgLtPezzo:
+          type: ["number", "null"]
+          exclusiveMinimum: 0
+          description: Contenuto predefinito per pezzo, senza modificare i lotti esistenti.
+        unitaMisuraPeso:
+          type: ["string", "null"]
+          enum: [kg, l, null]
         codiceBarre:
           type: string
         quantitaFrazionabile:
@@ -14452,6 +14473,10 @@ components:
       properties:
         versione: { type: integer, minimum: 1 }
         quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaPezzi:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaKgLt:
           $ref: "#/components/schemas/QuantitaContabile"
         numeroDocumento: { type: [string, "null"], maxLength: 100 }
         dataDocumento: { type: [string, "null"], format: date }
