@@ -29,10 +29,6 @@ vi.mock("@workspace/api-client-react", () => ({
     params: unknown,
     options: unknown,
   ) => mocks.getEmporioRiepilogo(params, options),
-  getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey: (params: unknown) => [
-    "emporio-riepilogo",
-    params,
-  ],
   useListBeneficiari: (params: unknown) => mocks.listBeneficiari(params),
   useCreateBeneficiario: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateMensaAbilitazione: () => ({
@@ -170,11 +166,6 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
       isLoading: false,
       isError: false,
     });
-    mocks.getEmporioRiepilogo.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -187,78 +178,30 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     vi.clearAllMocks();
   });
 
-  it.each(["non_abilitato", "attivo", "sospeso", "revocato", "programmato"])(
-    "B05/B14/B15: colonna Emporio usa lo stato server %s, non il credito",
-    async (stato) => {
-      mocks.getEmporioRiepilogo.mockReturnValue({
-        data: [{ beneficiarioId: 10, stato }],
-        isLoading: false,
-        isError: false,
-      });
-      await act(async () => root.render(<Beneficiari />));
-      expect(container.querySelector("thead")?.textContent).toContain(
-        "emporioServizio.colonna",
-      );
-      expect(container.querySelector("tbody")?.textContent).toContain(
-        `emporioServizio.${stato}`,
-      );
-      expect(mocks.getEmporioRiepilogo).toHaveBeenCalledWith(
-        { beneficiarioIds: "10" },
-        expect.objectContaining({
-          query: expect.objectContaining({ enabled: true }),
-        }),
-      );
-    },
-  );
+  it("mostra lo stato anagrafico senza esporre la colonna Emporio", async () => {
+    await act(async () => root.render(<Beneficiari />));
+    const headers = container.querySelector("thead")?.textContent;
+    expect(headers).toContain("beneficiari.colStato");
+    expect(headers).not.toContain("emporioServizio.colonna");
+    expect(container.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
+    expect(mocks.getEmporioRiepilogo).not.toHaveBeenCalled();
+  });
 
-  it("B16/B17: Mensa ed Emporio sono colonne indipendenti", async () => {
+  it("mantiene la colonna Mensa per i ruoli abilitati", async () => {
     mocks.permissions.add("mensa.view");
     mocks.getMensaRiepilogo.mockReturnValue({
       data: [{ beneficiarioId: 10, stato: "attiva" }],
       isLoading: false,
     });
-    mocks.getEmporioRiepilogo.mockReturnValue({
-      data: [{ beneficiarioId: 10, stato: "non_abilitato" }],
-      isLoading: false,
-    });
     await act(async () => root.render(<Beneficiari />));
     expect(container.querySelector("tbody")?.textContent).toContain("ATTIVA");
-    expect(container.querySelector("tbody")?.textContent).toContain(
-      "emporioServizio.non_abilitato",
-    );
     mocks.getMensaRiepilogo.mockReturnValue({
       data: [{ beneficiarioId: 10, stato: "non_abilitato" }],
-      isLoading: false,
-    });
-    mocks.getEmporioRiepilogo.mockReturnValue({
-      data: [{ beneficiarioId: 10, stato: "attivo" }],
       isLoading: false,
     });
     await act(async () => root.render(<Beneficiari />));
     expect(container.querySelector("tbody")?.textContent).toContain(
       "NON ABILITATO",
-    );
-    expect(container.querySelector("tbody")?.textContent).toContain(
-      "emporioServizio.attivo",
-    );
-  });
-
-  it("riepilogo in errore o ancora in caricamento non inventa NON ABILITATO", async () => {
-    mocks.getEmporioRiepilogo.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
-    await act(async () => root.render(<Beneficiari />));
-    expect(container.querySelector("tbody")?.textContent).not.toContain(
-      "emporioServizio.non_abilitato",
-    );
-    mocks.getEmporioRiepilogo.mockReturnValue({
-      data: [{ beneficiarioId: 10, stato: "attivo" }],
-      isError: true,
-    });
-    await act(async () => root.render(<Beneficiari />));
-    expect(container.querySelector("tbody")?.textContent).not.toContain(
-      "emporioServizio.attivo",
     );
   });
 
@@ -455,7 +398,7 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(document.body.textContent).toContain("NON ABILITATO");
   });
 
-  it("B19: naviga pagina 1, pagina 2, ritorna e resetta a pagina 1 con riepilogo Emporio limitato agli ID correnti", async () => {
+  it("B19: naviga pagina 1, pagina 2, ritorna e resetta a pagina 1", async () => {
     const pageRows = (page: number) =>
       Array.from({ length: 50 }, (_, index) => ({
         id: page * 100 + index,
@@ -480,14 +423,6 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 1, limit: 50 }),
     );
-    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
-      {
-        beneficiarioIds: pageRows(1)
-          .map((b) => b.id)
-          .join(","),
-      },
-      expect.anything(),
-    );
 
     const next = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "Successiva",
@@ -496,14 +431,6 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 2, limit: 50 }),
     );
-    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
-      {
-        beneficiarioIds: pageRows(2)
-          .map((b) => b.id)
-          .join(","),
-      },
-      expect.anything(),
-    );
 
     const previous = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "Precedente",
@@ -511,14 +438,6 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     await act(async () => previous?.click());
     expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 1, limit: 50 }),
-    );
-    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
-      {
-        beneficiarioIds: pageRows(1)
-          .map((b) => b.id)
-          .join(","),
-      },
-      expect.anything(),
     );
 
     await act(async () => next?.click());

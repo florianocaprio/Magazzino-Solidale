@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
+  tessereBeneficiariTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
@@ -154,6 +155,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (interventionIds.length) await db.delete(interventiTable).where(inArray(interventiTable.id, interventionIds));
   if (beneficiaryIds.length) {
+    await db.delete(tessereBeneficiariTable).where(inArray(tessereBeneficiariTable.beneficiarioId, beneficiaryIds));
     await db.delete(nucleoFamiliareTable).where(inArray(nucleoFamiliareTable.beneficiarioId, beneficiaryIds));
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiaryIds));
   }

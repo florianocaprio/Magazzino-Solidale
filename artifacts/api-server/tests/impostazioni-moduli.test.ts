@@ -4,6 +4,7 @@ import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
   beneficiariTable,
+  tessereBeneficiariTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
@@ -100,6 +101,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (beneficiarioIds.length > 0) {
+    await db
+      .delete(tessereBeneficiariTable)
+      .where(inArray(tessereBeneficiariTable.beneficiarioId, beneficiarioIds));
+  }
   await cleanupEmporioActorFixtures();
   if (zonaIds.length > 0)
     await db

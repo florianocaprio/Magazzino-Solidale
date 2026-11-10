@@ -6,6 +6,7 @@ import { httpListeners } from "./helpers/http-listeners";
 import {
   createAreaOperativa,
   createBeneficiario,
+  createCentroRec,
   createZona,
   insertIntervento,
   newScope,
@@ -178,6 +179,37 @@ it("F02 inactive Area denies ordinary UDS, while explicit administrative global 
     ]);
     expect((await admin.get(`/api/beneficiari/${person}`)).status).toBe(403);
   }
+});
+
+it("emette la tessera insieme all'anagrafica e consente il PDF all'operatore sociale nella sua Area", async () => {
+  const { f, user, agent } = await fixture(["sociale"]);
+  const scope = newScope();
+  const centre = await createCentroRec(scope, { areaOperativaId: f.area });
+  const otherArea = await createAreaOperativa(scope);
+  const foreign = await createBeneficiario(scope, null, { areaOperativaId: otherArea });
+  await pool.query("update ruoli set permessi=$1 where id=$2", [
+    JSON.stringify(["beneficiari.view", "beneficiari.manage"]), user.roleId,
+  ]);
+  await pool.query("update utenti set zona_uds_id=null where id=$1", [user.id]);
+
+  const created = await agent.post("/api/beneficiari").send({
+    nome: "Persona", cognome: "Prova tessera", sesso: "F", centroAscoltoId: centre.id,
+  });
+  expect(created.status, created.text).toBe(201);
+  const id = created.body.id;
+  const beforeDownload = await pool.query(
+    "select codice,stato,created_by from tessere_beneficiari where beneficiario_id=$1", [id],
+  );
+  expect(beforeDownload.rows).toEqual([
+    { codice: expect.stringMatching(/^MS-/), stato: "attiva", created_by: user.id },
+  ]);
+  const endpoint = `/api/beneficiari/${id}/tessera-documento`;
+  const download = await agent.post(endpoint).send({});
+  expect(download.status, download.text).toBe(200);
+  expect(download.body.codice).toBe(beforeDownload.rows[0].codice);
+  expect((await agent.post(endpoint).send({})).body).toEqual(download.body);
+  expect((await agent.post(`/api/beneficiari/${foreign}/tessera-documento`).send({})).status).toBe(403);
+  expect((await agent.post(`/api/beneficiari/${id}/tessere`).send({})).status).toBe(403);
 });
 
 it("BUG21: stati UDS minimi e prima tessera concorrente, senza concessione di gestione Mensa/tessere", async () => {

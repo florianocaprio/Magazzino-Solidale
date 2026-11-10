@@ -16,6 +16,8 @@ export class TesseraBeneficiarioError extends Error {
   }
 }
 
+type TesseraBeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export function formatTesseraBeneficiario(
   row: typeof tessereBeneficiariTable.$inferSelect,
 ) {
@@ -38,18 +40,18 @@ export async function issueTesseraBeneficiario(input: {
   beneficiarioId: number;
   dataScadenza: string | null;
   motivoSostituzione: string | null;
-  operatoreId: number;
+  operatoreId: number | null;
   ip: string | null;
   areaAudit: "mensa" | "beneficiari";
   recoverExisting?: boolean;
-  authorize?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], beneficiary: typeof beneficiariTable.$inferSelect) => Promise<void>;
-}) {
-  return db.transaction(async (tx) => {
+  authorize?: (tx: TesseraBeneficiarioTx, beneficiary: typeof beneficiariTable.$inferSelect) => Promise<void>;
+}, executor?: TesseraBeneficiarioTx) {
+  const issue = async (tx: TesseraBeneficiarioTx) => {
     // Blocca anche il caso senza tessere: due prime emissioni non possono gareggiare.
     const [beneficiary] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, input.beneficiarioId)).for("update");
     if (!beneficiary) throw new TesseraBeneficiarioError(404, "Beneficiario non trovato");
-    if (!beneficiary.attivo) throw new TesseraBeneficiarioError(409, "Il beneficiario non è attivo");
     await input.authorize?.(tx, beneficiary);
+    if (!beneficiary.attivo) throw new TesseraBeneficiarioError(409, "Il beneficiario non è attivo");
     if (input.recoverExisting) {
       const [existing] = await tx.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, input.beneficiarioId))
         .orderBy(sql`case when ${tessereBeneficiariTable.stato} = 'attiva' then 0 else 1 end`, desc(tessereBeneficiariTable.createdAt), desc(tessereBeneficiariTable.id)).limit(1);
@@ -108,5 +110,6 @@ export async function issueTesseraBeneficiario(input: {
       note: input.motivoSostituzione,
     });
     return row;
-  });
+  };
+  return executor ? issue(executor) : db.transaction(issue);
 }

@@ -686,6 +686,14 @@ export async function createBeneficiarioOne(
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
     if (fascicolo?.trim()) await saveBeneficiarioFascicolo(executor, row.id, fascicolo, 0, req.user?.id ?? null);
+    await issueTesseraBeneficiario({
+      beneficiarioId: row.id,
+      dataScadenza: null,
+      motivoSostituzione: null,
+      operatoreId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      areaAudit: "beneficiari",
+    }, executor);
     await executor.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `beneficiario:${row.id}`,
@@ -898,14 +906,22 @@ router.post("/beneficiari/:id/tessera-documento", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0 || Object.keys(req.body ?? {}).length) { res.status(400).json({ error: "Richiesta tessera non valida" }); return; }
   const fullManager = hasPermission(req, "beneficiari.cards.manage");
-  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view") || !req.user?.aree.includes("uds") || !(await isModuloAttivo("UDS")))) { res.status(403).json({ error: "Tessera non autorizzata" }); return; }
+  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view"))) {
+    res.status(403).json({ error: "Tessera non autorizzata" }); return;
+  }
   try {
     const card = await issueTesseraBeneficiario({
       beneficiarioId: id, dataScadenza: null, motivoSostituzione: null,
       operatoreId: req.user!.id, ip: req.ip ?? null, areaAudit: "beneficiari", recoverExisting: true,
       authorize: async (tx, person) => {
         const actor = await requireCurrentCommandActor(tx, req.user!.id, fullManager ? "beneficiari.cards.manage" : "beneficiari.manage");
-        if (!fullManager && (!person.uds || (!actor.isAdmin && (!actor.aree.includes("uds") || !actor.permessi.includes("beneficiari.view"))))) throw new TesseraBeneficiarioError(403, "Gestione persona UDS non autorizzata");
+        if (!fullManager && !actor.isAdmin) {
+          const allowedContext = actor.aree.includes("sociale") ||
+            (person.uds && actor.aree.includes("uds") && await isModuloAttivo("UDS"));
+          if (!allowedContext || !actor.permessi.includes("beneficiari.view")) {
+            throw new TesseraBeneficiarioError(403, "Tessera non autorizzata");
+          }
+        }
         if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
       },
     });

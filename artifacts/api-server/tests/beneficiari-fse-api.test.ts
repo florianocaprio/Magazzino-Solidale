@@ -8,6 +8,7 @@ import {
   areeOperativeTable,
   auditConfigurazioniTable,
   beneficiariTable,
+  tessereBeneficiariTable,
   centriAscoltoTable,
   db,
   fseFascicoliSocialiTable,
@@ -303,6 +304,9 @@ afterAll(async () => {
     ...new Set([...beneficiaryIds, ...createdInCenters.map((item) => item.id)]),
   ];
   if (ids.length) {
+    await db
+      .delete(tessereBeneficiariTable)
+      .where(inArray(tessereBeneficiariTable.beneficiarioId, ids));
     await db
       .delete(nucleoFamiliareTable)
       .where(inArray(nucleoFamiliareTable.beneficiarioId, ids));

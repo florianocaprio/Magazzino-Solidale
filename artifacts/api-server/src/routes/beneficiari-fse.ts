@@ -2,6 +2,7 @@ import { riallineaQuotaNucleoTx } from "../lib/creditoCalcolo";
 import { anagraficaImportValues, fseImportComparison } from "../lib/fseBeneficiariImportPlan";
 import { canonicalFseSnapshot, type SnapshotOrigin } from "../lib/beneficiarioFascicolo";
 import { allocateBeneficiaryCode } from "../lib/beneficiariCodice";
+import { issueTesseraBeneficiario } from "../lib/tesseraBeneficiarioService";
 import { createHash } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -923,6 +924,14 @@ router.post(
                 : null,
             }).returning({ id: beneficiariTable.id });
             beneficiarioId = created.id;
+            await issueTesseraBeneficiario({
+              beneficiarioId,
+              dataScadenza: null,
+              motivoSostituzione: null,
+              operatoreId: req.user?.id ?? null,
+              ip: req.ip ?? req.socket.remoteAddress ?? null,
+              areaAudit: "beneficiari",
+            }, tx);
             outcome = "creato";
             if (suggestions.length && resolution?.azione === "crea") {
               await tx.insert(auditConfigurazioniTable).values({

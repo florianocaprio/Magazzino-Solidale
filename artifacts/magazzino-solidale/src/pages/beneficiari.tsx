@@ -37,9 +37,7 @@ import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
-import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey, useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
-import { EmporioStatusBadge } from "@/components/beneficiario-emporio-card";
-import { emporioReadableData, useEmporioSecurity } from "@/hooks/use-emporio-security";
+import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey } from "@workspace/api-client-react";
 import { createBeneficiarioWithOptionalServices, type BeneficiarioServicesResult } from "@/lib/beneficiario-mensa-workflow";
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
@@ -163,8 +161,6 @@ export default function Beneficiari() {
   const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey() } });
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
-  const canViewEmporio = emporioAbilitato && hasPermission("beneficiari.view");
-  const emporioSecurity = useEmporioSecurity();
   const canManageEmporio = emporioAbilitato && isModuloAttivo("EMPORIO_SOLIDALE") && hasPermission("emporio.eligibility.manage") && hasPermission("credito.quota.manage") && (user?.isAdmin || hasArea("sociale"));
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
   const canManage = hasPermission("beneficiari.manage");
@@ -174,14 +170,6 @@ export default function Beneficiari() {
   const canExportFse = hasPermission("beneficiari.fse.export");
   const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
   const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
-  const emporioSummaryParams = { beneficiarioIds: beneficiarioIds.join(",") };
-  const emporioSummary = useGetEmporioAbilitazioniRiepilogoBeneficiari(emporioSummaryParams, {
-    query: {
-      ...emporioSecurity.readOptions(getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey(emporioSummaryParams)),
-      enabled: canViewEmporio && beneficiarioIds.length > 0,
-    },
-  });
-  const emporioSummaryByBeneficiario = new Map((emporioReadableData(emporioSummary) ?? []).map((item) => [item.beneficiarioId, item.stato]));
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
     query: {
       queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(mensaSummaryParams),
@@ -399,7 +387,6 @@ export default function Beneficiari() {
       setPostCreate(result);
       await queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(result.beneficiario.id) });
       await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioneQueryKey(result.beneficiario.id) });
-      await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey() });
       await queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
       if (shouldEnableMensa) {
         await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
@@ -650,7 +637,6 @@ export default function Beneficiari() {
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
                 {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
-                {canViewEmporio && <TableHead className="text-center">{t("emporioServizio.colonna")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -664,14 +650,13 @@ export default function Beneficiari() {
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
-                    {canViewEmporio && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0) + (canViewEmporio ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -704,11 +689,6 @@ export default function Beneficiari() {
                       ) : (
                         <MensaStatusBadge state={mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato"} />
                       )}
-                    </TableCell>
-                  )}
-                  {canViewEmporio && (
-                    <TableCell className="text-center">
-                      {emporioSummary.isLoading ? <Skeleton className="h-6 w-24 mx-auto rounded-full" /> : emporioSummary.isError || !emporioSummaryByBeneficiario.has(b.id) ? <span className="text-muted-foreground">-</span> : <EmporioStatusBadge state={emporioSummaryByBeneficiario.get(b.id)!} />}
                     </TableCell>
                   )}
                   <TableCell className="text-center">
