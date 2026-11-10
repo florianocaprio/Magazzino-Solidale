@@ -1,4 +1,4 @@
-import { cloneElement, useCallback, useState, useEffect, useRef } from "react";
+import { cloneElement, useCallback, useState, useEffect, useId, useRef } from "react";
 import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
 import {
   documentAuthContext,
@@ -346,6 +346,9 @@ export function CreaiBollaDialog({
   const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
   const [mezzo, setMezzo] = useState("");
   const [scanCode, setScanCode] = useState("");
+  const scanFieldId = useId();
+  const scanField = useRef<HTMLInputElement>(null);
+  const focusScanAfterCentre = useRef(false);
   const commandIntents = useCommandIntentRegistry();
   useEffect(() => {
     if (open) {
@@ -393,6 +396,9 @@ export function CreaiBollaDialog({
   const recipientContext = `${open}:${tipoDestinatario}:${recipientAreaId}:${centroId}:${authLookupContext}`;
   const currentContext = useRef(recipientContext);
   currentContext.current = recipientContext;
+  useEffect(() => {
+    if (open && contextReady) scanField.current?.focus();
+  }, [open, contextReady, recipientContext]);
   useEffect(() => {
     if (lockedBeneficiario) return;
     lookupVersion.current++;
@@ -468,13 +474,15 @@ export function CreaiBollaDialog({
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const handleScan = async () => {
-    if (!contextReady || !scanCode.length || scanLoading) return;
+  const handleScan = async (value: string) => {
+    const codiceTessera = value.trim();
+    if (!contextReady || !codiceTessera || scanLoading) return;
+    setScanCode(codiceTessera);
     const version = ++lookupVersion.current;
     const context = currentContext.current;
     setScanLoading(true); setCreateError(""); setSelectedBeneficiario(null); setBeneficiarioId("");
     try {
-      const person = await lookupBollaTessera({ areaOperativaId: Number(recipientAreaId), centroAscoltoId: Number(centroId), codiceTessera: scanCode });
+      const person = await lookupBollaTessera({ areaOperativaId: Number(recipientAreaId), centroAscoltoId: Number(centroId), codiceTessera });
       if (version !== lookupVersion.current || context !== currentContext.current) return;
       setSelectedBeneficiario(person); setBeneficiarioId(String(person.id)); setScanCode("");
       toast({ title: t("bolle.scanFound", { name: `${person.cognome} ${person.nome}` }) });
@@ -653,7 +661,14 @@ export function CreaiBollaDialog({
         if (!nextOpen) requestClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onOpenAutoFocus={(event) => {
+          if (!scanField.current || scanField.current.disabled) return;
+          event.preventDefault();
+          scanField.current.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t("bolle.createTitle")}</DialogTitle>
         </DialogHeader>
@@ -706,16 +721,58 @@ export function CreaiBollaDialog({
                 </div>
                 <div className="space-y-2">
                   <Label>{t("bolle.centroFilterLabel")}</Label>
-                  <Select value={centroId === "all" ? "" : centroId} onValueChange={setCentroId} disabled={isCentroLocked || !recipientAreaId}>
+                  <Select
+                    value={centroId === "all" ? "" : centroId}
+                    onValueChange={(value) => {
+                      focusScanAfterCentre.current = true;
+                      setCentroId(value);
+                    }}
+                    disabled={isCentroLocked || !recipientAreaId}
+                  >
                     <SelectTrigger aria-label={t("bolle.centroFilterLabel")}><SelectValue placeholder={t("beneficiari.centroRiferimento")} /></SelectTrigger>
-                    <SelectContent>{centri?.filter((centre) => centre.attivo && centre.areaOperativaId === Number(recipientAreaId) && (!isCentroLocked || centre.id === lockedCentroId)).map((centre) => <SelectItem key={centre.id} value={String(centre.id)}>{centre.nome}</SelectItem>)}</SelectContent>
+                    <SelectContent onCloseAutoFocus={(event) => {
+                      if (!focusScanAfterCentre.current) return;
+                      focusScanAfterCentre.current = false;
+                      if (!scanField.current || scanField.current.disabled) return;
+                      event.preventDefault();
+                      scanField.current.focus();
+                    }}>{centri?.filter((centre) => centre.attivo && centre.areaOperativaId === Number(recipientAreaId) && (!isCentroLocked || centre.id === lockedCentroId)).map((centre) => <SelectItem key={centre.id} value={String(centre.id)}>{centre.nome}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("bolle.scanLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input placeholder={t("bolle.scanPlaceholder")} disabled={!contextReady || scanLoading} value={scanCode} onChange={(event) => setScanCode(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleScan(); } }} className="font-mono" />
-                    <Button type="button" variant="outline" aria-label={t("bolle.scanLabel")} onClick={() => void handleScan()} disabled={!contextReady || !scanCode.length || scanLoading}><ScanLine className="h-4 w-4" /></Button>
+                  <Label htmlFor={scanFieldId}>{t("bolle.scanLabel")}</Label>
+                  <div className="flex gap-2" aria-busy={scanLoading}>
+                    <Input
+                      id={scanFieldId}
+                      ref={scanField}
+                      placeholder={t("bolle.scanPlaceholder")}
+                      disabled={!contextReady || scanLoading}
+                      value={scanCode}
+                      onChange={(event) => setScanCode(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void handleScan(event.currentTarget.value);
+                        }
+                      }}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className="min-w-0 font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleScan(scanCode)}
+                      disabled={!contextReady || !scanCode.trim() || scanLoading}
+                    >
+                      {t("common.search")}
+                    </Button>
+                    <BarcodeScannerButton
+                      key={recipientContext}
+                      disabled={!contextReady || scanLoading}
+                      onScan={(value) => void handleScan(value)}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1142,18 +1199,25 @@ function AggiungiProdottoDialog({
   const [lottoId, setLottoId] = useState("");
   const [quantita, setQuantita] = useState("");
   const [scanProdotto, setScanProdotto] = useState("");
+  const [productCodeToFind, setProductCodeToFind] = useState("");
+  const productCodeId = useId();
+  const productCodeField = useRef<HTMLInputElement>(null);
 
-  const { data: magazzini } = useListMagazziniOperativi({ contesto: "magazzino" });
+  const warehouses = useListMagazziniOperativi({ contesto: "magazzino" });
   const areaOperativaId =
-    magazzini?.find((m) => m.id === magazzinoId)?.areaOperativaId ?? 0;
+    warehouses.data?.find((m) => m.id === magazzinoId)?.areaOperativaId ?? 0;
   const giacenzeParams = { areaOperativaId, magazzinoId };
-  const { data: giacenze } = useListGiacenze(giacenzeParams, {
+  const stock = useListGiacenze(giacenzeParams, {
     query: {
       enabled: open && areaOperativaId > 0,
       queryKey: getListGiacenzeQueryKey(giacenzeParams),
     },
   });
-  const { data: prodotti } = useListProdotti();
+  const catalogue = useListProdotti();
+  const giacenze = stock.data;
+  const prodotti = catalogue.data;
+  const productLookupFailed = warehouses.isError || stock.isError || catalogue.isError ||
+    (warehouses.isSuccess && areaOperativaId === 0);
   const { data: lotti } = useListLotti({
     magazzinoId,
     prodottoId: prodottoId ? parseInt(prodottoId) : undefined,
@@ -1175,14 +1239,20 @@ function AggiungiProdottoDialog({
     onClose();
   };
 
-  const handleScanProdotto = (codeOverride?: string) => {
-    const code = (codeOverride ?? scanProdotto).trim();
-    if (!code) return;
-    if (!prodotti) {
-      toast({ title: t("common.loading") });
-      return;
-    }
-    const lc = code.toLowerCase();
+  const handleScanProdotto = (value: string) => {
+    const code = value.trim();
+    if (!code || addRiga.isPending || productLookupFailed) return;
+    setScanProdotto(code);
+    setProdottoId("");
+    setLottoId("");
+    setQuantita("");
+    setProductCodeToFind(code);
+  };
+
+  useEffect(() => {
+    if (!productCodeToFind || !prodotti || !giacenze || productLookupFailed) return;
+    setProductCodeToFind("");
+    const lc = productCodeToFind.toLowerCase();
     const p = prodotti.find(
       (x) =>
         (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) ||
@@ -1192,7 +1262,7 @@ function AggiungiProdottoDialog({
       toast({ title: t("bolle.scanProdottoNotFound"), variant: "destructive" });
       return;
     }
-    const g = giacenze?.find((x) => x.prodottoId === p.id);
+    const g = giacenze.find((x) => x.prodottoId === p.id);
     if (!g || g.disponibileReale <= 0) {
       toast({
         title: t("bolle.scanProdottoNoStock", { name: p.nome }),
@@ -1201,11 +1271,9 @@ function AggiungiProdottoDialog({
       return;
     }
     setProdottoId(String(p.id));
-    setLottoId("");
-    setQuantita("");
     setScanProdotto("");
     toast({ title: t("bolle.scanProdottoFound", { name: p.nome }) });
-  };
+  }, [productCodeToFind, prodotti, giacenze, productLookupFailed, t, toast]);
 
   const giacenzaSelezionata = giacenze?.find(
     (g) => g.prodottoId === parseInt(prodottoId),
@@ -1288,6 +1356,8 @@ function AggiungiProdottoDialog({
           setProdottoId("");
           setLottoId("");
           setQuantita("");
+          setScanProdotto("");
+          productCodeField.current?.focus();
         },
         onError: (err: unknown) => {
           commandIntents.fail(addRowSlot, err);
@@ -1309,41 +1379,64 @@ function AggiungiProdottoDialog({
         if (!nextOpen) requestClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onOpenAutoFocus={(event) => {
+          if (!productCodeField.current) return;
+          event.preventDefault();
+          productCodeField.current.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t("bolle.addProdottoTitle")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{t("bolle.scanProdottoLabel")}</Label>
+            <Label htmlFor={productCodeId}>{t("bolle.scanProdottoLabel")}</Label>
             <div className="flex gap-2">
               <Input
+                id={productCodeId}
+                ref={productCodeField}
                 value={scanProdotto}
-                onChange={(e) => setScanProdotto(e.target.value)}
+                onChange={(event) => {
+                  setProductCodeToFind("");
+                  setScanProdotto(event.target.value);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    handleScanProdotto();
+                    handleScanProdotto(e.currentTarget.value);
                   }
                 }}
                 placeholder={t("bolle.scanProdottoPlaceholder")}
-                autoFocus
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="min-w-0"
+                readOnly={addRiga.isPending}
               />
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleScanProdotto()}
-                disabled={!scanProdotto.trim()}
+                onClick={() => handleScanProdotto(scanProdotto)}
+                disabled={!scanProdotto.trim() || addRiga.isPending || productLookupFailed}
               >
                 {t("bolle.scanProdottoButton")}
               </Button>
               <BarcodeScannerButton
-                onScan={(v) => {
-                  setScanProdotto(v);
-                  handleScanProdotto(v);
-                }}
+                onScan={handleScanProdotto}
+                disabled={addRiga.isPending || productLookupFailed}
               />
             </div>
+            {productLookupFailed ? (
+              <p role="alert" className="text-sm text-destructive">
+                {t("bolle.scanProdottoLoadError")}
+              </p>
+            ) : productCodeToFind && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {t("common.loading")}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -1351,6 +1444,7 @@ function AggiungiProdottoDialog({
             <Select
               value={prodottoId}
               onValueChange={(v) => {
+                setProductCodeToFind("");
                 setProdottoId(v);
                 setLottoId("");
                 setQuantita("");
