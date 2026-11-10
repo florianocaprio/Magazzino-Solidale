@@ -9892,6 +9892,7 @@ export const GetBeneficiarioResponse = zod.object({
         centroAscoltoId: zod.number().nullable(),
         centroAscoltoNome: zod.string().nullable(),
         areaOperativaId: zod.number().nullable(),
+        areaOperativaNome: zod.string().nullish(),
         areaOperativaIdSnapshot: zod.number().nullish(),
         zonaUdsIdSnapshot: zod.number().nullish(),
         dataIntervento: zod.coerce.date().nullable(),
@@ -10567,6 +10568,7 @@ export const ListInterventiResponseItem = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -10878,6 +10880,7 @@ export const ListInterventiPaginaResponse = zod.object({
       centroAscoltoId: zod.number().nullable(),
       centroAscoltoNome: zod.string().nullable(),
       areaOperativaId: zod.number().nullable(),
+      areaOperativaNome: zod.string().nullish(),
       areaOperativaIdSnapshot: zod.number().nullish(),
       zonaUdsIdSnapshot: zod.number().nullish(),
       dataIntervento: zod.coerce.date().nullable(),
@@ -10995,6 +10998,29 @@ export const ListInterventiOperatoriResponseItem = zod.object({
 export const ListInterventiOperatoriResponse = zod.array(
   ListInterventiOperatoriResponseItem,
 );
+
+/**
+ * Cerca una tessera attiva nell'Area e nell'eventuale Centro selezionato per un intervento Sociale.
+ */
+export const cercaBeneficiarioInterventoPerTesseraBodyCodiceMax = 255;
+
+export const CercaBeneficiarioInterventoPerTesseraBody = zod.object({
+  codice: zod
+    .string()
+    .min(1)
+    .max(cercaBeneficiarioInterventoPerTesseraBodyCodiceMax),
+  areaOperativaId: zod.number().min(1),
+  centroAscoltoId: zod.number().min(1).optional(),
+});
+
+export const CercaBeneficiarioInterventoPerTesseraResponse = zod.object({
+  id: zod.number(),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaNome: zod.string(),
+  centroAscoltoNome: zod.string().nullable(),
+});
 
 /**
  * Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
@@ -11133,6 +11159,7 @@ export const GetInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11299,6 +11326,7 @@ export const UpdateInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11536,6 +11564,7 @@ export const AvviaInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11591,7 +11620,7 @@ export const AvviaInterventoResponse = zod.object({
 });
 
 /**
- * Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+ * Salva in una transazione i dati operativi senza chiudere l'intervento. Su un intervento Sociale concluso consente di aggiornare risultato, esito e note.
  */
 export const SalvaInterventoOperativitaParams = zod.object({
   id: zod.coerce.number(),
@@ -11800,7 +11829,7 @@ export const SalvaInterventoOperativitaResponse = zod.object({
 });
 
 /**
- * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
+ * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Risultato, esito e note sono facoltativi per gli interventi Sociali. Attività, materiali o documenti richiedono anche il permesso update.
  */
 export const ConcludiInterventoParams = zod.object({
   id: zod.coerce.number(),
@@ -12116,6 +12145,7 @@ export const ConcludiInterventoResponse = zod.object({
     centroAscoltoId: zod.number().nullable(),
     centroAscoltoNome: zod.string().nullable(),
     areaOperativaId: zod.number().nullable(),
+    areaOperativaNome: zod.string().nullish(),
     areaOperativaIdSnapshot: zod.number().nullish(),
     zonaUdsIdSnapshot: zod.number().nullish(),
     dataIntervento: zod.coerce.date().nullable(),
@@ -12290,6 +12320,7 @@ export const ConcludiInterventoResponse = zod.object({
       centroAscoltoId: zod.number().nullable(),
       centroAscoltoNome: zod.string().nullable(),
       areaOperativaId: zod.number().nullable(),
+      areaOperativaNome: zod.string().nullish(),
       areaOperativaIdSnapshot: zod.number().nullish(),
       zonaUdsIdSnapshot: zod.number().nullish(),
       dataIntervento: zod.coerce.date().nullable(),
@@ -12404,6 +12435,7 @@ export const AnnullaInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -12515,6 +12547,7 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -12647,6 +12680,7 @@ export const TransitionInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),

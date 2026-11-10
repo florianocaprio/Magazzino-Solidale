@@ -2,12 +2,15 @@ import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
+import QRCode from "qrcode";
+import { updateModuloAmbiente } from "../../api-server/src/lib/configurazioneAmbiente";
 import {
   db,
   pool,
   areeOperativeTable,
   centriAscoltoTable,
   beneficiariTable,
+  tessereBeneficiariTable,
   ruoliTable,
   utentiTable,
   interventiTable,
@@ -140,6 +143,147 @@ test("M63 pagine reali, filtri, calendario bounded, dettaglio e revoca", async (
     "solo la pagina corrente",
   );
   await expect(nav).toContainText("201 risultati");
+
+  const [otherCentre] = await db
+    .insert(centriAscoltoTable)
+    .values({
+      nome: `M63 secondo Centro ${suffix}`,
+      areaOperativaId: area.id,
+    })
+    .returning();
+  const [cardHolder] = await db
+    .insert(beneficiariTable)
+    .values({
+      codice: `M63-CARTA-${suffix}`,
+      nome: "Persona",
+      cognome: `Tessera ${suffix}`,
+      areaOperativaId: area.id,
+      centroAscoltoId: otherCentre.id,
+    })
+    .returning();
+  const [card] = await db
+    .insert(tessereBeneficiariTable)
+    .values({
+      beneficiarioId: cardHolder.id,
+      codice: `MS-E2E-${suffix}`,
+    })
+    .returning();
+  await updateModuloAmbiente("BARCODE", true, null);
+  // Feed the real browser decoder a synthetic frame without a physical camera.
+  await page.addInitScript(
+    async (qr) => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const image = new Image();
+        image.src = qr;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 400;
+        const context = canvas.getContext("2d")!;
+        const stream = canvas.captureStream(10);
+        const track = stream.getVideoTracks()[0];
+        const draw = () => {
+          if (track.readyState === "ended") return;
+          context.drawImage(image, 0, 0, 400, 400);
+          requestAnimationFrame(draw);
+        };
+        draw();
+        return stream;
+      };
+    },
+    await QRCode.toDataURL(card.codice, { width: 400 }),
+  );
+  await page.goto("/interventi");
+  await page.getByRole("button", { name: "Nuovo intervento" }).click();
+  await page
+    .getByRole("menuitem", { name: "Pianifica nuovo intervento" })
+    .click();
+  const form = page.getByRole("dialog", { name: "Intervento pianificato" });
+  const center = form.getByRole("combobox", { name: "Centro di Ascolto" });
+  await center.click();
+  await page.getByRole("option", { name: centre.nome, exact: true }).click();
+  const code = form.getByLabel("Codice tessera");
+  await code.fill(card.codice);
+  await code.press("Enter");
+  await expect(form.getByRole("status")).toContainText(
+    "Tessera valida non trovata",
+  );
+  await center.click();
+  await page
+    .getByRole("option", { name: otherCentre.nome, exact: true })
+    .click();
+  const person = form.getByRole("combobox", { name: "Beneficiario" });
+  await person.click();
+  await expect(
+    page.getByRole("option", { name: new RegExp(cardHolder.codice) }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: new RegExp(beneficiary.codice) }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await code.fill(card.codice);
+  await form.getByRole("button", { name: "Cerca tessera" }).click();
+  await expect(person).toContainText(cardHolder.cognome);
+  const cameraLookup = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/interventi/beneficiari/tessera") &&
+      response.request().method() === "POST",
+  );
+  await form.getByRole("button", { name: "Scansiona", exact: true }).click();
+  expect((await cameraLookup).status()).toBe(200);
+  await expect(person).toContainText(cardHolder.cognome);
+  const site = form.getByRole("combobox", { name: "Sede", exact: true });
+  await expect(site).toContainText(area.nome);
+  await site.click();
+  await page
+    .getByRole("option", { name: otherCentre.nome, exact: true })
+    .click();
+  const creation = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/interventi") &&
+      response.request().method() === "POST",
+  );
+  await form.getByRole("button", { name: "Salva", exact: true }).click();
+  const createdResponse = await creation;
+  expect(createdResponse.status()).toBe(201);
+  const created = await createdResponse.json();
+  expect(created).toMatchObject({
+    beneficiarioId: cardHolder.id,
+    operatoreId: user.id,
+    sede: otherCentre.nome,
+  });
+  const detail = page.getByRole("dialog", { name: /dettaglio intervento/i });
+  await detail.getByRole("button", { name: "Avvia intervento" }).click();
+  const conclude = detail.getByRole("button", {
+    name: "Concludi",
+    exact: true,
+  });
+  await expect(conclude).toBeDisabled();
+  await detail
+    .getByRole("checkbox", {
+      name: "Confermo la conclusione di questo intervento",
+    })
+    .check();
+  await expect(conclude).toBeEnabled();
+  await conclude.click();
+  await expect(
+    detail.getByRole("button", { name: "Salva", exact: true }),
+  ).toBeVisible();
+  await detail.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("tab", { name: /^Conclusi/ }).click();
+  await page.locator(`[data-intervento-id="${created.id}"]:visible`).click();
+  const note = detail.getByPlaceholder("Note", { exact: true });
+  await note.fill("Nota integrata dopo la conclusione");
+  await detail.getByRole("button", { name: "Salva", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const [saved] = await db
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, created.id));
+      return { stato: saved.stato, note: saved.note };
+    })
+    .toEqual({ stato: "concluso", note: "Nota integrata dopo la conclusione" });
+
   await page.goto(
     `/interventi?vista=pianificati&tipo=M63-${suffix}&interventoId=${records[0].id}`,
   );

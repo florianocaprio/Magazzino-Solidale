@@ -6,6 +6,7 @@ import type {
   InterventoDocumentoInput,
   InterventoOperatore,
   InterventoOperativita,
+  InterventoOperativitaInput,
   InterventoPriorita,
   InterventoStoricoStato,
 } from "@workspace/api-client-react";
@@ -60,7 +61,7 @@ export interface PianificazioneInterventoInput {
   dataOraPianificata: string;
   priorita: InterventoPriorita;
   sede: string | null;
-  operatoreId: number;
+  operatoreId?: number;
 }
 
 interface Props {
@@ -81,7 +82,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onPianifica: (input: PianificazioneInterventoInput) => void;
   onAvvia: (versione: string) => void;
-  onSalva: (input: InterventoConclusioneInput) => void;
+  onSalva: (input: InterventoOperativitaInput) => void;
   onConcludi: (input: InterventoConclusioneInput) => void;
   onAnnulla: (versione: string, motivo: string) => void;
   onMancataPresentazione: (versione: string, nota: string) => void;
@@ -211,10 +212,10 @@ export function InterventoSocialeDetailSheet({
     setSuccessivoData(todayEuropeRome());
     setSuccessivoOra("09:00");
     setSuccessivoPriorita("normale");
-    setSuccessivoSede(intervento.sede ?? "");
-    setSuccessivoOperatoreId(
-      intervento.operatoreId ? String(intervento.operatoreId) : "",
+    setSuccessivoSede(
+      intervento.areaOperativaNome ?? intervento.centroAscoltoNome ?? "",
     );
+    setSuccessivoOperatoreId("");
     setSuccessivoDocumenti([]);
     const planned = intervento.dataOraPianificata;
     setPianificazioneData(
@@ -222,10 +223,13 @@ export function InterventoSocialeDetailSheet({
     );
     setPianificazioneOra(planned ? timeEuropeRome(planned) : "09:00");
     setPianificazionePriorita(intervento.priorita);
-    setPianificazioneSede(intervento.sede ?? "");
-    setPianificazioneOperatoreId(
-      intervento.operatoreId ? String(intervento.operatoreId) : "",
+    setPianificazioneSede(
+      intervento.sede ??
+        intervento.areaOperativaNome ??
+        intervento.centroAscoltoNome ??
+        "",
     );
+    setPianificazioneOperatoreId("");
     loadedKey.current = key;
   }, [intervento, open, operativita]);
 
@@ -233,22 +237,36 @@ export function InterventoSocialeDetailSheet({
     intervento?.stato === "concluso" ||
     intervento?.stato === "annullato" ||
     intervento?.stato === "mancata_presentazione";
-  const operationalPayload = (): InterventoConclusioneInput | null => {
+  const canEditClosedOutcome = canUpdate && intervento?.stato === "concluso";
+  const canEditOutcome = canUpdate && (!terminal || canEditClosedOutcome);
+  const siteOptions = [
+    intervento?.areaOperativaNome,
+    intervento?.centroAscoltoNome,
+  ].filter((site): site is string => Boolean(site));
+  const planningSites = [
+    ...new Set(
+      [...siteOptions, intervento?.sede].filter((site): site is string =>
+        Boolean(site),
+      ),
+    ),
+  ];
+  const outcomePayload = (): InterventoOperativitaInput | null => {
     if (!operativita?.versione) return null;
     return {
       versione: operativita.versione,
       risultato: risultato || null,
       esito: esito || null,
       note: note || null,
-      attivita,
-      documenti,
-      conferma: true,
     };
   };
 
   const conclude = () => {
-    const payload = operationalPayload();
-    if (!payload) return;
+    if (!operativita?.versione) return;
+    const payload: InterventoConclusioneInput = {
+      versione: operativita.versione,
+      conferma: true,
+      ...(canUpdate ? { ...outcomePayload(), attivita, documenti } : {}),
+    };
     if (creaSuccessivo) {
       payload.successivo = {
         tipoIntervento: successivoTipo,
@@ -260,8 +278,10 @@ export function InterventoSocialeDetailSheet({
             ? dateTimeEuropeRomeToIso(successivoData, successivoOra)
             : null,
         sede: successivoSede || null,
-        operatoreId: Number(successivoOperatoreId),
-        documenti: successivoDocumenti,
+        ...(successivoOperatoreId
+          ? { operatoreId: Number(successivoOperatoreId) }
+          : {}),
+        ...(canUpdate ? { documenti: successivoDocumenti } : {}),
       };
     }
     onConcludi(payload);
@@ -275,9 +295,11 @@ export function InterventoSocialeDetailSheet({
           <SheetDescription>
             {intervento?.stato === "in_corso"
               ? t("interventi.operational.inProgressDescription")
-              : terminal
-                ? t("interventi.operational.readOnlyDescription")
-                : t("interventi.operational.planningDescription")}
+              : canEditClosedOutcome
+                ? t("interventi.operational.closedOutcomeDescription")
+                : terminal
+                  ? t("interventi.operational.readOnlyDescription")
+                  : t("interventi.operational.planningDescription")}
           </SheetDescription>
         </SheetHeader>
         {readUnavailable && (
@@ -428,16 +450,33 @@ export function InterventoSocialeDetailSheet({
                         )}
                       </SelectContent>
                     </Select>
-                    <Input
-                      value={pianificazioneSede}
-                      onChange={(event) =>
-                        setPianificazioneSede(event.target.value)
-                      }
-                      placeholder={t("interventi.detail.site")}
-                    />
                     <Select
-                      value={pianificazioneOperatoreId}
-                      onValueChange={setPianificazioneOperatoreId}
+                      value={pianificazioneSede}
+                      onValueChange={(value) => {
+                        if (value) setPianificazioneSede(value);
+                      }}
+                      disabled={planningSites.length === 0}
+                    >
+                      <SelectTrigger aria-label={t("interventi.detail.site")}>
+                        <SelectValue
+                          placeholder={t("interventi.detail.site")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {planningSites.map((site) => (
+                          <SelectItem key={site} value={site}>
+                            {site}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={pianificazioneOperatoreId || "current"}
+                      onValueChange={(value) =>
+                        setPianificazioneOperatoreId(
+                          value === "current" ? "" : value,
+                        )
+                      }
                     >
                       <SelectTrigger
                         aria-label={t("interventi.form.assignedOperator")}
@@ -445,21 +484,32 @@ export function InterventoSocialeDetailSheet({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {operatori.map((operatore) => (
-                          <SelectItem
-                            key={operatore.id}
-                            value={String(operatore.id)}
-                          >
-                            {operatore.nome}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="current">
+                          {intervento.operatoreNome ??
+                            t("interventi.form.keepOperator")}
+                        </SelectItem>
+                        {operatori
+                          .filter(
+                            (operatore) =>
+                              operatore.id !== intervento.operatoreId,
+                          )
+                          .map((operatore) => (
+                            <SelectItem
+                              key={operatore.id}
+                              value={String(operatore.id)}
+                            >
+                              {operatore.nome}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isPending || !pianificazioneOperatoreId}
+                    disabled={
+                      isPending || !pianificazioneData || !pianificazioneOra
+                    }
                     onClick={() =>
                       onPianifica({
                         dataOraPianificata: dateTimeEuropeRomeToIso(
@@ -468,7 +518,9 @@ export function InterventoSocialeDetailSheet({
                         ),
                         priorita: pianificazionePriorita,
                         sede: pianificazioneSede || null,
-                        operatoreId: Number(pianificazioneOperatoreId),
+                        ...(pianificazioneOperatoreId
+                          ? { operatoreId: Number(pianificazioneOperatoreId) }
+                          : {}),
                       })
                     }
                   >
@@ -634,22 +686,35 @@ export function InterventoSocialeDetailSheet({
               </h3>
               <Textarea
                 value={risultato}
-                readOnly={terminal || !canUpdate}
+                readOnly={!canEditOutcome}
                 onChange={(event) => setRisultato(event.target.value)}
                 placeholder={t("interventi.operational.result")}
               />
               <Textarea
                 value={esito}
-                readOnly={terminal || !canUpdate}
+                readOnly={!canEditOutcome}
                 onChange={(event) => setEsito(event.target.value)}
                 placeholder={t("interventi.esito")}
               />
               <Textarea
                 value={note}
-                readOnly={terminal || !canUpdate}
+                readOnly={!canEditOutcome}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder={t("interventi.note")}
               />
+              {canEditClosedOutcome && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isPending || !operativita.versione}
+                  onClick={() => {
+                    const payload = outcomePayload();
+                    if (payload) onSalva(payload);
+                  }}
+                >
+                  {t("common.save")}
+                </Button>
+              )}
             </section>
 
             <section className="space-y-3">
@@ -765,21 +830,41 @@ export function InterventoSocialeDetailSheet({
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input
-                        value={successivoSede}
-                        onChange={(event) =>
-                          setSuccessivoSede(event.target.value)
-                        }
-                        placeholder={t("interventi.detail.site")}
-                      />
                       <Select
-                        value={successivoOperatoreId}
-                        onValueChange={setSuccessivoOperatoreId}
+                        value={successivoSede}
+                        onValueChange={(value) => {
+                          if (value) setSuccessivoSede(value);
+                        }}
+                        disabled={siteOptions.length === 0}
+                      >
+                        <SelectTrigger aria-label={t("interventi.detail.site")}>
+                          <SelectValue
+                            placeholder={t("interventi.detail.site")}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[...new Set(siteOptions)].map((site) => (
+                            <SelectItem key={site} value={site}>
+                              {site}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={successivoOperatoreId || "automatic"}
+                        onValueChange={(value) =>
+                          setSuccessivoOperatoreId(
+                            value === "automatic" ? "" : value,
+                          )
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="automatic">
+                            {t("interventi.form.currentOperator")}
+                          </SelectItem>
                           {operatori.map((operatore) => (
                             <SelectItem
                               key={operatore.id}
@@ -800,6 +885,7 @@ export function InterventoSocialeDetailSheet({
                       magazzini={[]}
                       showActivities={false}
                       showMaterials={false}
+                      readOnly={!canUpdate}
                       onAttivitaChange={() => undefined}
                       onMaterialiChange={() => undefined}
                       onDocumentiChange={setSuccessivoDocumenti}
@@ -847,8 +933,9 @@ export function InterventoSocialeDetailSheet({
                       variant="outline"
                       disabled={isPending || !operativita.versione}
                       onClick={() => {
-                        const payload = operationalPayload();
-                        if (payload) onSalva(payload);
+                        const payload = outcomePayload();
+                        if (payload)
+                          onSalva({ ...payload, attivita, documenti });
                       }}
                     >
                       {t("interventi.operational.saveWithoutClosing")}
@@ -861,9 +948,10 @@ export function InterventoSocialeDetailSheet({
                         isPending ||
                         !operativita.versione ||
                         !confermaConclusione ||
-                        (!risultato.trim() && !esito.trim()) ||
                         (creaSuccessivo &&
-                          (!successivoTipo || !successivoOperatoreId))
+                          (!successivoTipo ||
+                            (successivoStato === "pianificato" &&
+                              (!successivoData || !successivoOra))))
                       }
                       onClick={conclude}
                     >

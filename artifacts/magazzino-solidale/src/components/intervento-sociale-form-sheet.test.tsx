@@ -45,7 +45,8 @@ describe("InterventoSocialeFormSheet", () => {
           ]}
           tipi={[{ id: 1, nome: "colloquio", attivo: true }]}
           operatori={[{ id: 4, nome: "Operatore Test", codice: "OP-4" }]}
-          currentOperatorId={4}
+          centri={[]}
+          onCentroChange={vi.fn()}
           beneficiarySearch=""
           onBeneficiarySearch={vi.fn()}
           onOpenChange={onOpenChange}
@@ -67,21 +68,25 @@ describe("InterventoSocialeFormSheet", () => {
     );
     expect(onOpenChange).not.toHaveBeenCalled();
 
-    const site = document.querySelector<HTMLInputElement>('input[name="sede"]');
+    const description = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="descrizione"]',
+    );
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
+        HTMLTextAreaElement.prototype,
         "value",
       )?.set;
-      setter?.call(site, "Sede modificata");
-      site?.dispatchEvent(new Event("input", { bubbles: true }));
+      setter?.call(description, "Descrizione modificata");
+      description?.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(site?.value).toBe("Sede modificata");
+    expect(description?.value).toBe("Descrizione modificata");
 
     await renderSheet(false, "da_pianificare", onOpenChange);
     await renderSheet(true, "da_pianificare", onOpenChange);
     expect(
-      document.querySelector<HTMLInputElement>('input[name="sede"]')?.value,
+      document.querySelector<HTMLTextAreaElement>(
+        'textarea[name="descrizione"]',
+      )?.value,
     ).toBe("");
     expect(onOpenChange).not.toHaveBeenCalled();
 
@@ -116,7 +121,7 @@ describe("InterventoSocialeFormSheet", () => {
 
   it("non ripristina i campi se i dati asincroni cambiano mentre il pannello è aperto", async () => {
     const onOpenChange = vi.fn();
-    const renderScheduled = async (currentOperatorId?: number) => {
+    const renderScheduled = async (operatorsLoaded = false) => {
       await act(async () => {
         root.render(
           <InterventoSocialeFormSheet
@@ -126,8 +131,13 @@ describe("InterventoSocialeFormSheet", () => {
               { id: 10, nome: "Mario", cognome: "Rossi", codice: "BEN-10" },
             ]}
             tipi={[{ id: 1, nome: "colloquio", attivo: true }]}
-            operatori={[{ id: 4, nome: "Operatore Test", codice: "OP-4" }]}
-            currentOperatorId={currentOperatorId}
+            operatori={
+              operatorsLoaded
+                ? [{ id: 4, nome: "Operatore Test", codice: "OP-4" }]
+                : []
+            }
+            centri={[]}
+            onCentroChange={vi.fn()}
             beneficiarySearch=""
             onBeneficiarySearch={vi.fn()}
             onOpenChange={onOpenChange}
@@ -159,7 +169,7 @@ describe("InterventoSocialeFormSheet", () => {
       description?.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    await renderScheduled(4);
+    await renderScheduled(true);
 
     expect(date?.value).toBe("2026-08-15");
     expect(description?.value).toBe("Valore inserito dall'operatore");
@@ -176,7 +186,8 @@ describe("InterventoSocialeFormSheet", () => {
           beneficiari={[]}
           tipi={[{ id: 1, nome: "colloquio", attivo: true }]}
           operatori={[{ id: 4, nome: "Operatore Test", codice: "OP-4" }]}
-          currentOperatorId={4}
+          centri={[]}
+          onCentroChange={vi.fn()}
           beneficiarySearch=""
           onBeneficiarySearch={vi.fn()}
           onOpenChange={vi.fn()}

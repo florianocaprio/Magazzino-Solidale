@@ -39,6 +39,8 @@ export interface Intervento {
   /** @nullable */
   areaOperativaId: number | null;
   /** @nullable */
+  areaOperativaNome?: string | null;
+  /** @nullable */
   areaOperativaIdSnapshot?: number | null;
   /** @nullable */
   zonaUdsIdSnapshot?: number | null;

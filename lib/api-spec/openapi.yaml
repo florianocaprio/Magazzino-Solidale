@@ -4863,6 +4863,26 @@ paths:
                 items:
                   $ref: "#/components/schemas/InterventoOperatore"
 
+  /interventi/beneficiari/tessera:
+    post:
+      operationId: cercaBeneficiarioInterventoPerTessera
+      tags: [interventi]
+      description: Cerca una tessera attiva nell'Area e nell'eventuale Centro selezionato per un intervento Sociale.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InterventoTesseraLookupInput" }
+      responses:
+        "200":
+          description: Beneficiario individuato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InterventoTesseraLookupResult" }
+        "400": { description: Ricerca non valida }
+        "403": { description: Permesso negato }
+        "404": { description: Tessera assente o fuori perimetro }
+
   /interventi/materiale-da-preparare:
     get:
       operationId: getMaterialeDaPreparare
@@ -5016,7 +5036,7 @@ paths:
     post:
       operationId: salvaInterventoOperativita
       tags: [interventi]
-      description: Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+      description: Salva in una transazione i dati operativi senza chiudere l'intervento. Su un intervento Sociale concluso consente di aggiornare risultato, esito e note.
       parameters:
         - name: id
           in: path
@@ -5041,7 +5061,7 @@ paths:
     post:
       operationId: concludiIntervento
       tags: [interventi]
-      description: Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
+      description: Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Risultato, esito e note sono facoltativi per gli interventi Sociali. Attività, materiali o documenti richiedono anche il permesso update.
       parameters:
         - name: id
           in: path
@@ -19119,6 +19139,25 @@ components:
         limite: { type: integer }
       required: [items, total, pagina, limite]
 
+    InterventoTesseraLookupInput:
+      type: object
+      properties:
+        codice: { type: string, minLength: 1, maxLength: 255 }
+        areaOperativaId: { type: integer, minimum: 1 }
+        centroAscoltoId: { type: integer, minimum: 1 }
+      required: [codice, areaOperativaId]
+
+    InterventoTesseraLookupResult:
+      type: object
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cognome: { type: string }
+        codice: { type: string }
+        areaOperativaNome: { type: string }
+        centroAscoltoNome: { type: ["string", "null"] }
+      required: [id, nome, cognome, codice, areaOperativaNome, centroAscoltoNome]
+
     Intervento:
       type: object
       properties:
@@ -19154,6 +19193,8 @@ components:
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
+        areaOperativaNome:
+          type: ["string", "null"]
         areaOperativaIdSnapshot:
           type: ["integer", "null"]
         zonaUdsIdSnapshot:

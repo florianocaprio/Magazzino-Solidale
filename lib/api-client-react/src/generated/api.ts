@@ -290,6 +290,8 @@ import type {
   InterventoOperatore,
   InterventoStoricoStato,
   InterventoSuccessivoInput,
+  InterventoTesseraLookupInput,
+  InterventoTesseraLookupResult,
   InterventoTransizioneInput,
   InterventoUpdate,
   ListAccessiEmporioParams,
@@ -17367,6 +17369,96 @@ export function useListInterventiOperatori<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+export const getCercaBeneficiarioInterventoPerTesseraUrl = () => {
+  return `/api/interventi/beneficiari/tessera`;
+};
+
+/**
+ * Cerca una tessera attiva nell'Area e nell'eventuale Centro selezionato per un intervento Sociale.
+ */
+export const cercaBeneficiarioInterventoPerTessera = async (
+  interventoTesseraLookupInput: InterventoTesseraLookupInput,
+  options?: RequestInit,
+): Promise<InterventoTesseraLookupResult> => {
+  return customFetch<InterventoTesseraLookupResult>(
+    getCercaBeneficiarioInterventoPerTesseraUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(interventoTesseraLookupInput),
+    },
+  );
+};
+
+export const getCercaBeneficiarioInterventoPerTesseraMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>,
+    TError,
+    { data: BodyType<InterventoTesseraLookupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>,
+  TError,
+  { data: BodyType<InterventoTesseraLookupInput> },
+  TContext
+> => {
+  const mutationKey = ["cercaBeneficiarioInterventoPerTessera"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>,
+    { data: BodyType<InterventoTesseraLookupInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return cercaBeneficiarioInterventoPerTessera(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CercaBeneficiarioInterventoPerTesseraMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>
+>;
+export type CercaBeneficiarioInterventoPerTesseraMutationBody =
+  BodyType<InterventoTesseraLookupInput>;
+export type CercaBeneficiarioInterventoPerTesseraMutationError =
+  ErrorType<void>;
+
+export const useCercaBeneficiarioInterventoPerTessera = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>,
+    TError,
+    { data: BodyType<InterventoTesseraLookupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cercaBeneficiarioInterventoPerTessera>>,
+  TError,
+  { data: BodyType<InterventoTesseraLookupInput> },
+  TContext
+> => {
+  return useMutation(
+    getCercaBeneficiarioInterventoPerTesseraMutationOptions(options),
+  );
+};
+
 export const getGetMaterialeDaPreparareUrl = (
   params?: GetMaterialeDaPreparareParams,
 ) => {
@@ -17926,7 +18018,7 @@ export const getSalvaInterventoOperativitaUrl = (id: number) => {
 };
 
 /**
- * Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+ * Salva in una transazione i dati operativi senza chiudere l'intervento. Su un intervento Sociale concluso consente di aggiornare risultato, esito e note.
  */
 export const salvaInterventoOperativita = async (
   id: number,
@@ -18014,7 +18106,7 @@ export const getConcludiInterventoUrl = (id: number) => {
 };
 
 /**
- * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
+ * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Risultato, esito e note sono facoltativi per gli interventi Sociali. Attività, materiali o documenti richiedono anche il permesso update.
  */
 export const concludiIntervento = async (
   id: number,

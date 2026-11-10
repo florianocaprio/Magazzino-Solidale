@@ -4930,6 +4930,8 @@ export interface Intervento {
   /** @nullable */
   areaOperativaId: number | null;
   /** @nullable */
+  areaOperativaNome?: string | null;
+  /** @nullable */
   areaOperativaIdSnapshot?: number | null;
   /** @nullable */
   zonaUdsIdSnapshot?: number | null;
@@ -6624,6 +6626,28 @@ export interface InterventiPagina {
   total: number;
   pagina: number;
   limite: number;
+}
+
+export interface InterventoTesseraLookupInput {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  codice: string;
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId?: number;
+}
+
+export interface InterventoTesseraLookupResult {
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  areaOperativaNome: string;
+  /** @nullable */
+  centroAscoltoNome: string | null;
 }
 
 /**

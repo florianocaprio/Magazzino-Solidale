@@ -491,6 +491,8 @@ export * from "./interventoStato";
 export * from "./interventoStoricoStato";
 export * from "./interventoSuccessivoInput";
 export * from "./interventoSuccessivoOperativoInput";
+export * from "./interventoTesseraLookupInput";
+export * from "./interventoTesseraLookupResult";
 export * from "./interventoTransizioneInput";
 export * from "./interventoUpdate";
 export * from "./interventoVista";

@@ -150,6 +150,12 @@ const fase53BEn = {
     time: "Planned time",
     occurredDate: "Intervention date",
     assignedOperator: "Assigned operator",
+    currentOperator: "Current operator (default)",
+    keepOperator: "Keep current assignment",
+    cardCode: "Card code",
+    findCard: "Find card",
+    cardLookupFailed:
+      "No valid card found in the selected area and centre, or the search is unavailable.",
     invalidDateTime: "Invalid date or time",
     saveError: "The intervention could not be saved",
   },
@@ -157,6 +163,8 @@ const fase53BEn = {
     inProgressDescription:
       "Operational workspace for the intervention in progress.",
     readOnlyDescription: "Completed data are available in read-only mode.",
+    closedOutcomeDescription:
+      "You can update the result, outcome and notes of this completed intervention.",
     planningDescription:
       "Prepare the appointment, materials and documents before starting.",
     openRegistry: "Open beneficiary record",
@@ -411,6 +419,12 @@ const fase53B = {
       time: "Ora pianificata",
       occurredDate: "Data intervento",
       assignedOperator: "Operatore assegnato",
+      currentOperator: "Operatore corrente (predefinito)",
+      keepOperator: "Mantieni l'assegnazione attuale",
+      cardCode: "Codice tessera",
+      findCard: "Cerca tessera",
+      cardLookupFailed:
+        "Tessera valida non trovata nell’Area e nel Centro selezionati oppure ricerca non disponibile.",
       invalidDateTime: "Data o ora non valide",
       saveError: "Impossibile salvare l'intervento",
     },
@@ -419,6 +433,8 @@ const fase53B = {
       inProgressDescription: "Workspace operativo dell'intervento in corso.",
       readOnlyDescription:
         "I dati conclusivi sono disponibili in sola lettura.",
+      closedOutcomeDescription:
+        "Puoi aggiornare risultato, esito e note dell’intervento concluso.",
       planningDescription:
         "Prepara appuntamento, materiali e documenti prima dell'avvio.",
       openRegistry: "Apri scheda anagrafica",

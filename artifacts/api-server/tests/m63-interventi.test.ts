@@ -8,6 +8,7 @@ import {
   areeOperativeTable,
   centriAscoltoTable,
   beneficiariTable,
+  tessereBeneficiariTable,
   utentiTable,
   ruoliTable,
   interventiTable,
@@ -139,6 +140,104 @@ afterAll(async () => {
 });
 
 describe("M63 sviluppo — sessioni reali e transazioni", () => {
+  it("cerca una tessera esatta nel Centro scelto e pianifica con i valori predefiniti", async () => {
+    const [secondCentre] = await db
+      .insert(centriAscoltoTable)
+      .values({
+        nome: `M63 secondo centro ${suffix}`,
+        areaOperativaId: area,
+      })
+      .returning();
+    const [beneficiary] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `M63-R3-${suffix}`,
+        nome: "Persona",
+        cognome: "Secondo centro",
+        areaOperativaId: area,
+        centroAscoltoId: secondCentre.id,
+        uds: true,
+      })
+      .returning();
+    const [card] = await db
+      .insert(tessereBeneficiariTable)
+      .values({
+        beneficiarioId: beneficiary.id,
+        codice: `MS-Ab${suffix}`,
+      })
+      .returning();
+    const path = "/api/interventi/beneficiari/tessera";
+    const scope = { areaOperativaId: area, centroAscoltoId: secondCentre.id };
+    const lookup = await actor.session
+      .post(path)
+      .send({ ...scope, codice: ` ${card.codice} ` });
+    expect(lookup.status, lookup.text).toBe(200);
+    expect(lookup.body).toEqual({
+      id: beneficiary.id,
+      nome: beneficiary.nome,
+      cognome: beneficiary.cognome,
+      codice: beneficiary.codice,
+      areaOperativaNome: `M63 A ${suffix}`,
+      centroAscoltoNome: secondCentre.nome,
+    });
+    expect(
+      (
+        await actor.session
+          .post(path)
+          .send({ ...scope, centroAscoltoId: centre, codice: card.codice })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await actor.session
+          .post(path)
+          .send({ ...scope, codice: card.codice.toLowerCase() })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await boundAdmin.session
+          .post(path)
+          .send({ ...scope, codice: card.codice })
+      ).status,
+    ).toBe(404);
+    const viewOnly = await user(
+      "card-readonly",
+      { areaOperativaId: area, centroAscoltoId: centre },
+      false,
+      ["sociale.interventi.view"],
+    );
+    expect(
+      (
+        await viewOnly.session
+          .post(path)
+          .send({ ...scope, codice: card.codice })
+      ).status,
+    ).toBe(403);
+    await db
+      .update(tessereBeneficiariTable)
+      .set({ dataScadenza: "2000-01-01" })
+      .where(eq(tessereBeneficiariTable.id, card.id));
+    expect(
+      (await actor.session.post(path).send({ ...scope, codice: card.codice }))
+        .status,
+    ).toBe(404);
+
+    const created = await actor.session.post("/api/interventi").send({
+      beneficiarioId: beneficiary.id,
+      ambito: "sociale",
+      stato: "pianificato",
+      tipoIntervento: `m63-r3-${suffix}`,
+      dataOraPianificata: "2030-01-10T09:00:00Z",
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body).toMatchObject({
+      stato: "pianificato",
+      operatoreId: actor.row.id,
+      sede: lookup.body.areaOperativaNome,
+    });
+  });
+
   it("T01 nullo non è globale; liste, dettaglio, storico e comando negati", async () => {
     const x = await user("null", {
         areaOperativaId: null,

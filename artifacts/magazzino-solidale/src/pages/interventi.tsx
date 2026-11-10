@@ -33,7 +33,6 @@ import {
   updateIntervento,
   type GetInterventiRiepilogoVisteParams,
   type Intervento,
-  type InterventoConclusioneInput,
   type InterventoInput,
   type ListInterventiParams,
 } from "@workspace/api-client-react";
@@ -127,6 +126,7 @@ function InterventiSession({ identity }: { identity: string }) {
   const [formMode, setFormMode] =
     useState<InterventoSocialeCreateMode>("da_pianificare");
   const [beneficiarySearch, setBeneficiarySearch] = useState("");
+  const [formCentroId, setFormCentroId] = useState<number>();
   const [selectedInterventoId, setSelectedInterventoId] = useState<
     number | null
   >(() => {
@@ -293,12 +293,12 @@ function InterventiSession({ identity }: { identity: string }) {
     attivo: true,
     search: debouncedBeneficiarySearch || undefined,
     areaOperativaId: effectiveAreaOperativaId,
-    centroAscoltoId: effectiveCentroId,
+    centroAscoltoId: formCentroId,
   };
   const beneficiariesQuery = useListBeneficiari(beneficiaryParams, {
     query: {
       queryKey: access.key(getListBeneficiariQueryKey(beneficiaryParams)),
-      enabled: canRead && !areaOperativaRequired,
+      enabled: canRead && canCreate && formOpen && !areaOperativaRequired,
     },
   });
   const areaOperativaQuery = useListAreeOperative({
@@ -365,6 +365,12 @@ function InterventiSession({ identity }: { identity: string }) {
   const openForm = (mode: InterventoSocialeCreateMode) => {
     setFormMode(mode);
     setBeneficiarySearch("");
+    setFormCentroId(
+      isCentroLocked ||
+        formCenters.some((center) => center.id === effectiveCentroId)
+        ? effectiveCentroId
+        : undefined,
+    );
     setFormOpen(true);
   };
 
@@ -468,6 +474,10 @@ function InterventiSession({ identity }: { identity: string }) {
       center.areaOperativaId === effectiveAreaOperativaId
     );
   });
+  const formCenters = centers.filter(
+    (center) =>
+      center.attivo && center.areaOperativaId === effectiveAreaOperativaId,
+  );
 
   if (!canRead || readDenied)
     return (
@@ -654,12 +664,23 @@ function InterventiSession({ identity }: { identity: string }) {
       </p>
 
       <InterventoSocialeFormSheet
+        key={`${identity}:${effectiveAreaOperativaId}`}
         open={formOpen && canCreate}
         mode={formMode}
-        beneficiari={beneficiariesQuery.data ?? []}
+        beneficiari={(beneficiariesQuery.data ?? []).filter(
+          (item) =>
+            formCentroId == null || item.centroAscoltoId === formCentroId,
+        )}
+        areaOperativaId={effectiveAreaOperativaId}
+        centri={formCenters}
+        centroId={formCentroId}
+        centroBloccato={isCentroLocked}
+        onCentroChange={(id) => {
+          setBeneficiarySearch("");
+          setFormCentroId(id);
+        }}
         tipi={typesQuery.data ?? []}
         operatori={operatorsQuery.data ?? []}
-        currentOperatorId={user?.id}
         beneficiarySearch={beneficiarySearch}
         isPending={createIntervento.isPending}
         onBeneficiarySearch={setBeneficiarySearch}
@@ -719,7 +740,7 @@ function InterventiSession({ identity }: { identity: string }) {
             },
           );
         }}
-        onSalva={(data: InterventoConclusioneInput) => {
+        onSalva={(data) => {
           if (selectedInterventoId == null) return;
           salvaOperativita.mutate(
             { id: selectedInterventoId, data },
