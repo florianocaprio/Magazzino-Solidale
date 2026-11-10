@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { ReportKpi } from "@workspace/api-client-react";
 
 vi.mock("react-i18next", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-i18next")>()),
@@ -16,9 +17,42 @@ import {
 import { isReportingCardVisible } from "@/pages/reporting-landing";
 import { MODULO_BY_ROUTE } from "@/lib/use-moduli";
 import { NAV_ITEMS } from "@/components/layout";
-import { reportingFiltersFromSearch } from "@/pages/reporting-dashboard";
+import {
+  reportingFiltersFromSearch,
+  reportingKpisForDisplay,
+} from "@/pages/reporting-dashboard";
 
 describe("reportistica integrata", () => {
+  it("accorpa soltanto le giacenze storiche esattamente uguali a quelle correnti", () => {
+    const items: ReportKpi[] = (
+      [
+        {
+          key: "giacenzaCorrentePezzi",
+          unit: "pieces",
+          exactValue: "3244.000000",
+        },
+        { key: "giacenzaAsOfPezzi", unit: "pieces", exactValue: "3244" },
+        { key: "giacenzaCorrenteKgLt", unit: "kgLt", exactValue: "1387.92" },
+        { key: "giacenzaAsOfKgLt", unit: "kgLt", exactValue: "1387.99" },
+      ] as const
+    ).map((item) => ({
+      ...item,
+      value: Number(item.exactValue),
+      availability: "ok",
+      drilldownMetric: null,
+    }));
+
+    expect(reportingKpisForDisplay("magazzino-logistica", items)).toEqual([
+      items[0],
+      items[2],
+      items[3],
+    ]);
+    expect(reportingKpisForDisplay("magazzino-logistica", [items[1]])).toEqual([
+      items[1],
+    ]);
+    expect(reportingKpisForDisplay("fse-plus", items)).toEqual(items);
+  });
+
   it("blocca i filtri corrispondenti allo scope del caller", () => {
     expect(
       getReportingFilterLocks({

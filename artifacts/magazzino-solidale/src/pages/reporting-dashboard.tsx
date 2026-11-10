@@ -9,6 +9,7 @@ import {
   useGetReportPacchi,
   useGetReportUdsIntegrato,
   type GetReportDrilldownParams,
+  type ReportKpi,
   type ReportingDashboard,
   type ReportingDashboardSection,
 } from "@workspace/api-client-react";
@@ -33,6 +34,7 @@ import {
   localizeReportingText,
   reportingColumnLabel,
 } from "@/lib/reporting-text";
+import { equalReportingDecimals } from "@/lib/reporting-number";
 import { FseOperations } from "@/components/reporting/fse-operations";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -151,6 +153,28 @@ function apiParams(filters: ReportingFilterState): CommonParams {
   };
 }
 
+const currentStockByHistoricalKey: Readonly<Record<string, string>> = {
+  giacenzaAsOfPezzi: "giacenzaCorrentePezzi",
+  giacenzaAsOfKgLt: "giacenzaCorrenteKgLt",
+};
+
+export function reportingKpisForDisplay(section: Section, items: ReportKpi[]) {
+  return items.filter((item) => {
+    if (["colloquiAccoglienza", "colloquiFollowup"].includes(item.key))
+      return false;
+    if (section !== "magazzino-logistica") return true;
+    const currentKey = currentStockByHistoricalKey[item.key];
+    if (!currentKey || item.availability !== "ok" || item.exactValue == null)
+      return true;
+    const current = items.find((candidate) => candidate.key === currentKey);
+    return (
+      current?.availability !== "ok" ||
+      current.exactValue == null ||
+      !equalReportingDecimals(item.exactValue, current.exactValue)
+    );
+  });
+}
+
 function QueryContent({
   section,
   filters,
@@ -206,6 +230,8 @@ function QueryContent({
   }
   const report = query.data;
   if (!report) return <ReportEmptyState />;
+  const stockPresentation = section === "magazzino-logistica";
+  const visibleKpis = reportingKpisForDisplay(section, report.kpi);
   const drilldownParams: Omit<
     GetReportDrilldownParams,
     "page" | "pageSize"
@@ -245,26 +271,22 @@ function QueryContent({
         </div>
         <ReportExportActions report={report} />
       </div>
-      {report.kpi.length === 0 ? (
+      {visibleKpis.length === 0 ? (
         <ReportEmptyState />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {report.kpi
-            .filter(
-              (item) =>
-                !["colloquiAccoglienza", "colloquiFollowup"].includes(item.key),
-            )
-            .map((item) => (
-              <ReportKpiCard
-                key={item.key}
-                item={item}
-                onOpen={
-                  item.drilldownMetric
-                    ? () => setMetric(item.drilldownMetric)
-                    : undefined
-                }
-              />
-            ))}
+          {visibleKpis.map((item) => (
+            <ReportKpiCard
+              key={item.key}
+              item={item}
+              stockPresentation={stockPresentation}
+              onOpen={
+                item.drilldownMetric
+                  ? () => setMetric(item.drilldownMetric)
+                  : undefined
+              }
+            />
+          ))}
         </section>
       )}
       {report.series.length > 0 && (
@@ -295,7 +317,11 @@ function QueryContent({
       {report.tables.length > 0 && (
         <section className="grid gap-4 xl:grid-cols-2">
           {report.tables.map((table) => (
-            <ReportTable key={table.key} table={table} />
+            <ReportTable
+              key={table.key}
+              table={table}
+              stockPresentation={stockPresentation}
+            />
           ))}
         </section>
       )}

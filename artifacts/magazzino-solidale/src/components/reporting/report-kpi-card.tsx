@@ -9,16 +9,26 @@ import { formatReportingDecimal } from "@/lib/reporting-number";
 export function ReportKpiCard({
   item,
   onOpen,
+  stockPresentation = false,
 }: {
   item: ReportKpi;
   onOpen?: () => void;
+  stockPresentation?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const unavailable = item.exactValue == null;
   const formatted =
     item.exactValue == null
       ? t("reporting.unavailable")
-      : formatReportingDecimal(item.exactValue, i18n.resolvedLanguage);
+      : formatReportingDecimal(
+          item.exactValue,
+          i18n.resolvedLanguage,
+          stockPresentation && item.unit === "kgLt"
+            ? "ceil"
+            : stockPresentation && item.unit === "pieces"
+              ? "trim"
+              : "exact",
+        );
   return (
     <Card className={unavailable ? "border-dashed" : undefined}>
       <CardHeader className="space-y-2 pb-2">

@@ -243,6 +243,24 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
     }
     if (section === "mensa") query.set("tipoServizio", "pranzo");
     await page.goto(`/report/${section}?${query}`);
+    if (section === "magazzino-logistica") {
+      const [whole, fraction] = exactStock.split(".");
+      const roundedStock = new Intl.NumberFormat("it").format(
+        BigInt(whole) + (/[1-9]/.test(fraction ?? "") ? 1n : 0n),
+      );
+      await expect(
+        page.getByText("Giacenza corrente Pezzi", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Giacenza as-of Pezzi", { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByText("Giacenza as-of Kg/Lt", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText(roundedStock, { exact: true }).first(),
+      ).toBeVisible();
+    }
     const pdf = page.getByRole("button", {
       name: "Esporta in PDF",
       exact: true,
