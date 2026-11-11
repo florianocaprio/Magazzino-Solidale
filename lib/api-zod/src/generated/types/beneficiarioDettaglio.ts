@@ -30,6 +30,7 @@ export interface BeneficiarioDettaglio {
   /** @minimum 0 */
   versioneFascicolo?: number;
   id: number;
+  udsAttivo?: boolean;
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;

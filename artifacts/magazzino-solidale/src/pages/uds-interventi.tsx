@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
 import {
   useListUdsDirectory,
   useListInterventiPagina,
@@ -166,6 +167,26 @@ function personLabel(b: {
   return b.soprannome ? `${base} (${b.soprannome})` : base;
 }
 
+const EditUdsBeneficiarioSheet = lazy(() =>
+  import("@/pages/beneficiario-dettaglio").then(({ EditUdsBeneficiarioSheet }) => ({
+    default: EditUdsBeneficiarioSheet,
+  })),
+);
+
+function initialUdsFilters(
+  beneficiarioId: number | undefined,
+  areaOperativaId: number | null | undefined,
+): ListInterventiPaginaParams {
+  const today = todayEuropeRome();
+  return {
+    ambito: "uds",
+    areaOperativaId: areaOperativaId ?? undefined,
+    ...(beneficiarioId == null
+      ? { da: today, a: today }
+      : { beneficiarioId, includiStorici: true }),
+  };
+}
+
 export default function UdsInterventi() {
   const { t } = useTranslation();
   const { user, hasArea, hasPermission } = useAuth();
@@ -173,9 +194,14 @@ export default function UdsInterventi() {
   const { toast } = useToast();
   const schema = makeSchema(t);
   const canView = hasArea("uds") && hasPermission("uds.interventi.view");
+  const canViewDirectory = canView && hasPermission("uds.directory.view");
+  const canEditPerson = hasPermission("beneficiari.view") && hasPermission("beneficiari.manage");
+  const queryPerson = Number(new URLSearchParams(useSearch()).get("beneficiarioId"));
+  const historyPersonId = Number.isSafeInteger(queryPerson) && queryPerson > 0 && queryPerson <= 2147483647
+    ? queryPerson : undefined;
 
   const isGlobal = user?.areaOperativaId == null;
-  const [selectedPerson, setSelectedPerson] = useState<string>("");
+  const [selectedPerson, setSelectedPerson] = useState(historyPersonId == null ? "" : String(historyPersonId));
   const [personSearch, setPersonSearch] = useState("");
   const [filterAreaOperativa, setFilterAreaOperativa] = useState<string>("");
   const [filterZona, setFilterZona] = useState<string>(ALL_ZONE);
@@ -184,6 +210,7 @@ export default function UdsInterventi() {
   const [selectedPersonFallback, setSelectedPersonFallback] =
     useState<UdsPersonaSelection | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [personEditOpen, setPersonEditOpen] = useState(false);
   const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
   const [bisogniEditingId, setBisogniEditingId] = useState<number | null>(null);
   const [noteText, setNoteText] = useState("");
@@ -191,7 +218,7 @@ export default function UdsInterventi() {
     "tutti" | "aperti" | "scaduti" | "nessuno"
   >("tutti");
 
-  const [dateMode, setDateMode] = useState("day");
+  const [dateMode, setDateMode] = useState(historyPersonId == null ? "day" : "all");
   const [from, setFrom] = useState(todayEuropeRome());
   const [to, setTo] = useState(todayEuropeRome());
   const [needType, setNeedType] = useState("all");
@@ -202,30 +229,22 @@ export default function UdsInterventi() {
   const [editingIntervento, setEditingIntervento] = useState<Intervento | null>(
     null,
   );
-  const [applied, setApplied] = useState<ListInterventiPaginaParams>({
-    ambito: "uds",
-    da: todayEuropeRome(),
-    a: todayEuropeRome(),
-    areaOperativaId: user?.areaOperativaId ?? undefined,
-  });
+  const [applied, setApplied] = useState(() => initialUdsFilters(historyPersonId, user?.areaOperativaId));
   useEffect(() => {
-    setSelectedPerson("");
+    setSelectedPerson(historyPersonId == null ? "" : String(historyPersonId));
     setSelectedPersonFallback(null);
     setPersonSearch("");
     setFilterAreaOperativa("");
     setFilterZona(ALL_ZONE);
     setPage(1);
     setIsFormOpen(false);
+    setPersonEditOpen(false);
     setIsNewPersonOpen(false);
     setNoteEditing(null);
     setBisogniEditingId(null);
-    setApplied({
-      ambito: "uds",
-      da: todayEuropeRome(),
-      a: todayEuropeRome(),
-      areaOperativaId: user?.areaOperativaId ?? undefined,
-    });
-  }, [user?.id, user?.areaOperativaId, canView]);
+    setDateMode(historyPersonId == null ? "day" : "all");
+    setApplied(initialUdsFilters(historyPersonId, user?.areaOperativaId));
+  }, [user?.id, user?.areaOperativaId, canView, historyPersonId]);
 
   const { data: areaOperativaList } = useListAreeOperative({
     query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
@@ -244,12 +263,13 @@ export default function UdsInterventi() {
     {
       query: {
         queryKey: ["zoneUds", "udsInt", effectiveAreaOperativa],
-        enabled: effectiveAreaOperativa != null,
+        enabled: canViewDirectory && effectiveAreaOperativa != null,
       },
     },
   );
 
   const personeParams = {
+    includiInattiviUds: true,
     ...(personSearch.trim() ? { search: personSearch.trim() } : {}),
     ...(isGlobal && effectiveAreaOperativa
       ? { areaOperativaId: effectiveAreaOperativa }
@@ -269,7 +289,7 @@ export default function UdsInterventi() {
     {
       query: {
         queryKey: ["/api/uds/directory", personeParams],
-        enabled: canView && effectiveAreaOperativa != null,
+        enabled: canViewDirectory && effectiveAreaOperativa != null,
       },
     },
   );
@@ -308,8 +328,9 @@ export default function UdsInterventi() {
       bisogni: bisogniFilter === "tutti" ? undefined : bisogniFilter,
       tipoBisogno:
         needType === "all" ? undefined : (needType as "richiesta" | "azione"),
-      da: from,
-      a: dateMode === "day" ? from : to,
+      ...(dateMode === "all" && personId != null
+        ? {}
+        : { da: from, a: dateMode === "range" ? to : from }),
     });
   };
   const loadExportRows = async () => {
@@ -395,7 +416,7 @@ export default function UdsInterventi() {
     setEditingIntervento(i);
     setFormPerson({
       id: i.beneficiarioId,
-      nome: i.beneficiarioNome ?? "",
+      nome: i.beneficiarioNome ?? `#${i.beneficiarioId}`,
       cognome: "",
     });
     form.reset({
@@ -664,6 +685,7 @@ export default function UdsInterventi() {
                     setFilterAreaOperativa(v === ALL_ZONE ? "" : v);
                     setFilterZona(ALL_ZONE);
                     setSelectedPerson("");
+                    if (dateMode === "all") setDateMode("day");
                     setSelectedPersonFallback(null);
                     setPersonSearch("");
                   }}
@@ -695,9 +717,11 @@ export default function UdsInterventi() {
               </span>
               <Select
                 value={filterZona}
+                disabled={!canViewDirectory}
                 onValueChange={(v) => {
                   setFilterZona(v);
                   setSelectedPerson("");
+                  if (dateMode === "all") setDateMode("day");
                   setSelectedPersonFallback(null);
                   setPersonSearch("");
                 }}
@@ -727,15 +751,19 @@ export default function UdsInterventi() {
               <BeneficiarioCombobox
                 items={persone ?? []}
                 value={selectedPerson}
+                disabled={!canViewDirectory}
                 onChange={(id) => {
                   setSelectedPerson(id);
+                  if (!id && dateMode === "all") setDateMode("day");
                   setSelectedPersonFallback(
                     persone?.find((p) => p.id === Number(id)) ?? null,
                   );
                 }}
                 placeholder={t("udsInterventi.selectPersonPlaceholder")}
                 selectedLabelFallback={
-                  selectedPersonData ? personLabel(selectedPersonData) : null
+                  selectedPersonData ? personLabel(selectedPersonData) :
+                    interventi?.find((item) => item.beneficiarioId === personId)?.beneficiarioNome ??
+                    (personId ? `#${personId}` : null)
                 }
                 searchValue={personSearch}
                 onSearchChange={setPersonSearch}
@@ -786,6 +814,7 @@ export default function UdsInterventi() {
               variant="outline"
               onClick={() => {
                 setSelectedPerson("");
+                if (dateMode === "all") setDateMode("day");
                 setSelectedPersonFallback(null);
               }}
             >
@@ -827,9 +856,14 @@ export default function UdsInterventi() {
                 <SelectItem value="range">
                   {t("udsReportGiornaliero.modeRange")}
                 </SelectItem>
+                {personId != null && (
+                  <SelectItem value="all">
+                    {t("udsInterventi.allDates")}
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
-            <label className="text-sm">
+            {dateMode !== "all" && <label className="text-sm">
               {t("udsReportGiornaliero.from")}
               <Input
                 aria-label={t("udsReportGiornaliero.from")}
@@ -838,7 +872,7 @@ export default function UdsInterventi() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
-            </label>
+            </label>}
             {dateMode === "range" && (
               <label className="text-sm">
                 {t("udsReportGiornaliero.to")}
@@ -1263,7 +1297,11 @@ export default function UdsInterventi() {
                 : t("udsInterventi.newTitle")}
             </SheetTitle>
             <SheetDescription>
-              {formPerson
+              {editingId != null && formPerson && canEditPerson ? (
+                <button type="button" className="min-h-11 text-primary underline underline-offset-4" onClick={() => setPersonEditOpen(true)}>
+                  {personLabel(formPerson)}
+                </button>
+              ) : formPerson
                 ? personLabel(formPerson)
                 : t("udsInterventi.subtitle")}
             </SheetDescription>
@@ -1434,6 +1472,20 @@ export default function UdsInterventi() {
           </div>
         </SheetContent>
       </Sheet>
+      {isFormOpen && personEditOpen && formPerson && canEditPerson && (
+        <Suspense fallback={null}>
+          <EditUdsBeneficiarioSheet
+            id={formPerson.id}
+            onClose={() => setPersonEditOpen(false)}
+            onSaved={({ id, nome, cognome, soprannome }) => {
+              setFormPerson((person) =>
+                person?.id === id ? { ...person, nome, cognome, soprannome } : person,
+              );
+              invalidateList();
+            }}
+          />
+        </Suspense>
+      )}
       <UnsavedChangesDialog guard={unsavedGuard} />
 
       <Dialog

@@ -8,6 +8,7 @@ import {
   timestamp,
   integer,
   date,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -16,6 +17,7 @@ import { mezziTable } from "./mezzi";
 import { volontariTable } from "./volontari";
 import { areeOperativeTable } from "./areeOperative";
 import { centriAscoltoTable } from "./centri";
+import { beneficiariTable } from "./beneficiari";
 
 export const consegneTable = pgTable(
   "consegne",
@@ -68,6 +70,11 @@ export const consegneTable = pgTable(
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },
   (table) => [
+    foreignKey({
+      name: "consegne_beneficiario_fk",
+      columns: [table.beneficiarioId],
+      foreignColumns: [beneficiariTable.id],
+    }).onDelete("restrict"),
     index("consegne_reporting_snapshot_idx").on(
       table.stato,
       table.dataEffettuata,

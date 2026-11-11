@@ -1,7 +1,7 @@
 import { CreditoQuotaFields } from "@/components/credito-quota-fields";
 import { UdsServiceStates, UdsTerritoryFields, TesseraDocumentoSection, invalidateBeneficiarioTerritory } from "@/components/beneficiario-uds-tools";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { udsDirectoryReturnPath } from "@/lib/uds-persona-context";
+import { udsDirectoryReturnPath, udsPersonInterventionsPath } from "@/lib/uds-persona-context";
 import { operationalCentroId } from "@/lib/service-scope";
 import i18n from "@/lib/i18n";
 import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
@@ -17,6 +17,8 @@ import {
   useListMagazziniOperativi,
   getListMagazziniOperativiQueryKey,
   useUpdateBeneficiario,
+  useDeleteBeneficiario,
+  useUpdateUdsBeneficiarioStato,
   useAddNucleoFamiliare,
   useUpdateNucleoFamiliare,
   useDeleteNucleoFamiliare,
@@ -35,6 +37,7 @@ import {
   useListTessereBeneficiarioDaAnagrafica,
   getListTessereBeneficiarioDaAnagraficaQueryKey,
   type TesseraBeneficiario,
+  type Beneficiario,
   type BeneficiarioDettaglio as BeneficiarioDettaglioType,
   type CreditoSolidaleMovimento,
   type Intervento,
@@ -172,17 +175,19 @@ export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
   const { id } = useParams();
   const numId = Number(id);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const udsContext = location.startsWith("/uds/anagrafica/");
   const params = useSearch();
   const udsReturn = udsDirectoryReturnPath(new URLSearchParams(params).get("ritorno"));
   const emporioEligibility = emporioReadableData(useBeneficiarioEmporio(numId, !udsContext));
   const { data: b, isLoading } = useGetBeneficiario(numId, {
-    query: { enabled: !!id, queryKey: getGetBeneficiarioQueryKey(numId) },
+    query: { enabled: Number.isSafeInteger(numId) && numId > 0, queryKey: getGetBeneficiarioQueryKey(numId) },
   });
   const { data: centri } = useListCentriAscolto();
   const { data: completionAreas } = useListAreeOperative();
   const updateBeneficiario = useUpdateBeneficiario();
+  const deleteBeneficiario = useDeleteBeneficiario();
+  const updateUdsStato = useUpdateUdsBeneficiarioStato();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user, hasArea, hasPermission } = useAuth();
@@ -216,6 +221,11 @@ export default function BeneficiarioDettaglio() {
   const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
+  const [udsConfirmation, setUdsConfirmation] = useState<{
+    action: "deactivate" | "reactivate" | "delete";
+    id: number;
+    versione: number;
+  } | null>(null);
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionCentroId, setCompletionCentroId] = useState("");
   const [completionAreaId, setCompletionAreaId] = useState("");
@@ -400,9 +410,85 @@ export default function BeneficiarioDettaglio() {
   if (!b)
     return <div className="p-6">{t("beneficiarioDettaglio.notFound")}</div>;
 
+  const canManageUdsStatus = udsContext && b.uds &&
+    canManage && hasPermission("uds.directory.view");
+  const udsActionPending = deleteBeneficiario.isPending || updateUdsStato.isPending;
+  const confirmation = udsConfirmation?.id === b.id ? udsConfirmation : null;
+  const udsAction = confirmation?.action;
+  const udsActionLabel = udsAction === "delete" ? t("beneficiari.deletePermanent") :
+    udsAction === "reactivate" ? t("udsAnagrafica.reactivateUds") :
+      t("udsAnagrafica.deactivateUds");
+  const confirmUdsAction = () => {
+    if (!confirmation || !canManageUdsStatus || udsActionPending) return;
+    const permanent = udsAction === "delete";
+    const callbacks = {
+      onSuccess: () => {
+        setUdsConfirmation(null);
+        if (permanent) navigate(udsReturn, { replace: true });
+        void invalidateBeneficiarioTerritory(queryClient);
+        toast({ title: permanent ? t("beneficiari.toastDeleted") : t("beneficiarioDettaglio.toastUdsUpdated") });
+      },
+      onError: (error: unknown) => {
+        setUdsConfirmation(null);
+        void invalidateBeneficiarioTerritory(queryClient);
+        toast({ title: apiErrorMessage(error, t("beneficiari.removalError")), variant: "destructive" });
+      },
+    };
+    if (permanent)
+      deleteBeneficiario.mutate({ id: confirmation.id, params: { permanente: true, versione: confirmation.versione, contesto: "uds" } }, callbacks);
+    else
+      updateUdsStato.mutate({ id: confirmation.id, data: { attivo: udsAction === "reactivate", versione: confirmation.versione } }, callbacks);
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {udsContext && <div className="flex items-center gap-3"><Button asChild variant="outline"><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button><h2>{t("blocco04.udsPerson")}</h2></div>}
+      {udsContext && <div className="flex flex-wrap items-center gap-3">
+        <Button asChild><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button>
+        <h2>{t("blocco04.udsPerson")}</h2>
+        {hasPermission("uds.interventi.view") && (
+          <Button asChild>
+            <Link href={udsPersonInterventionsPath(b.id)}>
+              {t("udsInterventi.personHistory")}
+            </Link>
+          </Button>
+        )}
+      </div>}
+      {canManageUdsStatus && (
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={udsActionPending} onClick={() => setUdsConfirmation({
+            id: b.id, versione: b.versione, action: b.udsAttivo === false ? "reactivate" : "deactivate",
+          })}>
+            {b.udsAttivo === false
+              ? t("udsAnagrafica.reactivateUds")
+              : t("udsAnagrafica.deactivateUds")}
+          </Button>
+          <Button variant="destructive" disabled={udsActionPending} onClick={() => setUdsConfirmation({
+            id: b.id, versione: b.versione, action: "delete",
+          })}>
+            {t("beneficiari.deletePermanent")}
+          </Button>
+        </div>
+      )}
+      {canManageUdsStatus && (
+        <Dialog open={confirmation != null} onOpenChange={(open) => { if (!open && !udsActionPending) setUdsConfirmation(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{udsActionLabel}</DialogTitle>
+              <DialogDescription>
+                {b.cognome} {b.nome}{" "}
+                {udsAction === "delete" ? t("beneficiari.deletePermanentDescription") :
+                  t("udsAnagrafica.statusUdsDescription")}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" disabled={udsActionPending} onClick={() => setUdsConfirmation(null)}>{t("common.cancel")}</Button>
+              <Button variant={udsAction === "reactivate" ? "default" : "destructive"} disabled={udsActionPending} onClick={confirmUdsAction}>
+                {udsActionLabel}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -427,6 +513,9 @@ export default function BeneficiarioDettaglio() {
             )}
             {!b.attivo && (
               <Badge variant="destructive">{t("common.inactive")}</Badge>
+            )}
+            {udsContext && b.udsAttivo === false && (
+              <Badge variant="secondary">{t("udsAnagrafica.inactiveUds")}</Badge>
             )}
           </div>
           <p className="text-muted-foreground flex items-center gap-2">
@@ -872,6 +961,7 @@ export default function BeneficiarioDettaglio() {
                 <NucleoSection
                   b={b}
                   canManage={udsContext && canManage}
+                  canAdd={canManage}
                   onChanged={() => { void queryClient.invalidateQueries({predicate:q=>/\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0]))}); }}
                 />
               </TabsContent>
@@ -1480,6 +1570,48 @@ function CreditoSolidaleSaldoPanel({
   );
 }
 
+export function EditUdsBeneficiarioSheet({ id, onClose, onSaved }: {
+  id: number;
+  onClose: () => void;
+  onSaved: (saved: Beneficiario) => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: b, isLoading, isError } = useGetBeneficiario(id, {
+    query: { queryKey: getGetBeneficiarioQueryKey(id) },
+  });
+
+  if (isLoading || isError || !b) {
+    return (
+      <Sheet open onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="w-full sm:max-w-md" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle>{t("beneficiarioDettaglio.editAnagrafica")}</SheetTitle>
+          </SheetHeader>
+          {isLoading ? <Skeleton className="mt-6 h-32" /> : (
+            <p role="alert" className="mt-6">{t("beneficiarioDettaglio.notFound")}</p>
+          )}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <EditBeneficiarioSheet
+      b={b}
+      udsContext
+      onClose={onClose}
+      onSaved={(saved) => {
+        void invalidateBeneficiarioTerritory(queryClient);
+        toast({ title: t("beneficiarioDettaglio.toastUpdated") });
+        onSaved(saved);
+        onClose();
+      }}
+    />
+  );
+}
+
 export function EditBeneficiarioSheet({
   b,
   udsContext = false,
@@ -1490,7 +1622,7 @@ export function EditBeneficiarioSheet({
   b: BeneficiarioDettaglioType;
   udsContext?: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: Beneficiario) => void;
   onReplaceTessera?: () => void;
 }) {
   const { t } = useTranslation();
@@ -1501,6 +1633,7 @@ export function EditBeneficiarioSheet({
   const editSchema = useMemo(() => makeEditSchema(t, Boolean(b.fascicolo)), [t, b.fascicolo]);
   const { user, hasPermission } = useAuth();
   const canManageAnagrafica = hasPermission("beneficiari.manage");
+  const canViewSensitive = hasPermission("beneficiari.sensitive.view");
   const servizio = emporioReadableData(useBeneficiarioEmporio(b.id, !udsContext));
   const canManageCredito =
     !udsContext && hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
@@ -1604,6 +1737,8 @@ export function EditBeneficiarioSheet({
 
   const onSubmit = async (data: EditValues, complete = false) => {
     const {
+      codiceFiscale,
+      restrizioniAlimentari,
       uds,
       areaOperativaId,
       zonaUdsId,
@@ -1646,9 +1781,10 @@ export function EditBeneficiarioSheet({
       dataNascita: data.dataNascita || null,
       sesso: data.sesso || undefined,
       areaProvenienza: data.areaProvenienza || undefined,
-      codiceFiscale: data.codiceFiscale?.trim()
-        ? data.codiceFiscale.trim().toUpperCase()
-        : null,
+      ...(canViewSensitive && {
+        codiceFiscale: codiceFiscale?.trim().toUpperCase() || null,
+        restrizioniAlimentari,
+      }),
       centroAscoltoId: centroAscoltoIdFinale,
       versione: b.versione,
       versioneFascicolo: b.versioneFascicolo ?? 0,
@@ -1671,7 +1807,7 @@ export function EditBeneficiarioSheet({
         delete payload.centroAscoltoId; delete payload.zonaUdsId; delete payload.areaOperativaId;
         delete payload.magazzinoEmporioPreferitoId; delete payload.uds;
       }
-      await updateBeneficiario.mutateAsync({
+      const saved = await updateBeneficiario.mutateAsync({
         id: b.id,
         data: payload as never,
       });
@@ -1689,7 +1825,7 @@ export function EditBeneficiarioSheet({
           },
         });
       }
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       const message = apiErrorMessage(
         err,
@@ -1745,7 +1881,7 @@ export function EditBeneficiarioSheet({
                 name="fascicolo"
                 render={({ field }) => <FormItem><FormLabel>{t("blocco07.fascicolo")}</FormLabel><FormControl><Input {...field} maxLength={255} /></FormControl></FormItem>}
               />
-              <FormField control={form.control}
+              {canViewSensitive && <FormField control={form.control}
                 name="codiceFiscale"
                 render={({ field }) => (
                   <FormItem>
@@ -1761,7 +1897,7 @@ export function EditBeneficiarioSheet({
                     </FormControl>
                   </FormItem>
                 )}
-              />
+              />}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -2068,7 +2204,7 @@ export function EditBeneficiarioSheet({
                   )}
                 />
               )}
-              <FormField
+              {canViewSensitive && <FormField
                 control={form.control}
                 name="restrizioniAlimentari"
                 render={({ field }) => (
@@ -2081,7 +2217,7 @@ export function EditBeneficiarioSheet({
                     </FormControl>
                   </FormItem>
                 )}
-              />
+              />}
 
               </fieldset>
               {canManageCredito && (
@@ -2387,10 +2523,12 @@ type MembroValues = z.infer<ReturnType<typeof makeMembroSchema>>;
 function NucleoSection({
   b,
   canManage,
+  canAdd = canManage,
   onChanged,
 }: {
   b: BeneficiarioDettaglioType;
   canManage: boolean;
+  canAdd?: boolean;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
@@ -2484,8 +2622,9 @@ function NucleoSection({
         <CardTitle className="text-base">
           {t("beneficiarioDettaglio.composizione")}
         </CardTitle>
-        {canManage && (
+        {canAdd && (
           <Button
+            type="button"
             size="sm"
             variant="outline"
             className="gap-2"

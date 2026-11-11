@@ -13,6 +13,7 @@ import {
   db,
   pool,
   beneficiariTable,
+  tessereBeneficiariTable,
   areeOperativeTable,
   centriAscoltoTable,
   zoneUdsTable,
@@ -186,6 +187,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (beneficiarioIds.length > 0) {
+    await db
+      .delete(tessereBeneficiariTable)
+      .where(inArray(tessereBeneficiariTable.beneficiarioId, beneficiarioIds));
+  }
   await cleanupEmporioActorFixtures();
   if (beneficiarioIds.length > 0) {
     await db

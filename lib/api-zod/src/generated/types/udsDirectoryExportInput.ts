@@ -7,6 +7,7 @@
  */
 
 export interface UdsDirectoryExportInput {
+  includiInattiviUds?: boolean;
   /**
    * @minLength 2
    * @maxLength 120

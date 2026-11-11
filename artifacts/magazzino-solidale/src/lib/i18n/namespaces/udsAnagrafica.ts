@@ -1,5 +1,9 @@
 export const udsAnagrafica = {
   it: {
+    deactivateUds: "Disattiva in UDS",
+    reactivateUds: "Riattiva in UDS",
+    inactiveUds: "Inattivo in UDS",
+    statusUdsDescription: "La modifica riguarda soltanto il servizio UDS. Gli altri servizi e lo storico restano disponibili.",
     title: "Anagrafica UDS",
     subtitle:
       "Persone seguite dall'Unità di Strada nella tua zona e Area Operativa.",
@@ -94,6 +98,10 @@ export const udsAnagrafica = {
     openInterventi: "Interventi",
   },
   es: {
+    deactivateUds: "Desactivar en UDS",
+    reactivateUds: "Reactivar en UDS",
+    inactiveUds: "Inactivo en UDS",
+    statusUdsDescription: "El cambio solo afecta a UDS. Los demás servicios y el historial siguen disponibles.",
     title: "Registro UDS",
     subtitle: "Personas atendidas por la Unidad de Calle en tu zona y área.",
     newPerson: "Nueva persona",
@@ -186,6 +194,10 @@ export const udsAnagrafica = {
     openInterventi: "Intervenciones",
   },
   en: {
+    deactivateUds: "Deactivate in UDS",
+    reactivateUds: "Reactivate in UDS",
+    inactiveUds: "Inactive in UDS",
+    statusUdsDescription: "This change applies only to UDS. Other services and history remain available.",
     title: "Street Unit Registry",
     subtitle: "People supported by the Street Unit in your zone and area.",
     newPerson: "New person",
@@ -278,6 +290,10 @@ export const udsAnagrafica = {
     openInterventi: "Interventions",
   },
   fr: {
+    deactivateUds: "Désactiver dans UDS",
+    reactivateUds: "Réactiver dans UDS",
+    inactiveUds: "Inactif dans UDS",
+    statusUdsDescription: "La modification concerne uniquement UDS. Les autres services et l’historique restent disponibles.",
     title: "Répertoire UDS",
     subtitle:
       "Personnes suivies par l'Unité de Rue dans votre zone et votre zone opérationnelle.",
@@ -371,6 +387,10 @@ export const udsAnagrafica = {
     openInterventi: "Interventions",
   },
   de: {
+    deactivateUds: "In UDS deaktivieren",
+    reactivateUds: "In UDS reaktivieren",
+    inactiveUds: "In UDS inaktiv",
+    statusUdsDescription: "Die Änderung gilt nur für UDS. Andere Dienste und der Verlauf bleiben verfügbar.",
     title: "UDS-Verzeichnis",
     subtitle:
       "Vom Straßendienst betreute Personen in Ihrer Zone und Ihrem Betriebsbereich.",
@@ -465,6 +485,10 @@ export const udsAnagrafica = {
     openInterventi: "Maßnahmen",
   },
   ar: {
+    deactivateUds: "إلغاء التفعيل في UDS",
+    reactivateUds: "إعادة التفعيل في UDS",
+    inactiveUds: "غير نشط في UDS",
+    statusUdsDescription: "يقتصر التغيير على خدمة UDS. تظل الخدمات الأخرى والسجل متاحين.",
     title: "سجل وحدة الشارع",
     subtitle: "الأشخاص الذين تتابعهم وحدة الشارع في منطقتك وإقليمك.",
     newPerson: "شخص جديد",

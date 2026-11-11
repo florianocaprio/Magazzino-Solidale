@@ -114,6 +114,7 @@ import {
 } from "../lib/m5bRequestAccess";
 import { CurrentCommandActorError } from "../lib/currentCommandActor";
 import { auditContextFromRequest } from "../lib/auditEvent";
+import { emporioValidCardCondition } from "../lib/emporioBeneficiarySearch";
 import {
   canReadSocialSubject,
   socialSubjectPredicate,
@@ -252,6 +253,7 @@ interface InterventoDisplayDetails {
   centroAscoltoId?: number | null;
   centroAscoltoNome?: string | null;
   areaOperativaId?: number | null;
+  areaOperativaNome?: string | null;
   operatoreNome?: string | null;
 }
 
@@ -307,6 +309,12 @@ async function runInterventoCommand<T>(
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtext('m63.intervento.catena'), ${beneficiaryId})`,
         );
+      if (newBeneficiarioId != null) {
+        const [person] = await tx.select().from(beneficiariTable)
+          .where(eq(beneficiariTable.id, newBeneficiarioId)).for("share");
+        if (!person?.attivo || !person.udsAttivo || !canAccessInterventoAmbito("uds", person, req))
+          throw new RouteError(403, "Persona non attiva o non accessibile per un Intervento UDS");
+      }
       return command(tx);
     });
   return db.transaction(async (tx) => {
@@ -890,6 +898,9 @@ function formatIntervento(
         ? (row.areaOperativaIdSnapshot ?? null)
         : (details.areaOperativaId ?? null),
     areaOperativaIdSnapshot: row.areaOperativaIdSnapshot ?? null,
+    ...(row.ambito !== "uds" && details.areaOperativaNome !== undefined
+      ? { areaOperativaNome: details.areaOperativaNome }
+      : {}),
     zonaUdsIdSnapshot: row.zonaUdsIdSnapshot ?? null,
     dataIntervento: row.dataIntervento ?? null,
     tipoIntervento: row.tipoIntervento,
@@ -1788,6 +1799,18 @@ async function beneficiarioAccess(
   return row ?? null;
 }
 
+async function defaultSocialSite(tx: DbTransaction, beneficiarioId: number) {
+  const [area] = await tx
+    .select({ nome: areeOperativeTable.nome })
+    .from(beneficiariTable)
+    .innerJoin(
+      areeOperativeTable,
+      eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+    )
+    .where(eq(beneficiariTable.id, beneficiarioId));
+  return area?.nome ?? null;
+}
+
 function canAccessInterventoAmbito(
   ambito: string | null,
   beneficiario: BeneficiarioAccess,
@@ -2010,6 +2033,7 @@ async function displayDetailsForIntervento(interventoId: number) {
       centroAscoltoId: beneficiariTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
       areaOperativaId: beneficiariTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
       operatoreCodice: sql<
         string | null
       >`coalesce(${utentiTable.matricola}, ${utentiTable.username})`,
@@ -2027,6 +2051,10 @@ async function displayDetailsForIntervento(interventoId: number) {
       centriAscoltoTable,
       eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
     )
+    .leftJoin(
+      areeOperativeTable,
+      eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+    )
     .where(eq(interventiTable.id, interventoId))
     .limit(1);
   if (!row) return null;
@@ -2039,6 +2067,7 @@ async function displayDetailsForIntervento(interventoId: number) {
       centroAscoltoId: row.centroAscoltoId,
       centroAscoltoNome: row.centroAscoltoNome,
       areaOperativaId: row.areaOperativaId,
+      areaOperativaNome: row.areaOperativaNome,
       operatoreNome: row.operatoreNome,
     } satisfies InterventoDisplayDetails,
   };
@@ -3285,6 +3314,70 @@ router.get(
   },
 );
 
+router.post("/interventi/beneficiari/tessera", async (req, res) => {
+  try {
+    await requireServizioInterventoAttivo("sociale");
+    requireSocialInterventoPermission(req, "sociale.interventi.create");
+    const body = req.body as Record<string, unknown> | undefined;
+    const codice = requiredText(body?.codice, "Il codice tessera", 255);
+    const areaId = parsePositiveInteger(body?.areaOperativaId);
+    const centroId = parsePositiveInteger(body?.centroAscoltoId);
+    if (
+      areaId == null ||
+      areaId > 2147483647 ||
+      (hasOwn(body ?? {}, "centroAscoltoId") &&
+        (centroId == null || centroId > 2147483647))
+    ) {
+      throw new RouteError(400, "Area o Centro di Ascolto non valido");
+    }
+    const callerCentro = callerCentroId(req);
+    const [row] = await db
+      .select({
+        id: beneficiariTable.id,
+        nome: beneficiariTable.nome,
+        cognome: beneficiariTable.cognome,
+        codice: beneficiariTable.codice,
+        areaOperativaNome: areeOperativeTable.nome,
+        centroAscoltoNome: centriAscoltoTable.nome,
+      })
+      .from(beneficiariTable)
+      .innerJoin(
+        areeOperativeTable,
+        eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+      )
+      .leftJoin(
+        centriAscoltoTable,
+        eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
+      )
+      .where(
+        and(
+          socialSubjectPredicate(socialActors.get(req)),
+          eq(areeOperativeTable.id, areaId),
+          eq(areeOperativeTable.attivo, true),
+          eq(beneficiariTable.attivo, true),
+          callerCentro == null
+            ? undefined
+            : eq(centriAscoltoTable.id, callerCentro),
+          centroId == null ? undefined : eq(centriAscoltoTable.id, centroId),
+          or(
+            isNull(beneficiariTable.centroAscoltoId),
+            and(
+              eq(centriAscoltoTable.areaOperativaId, areaId),
+              eq(centriAscoltoTable.attivo, true),
+            ),
+          ),
+          emporioValidCardCondition(codice),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new RouteError(404, "Tessera non trovata");
+    res.json(row);
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
 router.post("/interventi", async (req, res) => {
   const body = req.body as Record<string, unknown>;
   let workflow: WorkflowCreateResult;
@@ -3408,11 +3501,19 @@ router.post("/interventi", async (req, res) => {
           ))
         )
           throw new RouteError(403, "Operatore assegnato non più accessibile");
+        const sede =
+          workflow.values.sede ??
+          (workflow.values.ambito === "sociale" &&
+          (workflow.values.stato === "da_pianificare" ||
+            workflow.values.stato === "pianificato")
+            ? await defaultSocialSite(tx, beneficiarioId)
+            : null);
         const [created] = await tx
           .insert(interventiTable)
           .values({
             ...cleanInterventoBody(body),
             ...workflow.values,
+            sede,
             beneficiarioId,
             interventoPrecedenteId,
             operatoreId: assignedOperatorId,
@@ -3919,7 +4020,13 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
           .for("update");
         if (!current) throw new RouteError(404, "Intervento non trovato");
         assertExpectedVersion(body, current);
+        const descriptiveUpdate =
+          current.stato === "concluso" &&
+          Object.keys(body).every((key) =>
+            ["versione", "risultato", "esito", "note"].includes(key),
+          );
         if (
+          !descriptiveUpdate &&
           !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
         ) {
           throw new RouteError(
@@ -3930,7 +4037,8 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
         const effectiveCurrent = hasOwn(body, "materiali")
           ? await snapshotInterventoReportingContext(tx, current, req)
           : current;
-        await replaceOperativita(tx, effectiveCurrent, body, req, now);
+        if (!descriptiveUpdate)
+          await replaceOperativita(tx, effectiveCurrent, body, req, now);
         const updates: Partial<typeof interventiTable.$inferInsert> = {
           dataAggiornamento: now,
         };
@@ -4078,7 +4186,7 @@ router.post("/interventi/:id/concludi", async (req, res) => {
         const esito = hasOwn(body, "esito")
           ? nullableText(body.esito, "L'esito", 4000)
           : current.esito;
-        if (risultato == null && esito == null) {
+        if (current.ambito === "uds" && risultato == null && esito == null) {
           throw new RouteError(
             400,
             "Inserire almeno un risultato o un esito finale",
@@ -4167,6 +4275,9 @@ router.post("/interventi/:id/concludi", async (req, res) => {
             .values({
               ...cleanInterventoBody(successivoInput),
               ...successivoWorkflow.values,
+              sede:
+                successivoWorkflow.values.sede ??
+                (await defaultSocialSite(tx, current.beneficiarioId)),
               beneficiarioId: current.beneficiarioId,
               interventoPrecedenteId: id,
               operatoreId: successivoOperatoreId,
@@ -4788,6 +4899,8 @@ router.post("/interventi/:id/transizioni", async (req, res) => {
               "La transizione a pianificato richiede data e ora pianificate",
             );
           }
+          if (isSocialWorkflow && !current.sede?.trim())
+            updates.sede = await defaultSocialSite(tx, current.beneficiarioId);
         }
         if (target === "da_pianificare") {
           updates.dataOraPianificata = null;
@@ -4948,6 +5061,11 @@ router.post("/interventi/:id/successivi", async (req, res) => {
           .values({
             ...cleanInterventoBody(body),
             ...workflow.values,
+            sede:
+              workflow.values.sede ??
+              (workflow.values.ambito === "sociale"
+                ? await defaultSocialSite(tx, precedente.beneficiarioId)
+                : null),
             beneficiarioId: precedente.beneficiarioId,
             interventoPrecedenteId: precedenteId,
             operatoreId: req.user!.id,
@@ -4970,6 +5088,7 @@ router.post("/interventi/:id/successivi", async (req, res) => {
         });
         return row;
       },
+      precedente.beneficiarioId,
     );
     res.status(201).json(formatIntervento(created, emptySummary()));
   } catch (error) {

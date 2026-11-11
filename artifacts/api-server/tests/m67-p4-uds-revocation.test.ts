@@ -6,6 +6,7 @@ import { httpListeners } from "./helpers/http-listeners";
 import {
   createAreaOperativa,
   createBeneficiario,
+  createCentroRec,
   createZona,
   insertIntervento,
   newScope,
@@ -60,6 +61,45 @@ async function fixture(areas = ["uds", "analisi"]) {
   expect((await agent.post("/api/auth/login").send(user)).status).toBe(200);
   return { f, user, agent, server, person, intervention, zone };
 }
+
+it("disattiva solo l'UDS, preserva lo storico e applica i vincoli alla cancellazione", async () => {
+  const { f, user, agent, person, intervention } = await fixture();
+  await pool.query("update ruoli set permessi=$1 where id=$2", [
+    JSON.stringify(["beneficiari.view", "beneficiari.manage", "uds.directory.view", "uds.interventi.view", "uds.interventi.create"]),
+    user.roleId,
+  ]);
+  const profile = await agent.get(`/api/beneficiari/${person}`);
+  expect(profile.status, profile.text).toBe(200);
+  const version = profile.body.versione;
+  const removalPath = (id: number, v: number) =>
+    `/api/beneficiari/${id}?contesto=uds&permanente=true&versione=${v}`;
+  expect((await agent.delete(removalPath(person, version))).status).toBe(409);
+  const statePath = `/api/uds/directory/${person}/stato`;
+  const disabled = await agent.patch(statePath).send({ attivo: false, versione: version });
+  expect(disabled.status, disabled.text).toBe(204);
+  const current = await agent.get(`/api/beneficiari/${person}`);
+  expect(current.body).toMatchObject({ attivo: true, uds: true, udsAttivo: false });
+  expect((await agent.get("/api/uds/directory")).body.some((row: { id: number }) => row.id === person)).toBe(false);
+  expect((await agent.get("/api/uds/directory?includiInattiviUds=true")).body).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: person, udsAttivo: false })]),
+  );
+  const history = await agent.get(`/api/interventi/pagina?ambito=uds&beneficiarioId=${person}&includiStorici=true`);
+  expect(history.status, history.text).toBe(200);
+  expect(history.body.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: intervention })]));
+  expect((await agent.post("/api/uds/interventi").send({ beneficiarioId: person, tipoIntervento: "ascolto" })).status).toBe(403);
+  expect((await agent.post("/api/interventi").send({ beneficiarioId: person, ambito: "uds", stato: "da_pianificare", tipoIntervento: "ascolto" })).status).toBe(403);
+  expect((await agent.patch(statePath).send({ attivo: true, versione: version })).status).toBe(409);
+  expect((await agent.patch(statePath).send({ attivo: true, versione: current.body.versione })).status).toBe(204);
+
+  const created = await agent.post("/api/beneficiari").send({
+    nome: "Test", cognome: "Eliminazione UDS", sesso: "M", uds: true,
+    areaProvenienza: "UE", fasciaEtaPresunta: "30_64", areaOperativaId: f.area,
+  });
+  expect(created.status, created.text).toBe(201);
+  const deleted = await agent.delete(removalPath(created.body.id, created.body.versione));
+  expect(deleted.status, deleted.text).toBe(204);
+  expect((await agent.get(`/api/beneficiari/${created.body.id}`)).status).toBe(404);
+});
 
 it.each([false, true])(
   "F02 same real session, ordinary mixed=%s: revoke Area, deny dossier/list/intervention/export/report and no mutation",
@@ -178,6 +218,37 @@ it("F02 inactive Area denies ordinary UDS, while explicit administrative global 
     ]);
     expect((await admin.get(`/api/beneficiari/${person}`)).status).toBe(403);
   }
+});
+
+it("emette la tessera insieme all'anagrafica e consente il PDF all'operatore sociale nella sua Area", async () => {
+  const { f, user, agent } = await fixture(["sociale"]);
+  const scope = newScope();
+  const centre = await createCentroRec(scope, { areaOperativaId: f.area });
+  const otherArea = await createAreaOperativa(scope);
+  const foreign = await createBeneficiario(scope, null, { areaOperativaId: otherArea });
+  await pool.query("update ruoli set permessi=$1 where id=$2", [
+    JSON.stringify(["beneficiari.view", "beneficiari.manage"]), user.roleId,
+  ]);
+  await pool.query("update utenti set zona_uds_id=null where id=$1", [user.id]);
+
+  const created = await agent.post("/api/beneficiari").send({
+    nome: "Persona", cognome: "Prova tessera", sesso: "F", centroAscoltoId: centre.id,
+  });
+  expect(created.status, created.text).toBe(201);
+  const id = created.body.id;
+  const beforeDownload = await pool.query(
+    "select codice,stato,created_by from tessere_beneficiari where beneficiario_id=$1", [id],
+  );
+  expect(beforeDownload.rows).toEqual([
+    { codice: expect.stringMatching(/^MS-/), stato: "attiva", created_by: user.id },
+  ]);
+  const endpoint = `/api/beneficiari/${id}/tessera-documento`;
+  const download = await agent.post(endpoint).send({});
+  expect(download.status, download.text).toBe(200);
+  expect(download.body.codice).toBe(beforeDownload.rows[0].codice);
+  expect((await agent.post(endpoint).send({})).body).toEqual(download.body);
+  expect((await agent.post(`/api/beneficiari/${foreign}/tessera-documento`).send({})).status).toBe(403);
+  expect((await agent.post(`/api/beneficiari/${id}/tessere`).send({})).status).toBe(403);
 });
 
 it("BUG21: stati UDS minimi e prima tessera concorrente, senza concessione di gestione Mensa/tessere", async () => {

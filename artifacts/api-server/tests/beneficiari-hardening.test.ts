@@ -5,12 +5,15 @@ import { and, eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
+  bolleTable,
+  tessereBeneficiariTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
   interventiTable,
   magazziniTable,
   nucleoFamiliareTable,
+  ruoliTable,
   utentiTable,
   zoneUdsTable,
 } from "@workspace/db";
@@ -154,6 +157,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (interventionIds.length) await db.delete(interventiTable).where(inArray(interventiTable.id, interventionIds));
   if (beneficiaryIds.length) {
+    await db.delete(tessereBeneficiariTable).where(inArray(tessereBeneficiariTable.beneficiarioId, beneficiaryIds));
     await db.delete(nucleoFamiliareTable).where(inArray(nucleoFamiliareTable.beneficiarioId, beneficiaryIds));
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiaryIds));
   }
@@ -166,6 +170,72 @@ afterAll(async () => {
 });
 
 describe("hardening Beneficiari: RBAC, DTO e scope", () => {
+  it("elimina soltanto anagrafiche senza storico operativo, compresa la tessera iniziale", async () => {
+    const [role] = await db.insert(ruoliTable).values({
+      nome: `R5-sociale-${suffix}`, aree: ["sociale"], permessi: SOCIAL_PERMISSIONS,
+    }).returning();
+    await db.update(utentiTable).set({ ruoloId: role.id, areaOperativaId: areaA }).where(eq(utentiTable.id, auditUserId));
+    const api = request(socialAreaA());
+    const path = (person: { id: number; versione: number }) =>
+      `/beneficiari/${person.id}?permanente=true&versione=${person.versione}`;
+    try {
+      const created = await api.post("/beneficiari").send({
+        nome: "R5", cognome: `Senza storico ${suffix}`, sesso: "M", centroAscoltoId: centerA,
+      });
+      expect(created.status, created.text).toBe(201);
+      const person = created.body as { id: number; versione: number };
+      beneficiaryIds.push(person.id);
+      expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(1);
+      expect((await api.delete(path({ ...person, versione: person.versione + 1 }))).status).toBe(409);
+      const removed = await api.delete(path(person));
+      expect(removed.status, removed.text).toBe(204);
+      expect((await api.get(`/beneficiari/${person.id}`)).status).toBe(404);
+      expect((await api.delete(path(person))).status).toBe(204);
+      expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(0);
+      expect(await db.select().from(auditConfigurazioniTable).where(and(
+        eq(auditConfigurazioniTable.chiave, `beneficiario:${person.id}`),
+        eq(auditConfigurazioniTable.azione, "eliminazione"),
+      ))).toHaveLength(1);
+
+      const withBolla = await insertBeneficiary({ centroAscoltoId: centerA });
+      const withIntervento = await insertBeneficiary({ centroAscoltoId: centerA });
+      const outside = await insertBeneficiary({ areaOperativaId: areaB, centroAscoltoId: centerB });
+      const bolla = {
+        numeroBolla: `R5-${suffix}`, dataBolla: "2026-11-01", magazzinoId: emporioA,
+      };
+      await expect(db.insert(bolleTable).values({ ...bolla, beneficiarioId: person.id })).rejects.toThrow();
+      const [document] = await db.insert(bolleTable).values({ ...bolla, beneficiarioId: withBolla.id }).returning();
+      try {
+        const [intervention] = await db.insert(interventiTable).values({
+          beneficiarioId: withIntervento.id, tipoIntervento: "colloquio", ambito: "sociale", stato: "da_pianificare",
+        }).returning();
+        interventionIds.push(intervention.id);
+        for (const linked of [withBolla, withIntervento]) {
+          const denied = await api.delete(path(linked));
+          expect(denied.status, denied.text).toBe(409);
+          expect(denied.body.error).toContain("dati associati");
+          const [unchanged] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, linked.id));
+          expect(unchanged.attivo).toBe(true);
+        }
+        expect((await api.delete(path(outside))).status).toBe(403);
+        const deactivateOnly = request(makeApp({
+          areaOperativaId: areaA, centroAscoltoId: null, zonaUdsId: null,
+          aree: ["sociale"], permessi: ["beneficiari.deactivate"],
+        }));
+        expect((await deactivateOnly.delete(path(withBolla))).status).toBe(403);
+        expect((await deactivateOnly.delete(`/beneficiari/${withBolla.id}`)).status).toBe(204);
+        const [inactive] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, withBolla.id));
+        expect(inactive.attivo).toBe(false);
+        expect(await db.select().from(bolleTable).where(eq(bolleTable.id, document.id))).toHaveLength(1);
+      } finally {
+        await db.delete(bolleTable).where(eq(bolleTable.id, document.id));
+      }
+    } finally {
+      await db.update(utentiTable).set({ ruoloId: null, areaOperativaId: null }).where(eq(utentiTable.id, auditUserId));
+      await db.delete(ruoliTable).where(eq(ruoliTable.id, role.id));
+    }
+  });
+
   it("nega lettura e mutazione senza permessi granulari", async () => {
     const app = makeApp({ areaOperativaId: areaA, centroAscoltoId: null, zonaUdsId: null, aree: ["sociale"], permessi: [] });
     expect((await request(app).get("/beneficiari")).status).toBe(403);

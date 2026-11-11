@@ -133,8 +133,7 @@ export function TesseraDocumentoSection({
   const submitting = useRef(false);
   const canDownload =
     hasPermission("beneficiari.cards.manage") ||
-    (udsContext &&
-      hasArea("uds") &&
+    ((hasArea("sociale") || (udsContext && b.uds && hasArea("uds"))) &&
       hasPermission("beneficiari.view") &&
       hasPermission("beneficiari.manage"));
   useEffect(() => {

@@ -3,6 +3,7 @@ import { assertViewportSafe, login, selectOption } from "./helpers";
 
 type UdsIntervento = {
   id: number;
+  beneficiarioId: number;
   descrizione: string | null;
   dataAggiornamento: string;
 };
@@ -13,6 +14,7 @@ async function runUdsLifecycle(
   auditTablet = false,
 ) {
   await login(page);
+  await expect(page).toHaveURL((url) => url.pathname === "/");
   const suffix = Date.now();
   const initialDescription = `Incontro UDS E2E ${suffix}`;
   const rectifiedDescription = `${initialDescription} rettificato`;
@@ -44,6 +46,7 @@ async function runUdsLifecycle(
 
   await page.getByRole("button", { name: /nuovo intervento/i }).click();
   const identify = page.getByRole("dialog", { name: /identifica la persona/i });
+  await expect(identify.getByLabel("Soprannome", { exact: true })).toBeVisible();
   await identify
     .getByLabel("Cerca una persona già presente", { exact: true })
     .fill("DEMO-BEN-001");
@@ -96,6 +99,11 @@ async function runUdsLifecycle(
   await rectification
     .getByRole("textbox", { name: /sintesi dell'incontro/i })
     .fill(rectifiedDescription);
+  await rectification.getByRole("button", { name: /Demo 001/i }).click();
+  const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await expect(editPerson.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue("Beneficiario");
+  await editPerson.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(rectification.getByRole("textbox", { name: /sintesi dell'incontro/i })).toHaveValue(rectifiedDescription);
   await rectification
     .getByRole("textbox", { name: /motivo della rettifica/i })
     .fill("Correzione verificata dal test E2E");
@@ -149,6 +157,14 @@ async function runUdsLifecycle(
       }),
     ]),
   );
+  await page.goto(`/uds/anagrafica/${created.beneficiarioId}`);
+  const historyLink = page.getByRole("link", { name: /vedi tutti gli interventi uds/i });
+  await expect(historyLink).toHaveClass(/\bbg-primary\b/);
+  await expect(page.getByRole("button", { name: /disattiva in uds/i })).toHaveClass(/\bbg-primary\b/);
+  await expect(page.getByRole("button", { name: /elimina definitivamente/i })).toHaveClass(/\btext-destructive-foreground\b/);
+  await historyLink.click();
+  await expect(page).toHaveURL(new RegExp(`/uds/interventi\\?beneficiarioId=${created.beneficiarioId}$`));
+  await expect(row).toContainText(rectifiedDescription);
 }
 
 test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una versione obsoleta", async ({
@@ -169,6 +185,48 @@ test("tablet 820: crea e rettifica un intervento UDS dalla card", async ({
     "Lifecycle UDS dedicato al tablet 820",
   );
   await runUdsLifecycle(page, "uds-interventi-mobile", true);
+});
+
+test("la rettifica aperta mostra il nome salvato in anagrafica e conserva la bozza", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Anagrafica sintetica creata una volta");
+  await login(page);
+  const areas = await (await page.request.get("/api/aree-operative")).json();
+  const area = areas.find((item: { nome: string }) => item.nome === "Area Demo");
+  const created = await page.request.post("/api/beneficiari", {
+    data: {
+      nome: "Nome iniziale",
+      cognome: `Rettifica${Date.now()}`,
+      sesso: "M",
+      fasciaEtaPresunta: "30_64",
+      areaProvenienza: "UE",
+      uds: true,
+      statoAnagrafica: "provvisoria",
+      areaOperativaId: area.id,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const intervention = await page.request.post("/api/uds/interventi", {
+    data: { beneficiarioId: person.id, tipoIntervento: "ascolto" },
+  });
+  expect(intervention.status(), await intervention.text()).toBe(201);
+
+  await page.goto(`/uds/interventi?beneficiarioId=${person.id}`);
+  const list = page.getByTestId("uds-interventi-desktop");
+  await list.getByRole("button", { name: /rettifica/i }).click();
+  const rectification = page.getByRole("dialog", { name: /rettifica intervento/i });
+  const draft = rectification.getByRole("textbox", { name: /sintesi dell'incontro/i });
+  await draft.fill("Bozza della rettifica");
+  await rectification.getByRole("button", { name: /nome iniziale/i }).click();
+
+  const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await editPerson.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  const savePerson = editPerson.getByRole("button", { name: /^salva$/i })
+    .and(editPerson.locator('button[type="submit"]'));
+  await savePerson.click();
+  await expect(editPerson).toBeHidden();
+  await expect(rectification.getByRole("button", { name: /nome aggiornato/i })).toBeVisible();
+  await expect(draft).toHaveValue("Bozza della rettifica");
 });
 
 test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno filtrato", async ({ page }, info) => {
@@ -300,6 +358,8 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
     } });
     expect(created.status()).toBe(201);
     const person = await created.json();
+    const initialCards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+    expect(initialCards).toHaveLength(1);
     let creates = 0;
     page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/api/beneficiari") creates++; });
     await page.goto("/uds/anagrafica");
@@ -344,7 +404,7 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
     if (scenario === "età mancante") expect(final.fasciaEtaPresunta).toBe("30_64");
     expect(creates).toBe(0);
     expect(await (await page.request.get(`/api/beneficiari?areaOperativaId=${area.id}`)).json()).toHaveLength(1);
-    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual([]);
+    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual(initialCards);
     expect(await (await page.request.get(`/api/credito-solidale/beneficiari/${person.id}/movimenti`)).json()).toEqual([]);
   });
 }

@@ -1,12 +1,14 @@
-import type {
-  InterventoInput,
-  InterventoOperatore,
+import {
+  cercaBeneficiarioInterventoPerTessera,
+  type InterventoInput,
+  type InterventoOperatore,
 } from "@workspace/api-client-react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import {
   BeneficiarioCombobox,
   type BeneficiarioOption,
@@ -37,7 +39,10 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { dateTimeEuropeRomeToIso, todayEuropeRome } from "@/lib/europe-rome";
-import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
 
 export type InterventoSocialeCreateMode =
   | "da_pianificare"
@@ -50,13 +55,22 @@ interface TipoOption {
   attivo: boolean;
 }
 
+type BeneficiarioIntervento = BeneficiarioOption & {
+  areaOperativaNome?: string | null;
+  centroAscoltoNome?: string | null;
+};
+
 interface Props {
   open: boolean;
   mode: InterventoSocialeCreateMode;
-  beneficiari: BeneficiarioOption[];
+  beneficiari: BeneficiarioIntervento[];
+  areaOperativaId?: number;
+  centri: { id: number; nome: string }[];
+  centroId?: number;
+  centroBloccato?: boolean;
+  onCentroChange: (id: number | undefined) => void;
   tipi: TipoOption[];
   operatori: InterventoOperatore[];
-  currentOperatorId?: number;
   beneficiarySearch: string;
   isPending?: boolean;
   onBeneficiarySearch: (value: string) => void;
@@ -77,7 +91,7 @@ function makeSchema(
       oraPianificata: z.string(),
       dataIntervento: z.string(),
       sede: z.string().trim().max(255),
-      operatoreId: z.string().regex(/^\d+$/, t("common.requiredField")),
+      operatoreId: z.string().regex(/^\d*$/),
       descrizione: z.string().trim().max(4000),
       esito: z.string().trim().max(4000),
       note: z.string().trim().max(2000),
@@ -130,9 +144,13 @@ export function InterventoSocialeFormSheet({
   open,
   mode,
   beneficiari,
+  areaOperativaId,
+  centri,
+  centroId,
+  centroBloccato,
+  onCentroChange,
   tipi,
   operatori,
-  currentOperatorId,
   beneficiarySearch,
   isPending = false,
   onBeneficiarySearch,
@@ -153,7 +171,7 @@ export function InterventoSocialeFormSheet({
       oraPianificata: "09:00",
       dataIntervento: todayEuropeRome(),
       sede: "",
-      operatoreId: currentOperatorId ? String(currentOperatorId) : "",
+      operatoreId: "",
       descrizione: "",
       esito: "",
       note: "",
@@ -161,6 +179,65 @@ export function InterventoSocialeFormSheet({
   });
   const { reset } = form;
   const wasOpen = useRef(false);
+  const centerInputId = useId();
+  const cardInputId = useId();
+  const [selected, setSelected] = useState<BeneficiarioIntervento>();
+  const [cardCode, setCardCode] = useState("");
+  const [cardPending, setCardPending] = useState(false);
+  const [cardError, setCardError] = useState(false);
+  const cardRequest = useRef<AbortController | null>(null);
+  const siteOptions = [
+    ...new Set(
+      [selected?.areaOperativaNome, selected?.centroAscoltoNome].filter(
+        (name): name is string => Boolean(name),
+      ),
+    ),
+  ];
+  const resetCardLookup = () => {
+    cardRequest.current?.abort();
+    setCardCode("");
+    setCardError(false);
+    setCardPending(false);
+  };
+  const chooseBeneficiary = (
+    beneficiary: BeneficiarioIntervento | undefined,
+  ) => {
+    setSelected(beneficiary);
+    form.setValue("beneficiarioId", beneficiary ? String(beneficiary.id) : "", {
+      shouldDirty: true,
+      shouldValidate: form.formState.isSubmitted,
+    });
+    if (mode !== "gia_effettuato")
+      form.setValue(
+        "sede",
+        beneficiary?.areaOperativaNome ?? beneficiary?.centroAscoltoNome ?? "",
+      );
+  };
+  const lookupCard = async (rawCode: string) => {
+    const codice = rawCode.trim();
+    if (!codice || !areaOperativaId) return;
+    cardRequest.current?.abort();
+    chooseBeneficiary(undefined);
+    const request = new AbortController();
+    cardRequest.current = request;
+    setCardPending(true);
+    setCardError(false);
+    try {
+      const beneficiary = await cercaBeneficiarioInterventoPerTessera(
+        { codice, areaOperativaId, centroAscoltoId: centroId },
+        { signal: request.signal },
+      );
+      if (!request.signal.aborted) {
+        chooseBeneficiary(beneficiary);
+        setCardCode("");
+      }
+    } catch {
+      if (!request.signal.aborted) setCardError(true);
+    } finally {
+      if (!request.signal.aborted) setCardPending(false);
+    }
+  };
+  useEffect(() => () => cardRequest.current?.abort(), [open]);
   const unsavedGuard = useUnsavedChangesGuard(open && form.formState.isDirty);
   const requestOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
@@ -174,6 +251,8 @@ export function InterventoSocialeFormSheet({
     const isOpening = open && !wasOpen.current;
     wasOpen.current = open;
     if (!isOpening) return;
+    setSelected(undefined);
+    resetCardLookup();
     reset({
       beneficiarioId: "",
       tipoIntervento: defaultTipo,
@@ -182,18 +261,20 @@ export function InterventoSocialeFormSheet({
       oraPianificata: "09:00",
       dataIntervento: todayEuropeRome(),
       sede: "",
-      operatoreId: currentOperatorId ? String(currentOperatorId) : "",
+      operatoreId: "",
       descrizione: "",
       esito: "",
       note: "",
     });
-  }, [currentOperatorId, defaultTipo, mode, open, reset]);
+  }, [defaultTipo, mode, open, reset]);
 
   const submit = (values: FormValues) => {
     const common: InterventoInput = {
       beneficiarioId: Number(values.beneficiarioId),
       tipoIntervento: values.tipoIntervento,
-      operatoreId: Number(values.operatoreId),
+      ...(values.operatoreId
+        ? { operatoreId: Number(values.operatoreId) }
+        : {}),
       ambito: "sociale",
       priorita: values.priorita,
       sede: values.sede || null,
@@ -235,6 +316,37 @@ export function InterventoSocialeFormSheet({
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <label htmlFor={centerInputId} className="text-sm font-medium">
+                {t("beneficiari.centroAscolto")}
+              </label>
+              <Select
+                value={centroId == null ? "all" : String(centroId)}
+                disabled={centroBloccato || isPending}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  chooseBeneficiary(undefined);
+                  resetCardLookup();
+                  onCentroChange(value === "all" ? undefined : Number(value));
+                }}
+              >
+                <SelectTrigger id={centerInputId}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {!centroBloccato && (
+                    <SelectItem value="all">
+                      {t("beneficiari.allCentri")}
+                    </SelectItem>
+                  )}
+                  {centri.map((centro) => (
+                    <SelectItem key={centro.id} value={String(centro.id)}>
+                      {centro.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <FormField
               control={form.control}
               name="beneficiarioId"
@@ -245,8 +357,19 @@ export function InterventoSocialeFormSheet({
                     <BeneficiarioCombobox
                       items={beneficiari}
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(id) => {
+                        resetCardLookup();
+                        chooseBeneficiary(
+                          beneficiari.find((item) => String(item.id) === id),
+                        );
+                      }}
                       ariaLabel={t("interventi.beneficiario")}
+                      filterLocally={false}
+                      selectedLabelFallback={
+                        selected
+                          ? `${selected.cognome} ${selected.nome}`
+                          : undefined
+                      }
                       searchValue={beneficiarySearch}
                       onSearchChange={onBeneficiarySearch}
                     />
@@ -255,6 +378,54 @@ export function InterventoSocialeFormSheet({
                 </FormItem>
               )}
             />
+            <div className="space-y-2">
+              <label htmlFor={cardInputId} className="text-sm font-medium">
+                {t("interventi.form.cardCode")}
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id={cardInputId}
+                  autoComplete="off"
+                  maxLength={255}
+                  value={cardCode}
+                  onChange={(event) => {
+                    setCardCode(event.target.value);
+                    setCardError(false);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    if (!cardPending) void lookupCard(cardCode);
+                  }}
+                  disabled={!areaOperativaId || isPending || cardPending}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    !areaOperativaId ||
+                    !cardCode.trim() ||
+                    isPending ||
+                    cardPending
+                  }
+                  onClick={() => void lookupCard(cardCode)}
+                >
+                  {t("interventi.form.findCard")}
+                </Button>
+                {areaOperativaId && (
+                  <BarcodeScannerButton
+                    key={centroId ?? "all"}
+                    disabled={isPending || cardPending}
+                    onScan={(code) => void lookupCard(code)}
+                  />
+                )}
+              </div>
+              {cardError && (
+                <p role="status" className="text-sm text-destructive">
+                  {t("interventi.form.cardLookupFailed")}
+                </p>
+              )}
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
@@ -364,9 +535,32 @@ export function InterventoSocialeFormSheet({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("interventi.detail.site")}</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    {mode === "gia_effettuato" ? (
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                    ) : (
+                      <Select
+                        value={field.value || siteOptions[0] || ""}
+                        onValueChange={(value) => {
+                          if (value) field.onChange(value);
+                        }}
+                        disabled={siteOptions.length === 0}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("common.select")} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {siteOptions.map((site) => (
+                            <SelectItem key={site} value={site}>
+                              {site}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -379,13 +573,21 @@ export function InterventoSocialeFormSheet({
                     <FormLabel>
                       {t("interventi.form.assignedOperator")}
                     </FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value || "automatic"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "automatic" ? "" : value)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="automatic">
+                          {t("interventi.form.currentOperator")}
+                        </SelectItem>
                         {operatori.map((operatore) => (
                           <SelectItem
                             key={operatore.id}
@@ -452,7 +654,7 @@ export function InterventoSocialeFormSheet({
               >
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || cardPending}>
                 {isPending ? t("common.loading") : t("common.save")}
               </Button>
             </div>

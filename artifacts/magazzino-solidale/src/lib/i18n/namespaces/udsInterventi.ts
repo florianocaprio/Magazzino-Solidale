@@ -1,5 +1,7 @@
 export const udsInterventi = {
   it: {
+    personHistory: "Vedi tutti gli interventi UDS",
+    allDates: "Tutte le date",
     clearPerson: "Azzera persona",
     needType: "Tipo bisogno",
     request: "Richiesta",
@@ -122,6 +124,8 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Prossima: {{date}}",
   },
   es: {
+    personHistory: "Ver todas las intervenciones UDS",
+    allDates: "Todas las fechas",
     clearPerson: "Quitar persona",
     needType: "Tipo de necesidad",
     request: "Solicitud",
@@ -244,6 +248,8 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Próxima: {{date}}",
   },
   en: {
+    personHistory: "View all UDS interventions",
+    allDates: "All dates",
     clearPerson: "Clear person",
     needType: "Need type",
     request: "Request",
@@ -362,6 +368,8 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Next: {{date}}",
   },
   fr: {
+    personHistory: "Voir toutes les interventions UDS",
+    allDates: "Toutes les dates",
     clearPerson: "Effacer la personne",
     needType: "Type de besoin",
     request: "Demande",
@@ -482,6 +490,8 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Prochaine : {{date}}",
   },
   de: {
+    personHistory: "Alle UDS-Einsätze anzeigen",
+    allDates: "Alle Daten",
     clearPerson: "Person zurücksetzen",
     needType: "Bedarfsart",
     request: "Anfrage",
@@ -601,6 +611,8 @@ export const udsInterventi = {
     bisogniProssimaScadenza: "Nächste: {{date}}",
   },
   ar: {
+    personHistory: "عرض جميع تدخلات UDS",
+    allDates: "جميع التواريخ",
     clearPerson: "مسح الشخص",
     needType: "نوع الاحتياج",
     request: "طلب",

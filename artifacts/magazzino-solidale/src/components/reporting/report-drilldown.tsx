@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatLogisticsQuantity } from "@/lib/reporting-number";
 
 export function ReportDrilldown({
   open,
@@ -19,7 +20,7 @@ export function ReportDrilldown({
   onOpenChange: (open: boolean) => void;
   params: Omit<GetReportDrilldownParams, "page" | "pageSize"> | null;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [page, setPage] = useState(1);
   const queryParams = { ...(params ?? { section: "pacchi" as const, metric: "" }), page, pageSize: 25 };
   const query = useGetReportDrilldown(queryParams, {
@@ -48,7 +49,19 @@ export function ReportDrilldown({
                 <TableBody>
                   {query.data?.rows.map((row, index) => (
                     <TableRow key={String(row.id ?? index)}>
-                      {query.data?.columns.map((column) => <TableCell key={column}>{row[column] == null ? "—" : String(row[column])}</TableCell>)}
+                      {query.data?.columns.map((column) => (
+                        <TableCell key={column}>
+                          {(params?.section === "magazzino-logistica" &&
+                          column === "quantita"
+                            ? formatLogisticsQuantity(
+                                row[column],
+                                row.unita,
+                                i18n.resolvedLanguage,
+                              )
+                            : undefined) ??
+                            (row[column] == null ? "—" : String(row[column]))}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>

@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, Power, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
@@ -37,9 +37,7 @@ import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
-import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey, useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
-import { EmporioStatusBadge } from "@/components/beneficiario-emporio-card";
-import { emporioReadableData, useEmporioSecurity } from "@/hooks/use-emporio-security";
+import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey } from "@workspace/api-client-react";
 import { createBeneficiarioWithOptionalServices, type BeneficiarioServicesResult } from "@/lib/beneficiario-mensa-workflow";
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
@@ -163,8 +161,6 @@ export default function Beneficiari() {
   const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey() } });
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
-  const canViewEmporio = emporioAbilitato && hasPermission("beneficiari.view");
-  const emporioSecurity = useEmporioSecurity();
   const canManageEmporio = emporioAbilitato && isModuloAttivo("EMPORIO_SOLIDALE") && hasPermission("emporio.eligibility.manage") && hasPermission("credito.quota.manage") && (user?.isAdmin || hasArea("sociale"));
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
   const canManage = hasPermission("beneficiari.manage");
@@ -174,14 +170,6 @@ export default function Beneficiari() {
   const canExportFse = hasPermission("beneficiari.fse.export");
   const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
   const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
-  const emporioSummaryParams = { beneficiarioIds: beneficiarioIds.join(",") };
-  const emporioSummary = useGetEmporioAbilitazioniRiepilogoBeneficiari(emporioSummaryParams, {
-    query: {
-      ...emporioSecurity.readOptions(getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey(emporioSummaryParams)),
-      enabled: canViewEmporio && beneficiarioIds.length > 0,
-    },
-  });
-  const emporioSummaryByBeneficiario = new Map((emporioReadableData(emporioSummary) ?? []).map((item) => [item.beneficiarioId, item.stato]));
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
     query: {
       queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(mensaSummaryParams),
@@ -205,7 +193,7 @@ export default function Beneficiari() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [removal, setRemoval] = useState<{ beneficiary: BeneficiarioDirectory; permanent: boolean } | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [schedaId, setSchedaId] = useState<number | null>(null);
 
@@ -399,7 +387,6 @@ export default function Beneficiari() {
       setPostCreate(result);
       await queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(result.beneficiario.id) });
       await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioneQueryKey(result.beneficiario.id) });
-      await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey() });
       await queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
       if (shouldEnableMensa) {
         await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
@@ -650,7 +637,6 @@ export default function Beneficiari() {
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
                 {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
-                {canViewEmporio && <TableHead className="text-center">{t("emporioServizio.colonna")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -664,14 +650,13 @@ export default function Beneficiari() {
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
-                    {canViewEmporio && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0) + (canViewEmporio ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -706,11 +691,6 @@ export default function Beneficiari() {
                       )}
                     </TableCell>
                   )}
-                  {canViewEmporio && (
-                    <TableCell className="text-center">
-                      {emporioSummary.isLoading ? <Skeleton className="h-6 w-24 mx-auto rounded-full" /> : emporioSummary.isError || !emporioSummaryByBeneficiario.has(b.id) ? <span className="text-muted-foreground">-</span> : <EmporioStatusBadge state={emporioSummaryByBeneficiario.get(b.id)!} />}
-                    </TableCell>
-                  )}
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center">
                       <Switch
@@ -735,7 +715,16 @@ export default function Beneficiari() {
                         </DropdownMenuItem>}
                         {canManage && <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>}
                         {canExport && <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>}
-                        {canDeactivate && <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>}
+                        {canDeactivate && b.attivo && (
+                          <DropdownMenuItem disabled={deleteBeneficiario.isPending} onClick={() => setRemoval({ beneficiary: b, permanent: false })}>
+                            <Power className="mr-2 h-4 w-4" /> {t("beneficiari.disattiva")}
+                          </DropdownMenuItem>
+                        )}
+                        {canManage && canDeactivate && (
+                          <DropdownMenuItem className="text-destructive" disabled={deleteBeneficiario.isPending} onClick={() => setRemoval({ beneficiary: b, permanent: true })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("beneficiari.deletePermanent")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1033,24 +1022,42 @@ export default function Beneficiari() {
       {editingId != null && <QuickEditBeneficiario id={editingId} onClose={() => setEditingId(null)} />}
       {schedaId != null && <SchedaExportDialog id={schedaId} onClose={() => setSchedaId(null)} />}
 
-      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+      <AlertDialog open={removal != null} onOpenChange={(open) => {
+        if (!open && !deleteBeneficiario.isPending) setRemoval(null);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disattiva Beneficiario</AlertDialogTitle>
-            <AlertDialogDescription>Il Beneficiario non potrà generare nuove attività operative. Lo storico resta preservato e potrà essere riattivato.</AlertDialogDescription>
+            <AlertDialogTitle>{removal?.permanent ? t("beneficiari.deleteTitle") : t("beneficiari.disattiva")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{removal?.beneficiary.cognome} {removal?.beneficiary.nome}</strong>{" "}
+              {t(removal?.permanent ? "beneficiari.deletePermanentDescription" : "beneficiari.deactivateDescription")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (deletingId) {
-                deleteBeneficiario.mutate({ id: deletingId }, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-                    setDeletingId(null);
-                  }
-                });
-              }
-            }} className="bg-destructive text-destructive-foreground">Disattiva</AlertDialogAction>
+            <AlertDialogCancel disabled={deleteBeneficiario.isPending}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction disabled={deleteBeneficiario.isPending} onClick={(event) => {
+              event.preventDefault();
+              if (!removal || deleteBeneficiario.isPending) return;
+              const { beneficiary, permanent } = removal;
+              deleteBeneficiario.mutate({
+                id: beneficiary.id,
+                ...(permanent ? { params: { permanente: true, versione: beneficiary.versione } } : {}),
+              }, {
+                onSuccess: () => {
+                  void queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+                  void queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(beneficiary.id) });
+                  toast({ title: t(permanent ? "beneficiari.toastDeleted" : "beneficiari.toastDisattivato") });
+                  setRemoval(null);
+                },
+                onError: (error) => {
+                  toast({ title: apiErrorMessage(error, t("beneficiari.removalError")), variant: "destructive" });
+                  void queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+                  setRemoval(null);
+                },
+              });
+            }} className="bg-destructive text-destructive-foreground">
+              {t(removal?.permanent ? "beneficiari.deletePermanent" : "beneficiari.disattiva")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

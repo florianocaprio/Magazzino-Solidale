@@ -225,6 +225,7 @@ export function UdsPersonaSheet({
   const { t } = useTranslation();
   const { user } = useAuth();
   const canManage = !selectionMode || Boolean(user?.isAdmin || user?.isSuperAdmin || user?.permessi?.includes("beneficiari.manage"));
+  const canViewDirectory = Boolean(user?.isAdmin || user?.permessi?.includes("uds.directory.view"));
   const canViewSensitive = Boolean(
     user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"),
   );
@@ -391,7 +392,7 @@ export function UdsPersonaSheet({
       query: {
         queryKey: getListUdsDirectoryQueryKey(directoryParams),
         enabled:
-          open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+          canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
       },
     });
   const linkCandidateParams = {
@@ -406,7 +407,7 @@ export function UdsPersonaSheet({
     query: {
       queryKey: getListUdsLinkCandidatesQueryKey(linkCandidateParams),
       enabled:
-        canManage && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+        canManage && canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
     },
   });
   const lookupFailed = selectionMode && (directoryError || (canManage && linkCandidatesError));
@@ -431,7 +432,7 @@ export function UdsPersonaSheet({
     {
       query: {
         queryKey: ["zoneUds", "personaForm", formAreaOperativa],
-        enabled: formAreaOperativa != null,
+        enabled: canViewDirectory && open && formAreaOperativa != null,
       },
     },
   );
@@ -962,6 +963,21 @@ export function UdsPersonaSheet({
 
                 <FormField
                   control={form.control}
+                  name="soprannome"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t("udsAnagrafica.fSoprannome")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="areaProvenienza"
                   render={({ field }) => (
                     <FormItem>
@@ -1100,20 +1116,6 @@ export function UdsPersonaSheet({
                     {t("udsAnagrafica.optionalDataHint")}
                   </p>
                   <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="soprannome"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            {t("udsAnagrafica.fSoprannome")}
-                          </FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
                 <FormField
                   control={form.control}
                   name="telefono"

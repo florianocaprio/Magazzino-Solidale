@@ -358,6 +358,11 @@ function AuthorizedHome() {
   const { user, hasArea, hasPermission } = useAuth();
   const flags = useConfigurazioneAmbienteFlags();
   if (flags.isLoading) return <Loader2 className="m-auto h-6 w-6 animate-spin" />;
+  if (
+    user?.ruoloNome === "Operatore UDS" && hasArea("uds") &&
+    hasPermission("uds.interventi.view") && flags.isModuloAttivo("UDS")
+  )
+    return <Redirect to="/uds/interventi" replace />;
   if (hasArea("generale") && flags.isModuloAttivo("REPORT")) return <Dashboard />;
   const destination = NAV_ITEMS.find((item) => item.url !== "/" && !item.public &&
     (!item.globalAdmin || canManageGlobalAdminResources(user)) &&

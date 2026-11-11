@@ -53,6 +53,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleSaldo: decimal("credito_solidale_saldo", { precision: 10, scale: 2 }).notNull().default("0"),
   creditoSolidaleDataUltimoMovimento: timestamp("credito_solidale_data_ultimo_movimento"),
   uds: boolean("uds").notNull().default(false),
+  udsAttivo: boolean("uds_attivo").notNull().default(true),
   areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
   attivo: boolean("attivo").notNull().default(true),
@@ -86,7 +87,13 @@ export const nucleoFamiliareTable = pgTable("nucleo_familiare", {
   numeroScarpe: varchar("numero_scarpe", { length: 10 }),
   esigenzeParticolari: text("esigenze_particolari"),
   note: text("note"),
-});
+}, (table) => [
+  foreignKey({
+    name: "nucleo_familiare_beneficiario_fk",
+    columns: [table.beneficiarioId],
+    foreignColumns: [beneficiariTable.id],
+  }).onDelete("restrict"),
+]);
 
 export const insertBeneficiarioSchema = createInsertSchema(beneficiariTable).omit({ id: true, dataCreazione: true, dataAggiornamento: true });
 export type InsertBeneficiario = z.infer<typeof insertBeneficiarioSchema>;

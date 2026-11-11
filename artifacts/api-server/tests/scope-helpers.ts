@@ -9,6 +9,7 @@ import {
   centriAscoltoTable,
   magazziniTable,
   beneficiariTable,
+  tessereBeneficiariTable,
   prodottiTable,
   lottiProduttoreTable,
   fornitoriTable,
@@ -1106,6 +1107,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
   }
   if (scope.beneficiarioIds.length > 0) {
+    await db
+      .delete(tessereBeneficiariTable)
+      .where(inArray(tessereBeneficiariTable.beneficiarioId, scope.beneficiarioIds));
     await db
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, scope.beneficiarioIds));

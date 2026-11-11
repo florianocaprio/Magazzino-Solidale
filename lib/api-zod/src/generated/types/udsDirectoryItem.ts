@@ -25,4 +25,5 @@ export interface UdsDirectoryItem {
   zonaUdsNome: string | null;
   canale: UdsDirectoryItemCanale;
   accessoCompleto: boolean;
+  udsAttivo?: boolean;
 }

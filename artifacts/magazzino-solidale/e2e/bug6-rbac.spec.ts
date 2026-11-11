@@ -70,7 +70,7 @@ const profiles = [
   {
     name: "BUG6 multi",
     routes: ["/turni", "/uds/report-giornaliero"],
-    grants: ["logistica.turni.view", "uds.reports.view"],
+    grants: ["logistica.turni.view", "uds.reports.view", "uds.interventi.view"],
     areas: ["logistica", "uds"],
   },
   {
@@ -94,7 +94,7 @@ const expectedHome: Record<string, string> = {
   Operatore: "/",
   "Operatore Magazzino": "/prodotti",
   "Operatore Logistica": "/turni",
-  "Operatore UDS": "/uds/anagrafica",
+  "Operatore UDS": "/uds/interventi",
   Emporio: "/emporio/cassa",
   "Operatore Mensa": "/mensa/postazione",
   Volontario: "/consegne",
@@ -361,6 +361,16 @@ for (const profile of profiles)
     await expect(page).toHaveURL(
       (url) => url.pathname === expectedHome[profile.name],
     );
+    if (profile.name === "BUG6 multi") {
+      const mobileMenu = page.viewportSize()!.width < 768;
+      const openMenu = page.getByRole("button", { name: "Apri menu", exact: true });
+      if (mobileMenu) await openMenu.click();
+      await page.getByRole("button", { name: "Unità di Strada", exact: true }).click();
+      await expect(page).toHaveURL(/\/uds\/interventi$/);
+      if (mobileMenu) await openMenu.click();
+      await expect(page.getByRole("link", { name: "Interventi UDS", exact: true }))
+        .toHaveAttribute("aria-current", "page");
+    }
     const identity = await (await page.request.get("/api/auth/me")).json();
     expect(identity.isAdmin).toBe("admin" in profile);
     expect(identity.isSuperAdmin).toBe(profile.name === "SuperAdmin");
@@ -426,6 +436,45 @@ for (const profile of profiles)
       expect((await page.request.get("/api/volontari")).status()).toBe(403);
     }
   });
+
+test("Operatore UDS salva il nome dalla rettifica e conserva i dati riservati", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Anagrafica sintetica creata una volta");
+  const reserved = { codiceFiscale: "RSSMRA90A01H501U", restrizioniAlimentari: "Dato sintetico riservato" };
+  const created = await admin.post("/api/beneficiari", {
+    data: {
+      ...reserved,
+      nome: "Nome iniziale",
+      cognome: `Rettifica ${suffix}`,
+      sesso: "M",
+      fasciaEtaPresunta: "30_64",
+      areaProvenienza: "UE",
+      uds: true,
+      statoAnagrafica: "provvisoria",
+      areaOperativaId: areaId,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const intervention = await admin.post("/api/uds/interventi", {
+    data: { beneficiarioId: person.id, tipoIntervento: "ascolto" },
+  });
+  expect(intervention.status(), await intervention.text()).toBe(201);
+
+  await login(page, users.get("Operatore UDS")!.username);
+  await page.goto(`/uds/interventi?beneficiarioId=${person.id}`);
+  await page.getByTestId("uds-interventi-desktop").getByRole("button", { name: /rettifica/i }).click();
+  const rectification = page.getByRole("dialog", { name: /rettifica intervento/i });
+  await rectification.getByRole("button", { name: /nome iniziale/i }).click();
+  const edit = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await edit.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  await expect(edit.getByRole("textbox", { name: /codice fiscale|restrizioni alimentari/i })).toHaveCount(0);
+  const saved = page.waitForResponse((response) => response.request().method() === "PATCH" &&
+    new URL(response.url()).pathname === `/api/beneficiari/${person.id}`);
+  await edit.getByRole("button", { name: /^salva$/i }).and(edit.locator('button[type="submit"]')).click();
+  expect((await saved).status()).toBe(200);
+  await expect(rectification.getByRole("button", { name: /nome aggiornato/i })).toBeVisible();
+  expect(await (await admin.get(`/api/beneficiari/${person.id}`)).json()).toMatchObject(reserved);
+});
 
 test("Volontario: PDF reale della bolla, altra Area e tutti i comandi restano negati", async ({
   page,

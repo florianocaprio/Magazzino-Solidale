@@ -3820,7 +3820,7 @@ describe("Modulo Mensa", () => {
     expect(audits).toHaveLength(1);
   });
 
-  it("crea una persona provvisoria e un accesso temporaneo senza tessera o abilitazione permanente", async () => {
+  it("emette la tessera anagrafica della persona provvisoria e registra l'accesso temporaneo senza usarla", async () => {
     const fixture = await createFixture();
     const app = makeApp(fixture);
     const key = `temporary-new-${rnd()}`;
@@ -3842,6 +3842,11 @@ describe("Modulo Mensa", () => {
     expect(first.body.esito).toBe("consentito");
     expect(first.body.modalitaAccesso).toBe("temporaneo");
     expect(first.body.temporaneo).toBe(true);
+    const [access] = await db
+      .select({ tesseraId: mensaAccessiTable.tesseraId })
+      .from(mensaAccessiTable)
+      .where(eq(mensaAccessiTable.id, first.body.id));
+    expect(access.tesseraId).toBeNull();
     const createdId = Number(first.body.beneficiarioId);
     ids.beneficiaries.push(createdId);
 
@@ -3861,7 +3866,7 @@ describe("Modulo Mensa", () => {
         .select()
         .from(tessereBeneficiariTable)
         .where(eq(tessereBeneficiariTable.beneficiarioId, createdId)),
-    ).toHaveLength(0);
+    ).toMatchObject([{ codice: expect.stringMatching(/^MS-/), stato: "attiva" }]);
 
     const meal = await request(app)
       .post("/mensa/pasti")

@@ -11,6 +11,7 @@ import {
 import { ReportEmptyState } from "./report-empty-state";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
+import { formatLogisticsQuantity } from "@/lib/reporting-number";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -24,9 +25,30 @@ function cell(
   return localizeReportingText(t, String(value));
 }
 
-export function ReportTable({ table }: { table: ReportTableData }) {
-  const { t } = useTranslation();
+const stockQuantityColumns: Readonly<Record<string, readonly string[]>> = {
+  giacenze: ["quantita"],
+  causali: ["quantita"],
+  disponibilitaCorrente: [
+    "fisica",
+    "distribuibile",
+    "impegnato",
+    "disponibile",
+    "soglia",
+  ],
+};
+
+export function ReportTable({
+  table,
+  stockPresentation = false,
+}: {
+  table: ReportTableData;
+  stockPresentation?: boolean;
+}) {
+  const { t, i18n } = useTranslation();
   const { hasArea, hasPermission } = useAuth();
+  const quantityColumns = stockPresentation
+    ? stockQuantityColumns[table.key]
+    : undefined;
   const requestPath =
     (hasArea("sociale") || hasArea("magazzino")) &&
     hasPermission("richieste_magazzino.view")
@@ -82,7 +104,13 @@ export function ReportTable({ table }: { table: ReportTableData }) {
                             {cell(row[column], t)}
                           </Link>
                         ) : (
-                          cell(row[column], t)
+                          ((quantityColumns?.includes(column)
+                            ? formatLogisticsQuantity(
+                                row[column],
+                                row.unitaMisura ?? row.unita,
+                                i18n.resolvedLanguage,
+                              )
+                            : undefined) ?? cell(row[column], t))
                         )}
                       </TableCell>
                     ))}

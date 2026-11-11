@@ -809,7 +809,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     });
     const invalid = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
-      .send({ conferma: true, versione: await versioneIntervento(id) });
+      .send({ conferma: false, versione: await versioneIntervento(id) });
     expect(invalid.status).toBe(400);
 
     const response = await request(makeApp())
@@ -863,7 +863,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     const immutable = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)
       .send({
-        risultato: "Alterazione",
+        attivita: [],
         versione: response.body.operativita.versione,
       });
     expect(immutable.status).toBe(409);
@@ -900,6 +900,56 @@ describe("gestione operativa degli interventi Sociali", () => {
         })
         .where(eq(beneficiariTable.id, beneficiarioRoma));
     }
+  });
+
+  it("conclude senza esito e permette di integrare i testi conservando lo storico", async () => {
+    const id = await createIntervento({
+      stato: "in_corso",
+      avvio: new Date("2026-08-20T08:00:00Z"),
+    });
+    const session = request(makeApp());
+    const concluded = await session.post(`/interventi/${id}/concludi`).send({
+      conferma: true,
+      versione: await versioneIntervento(id),
+      dataOraConclusione: "2026-08-20T09:00:00Z",
+    });
+    expect(concluded.status, concluded.text).toBe(200);
+    expect(concluded.body.intervento).toMatchObject({
+      stato: "concluso",
+      risultato: null,
+      esito: null,
+    });
+    const version = concluded.body.operativita.versione;
+    const saved = await session
+      .post(`/interventi/${id}/salva-operativita`)
+      .send({
+        versione: version,
+        risultato: "Colloquio svolto",
+        esito: "Contatto stabilito",
+        note: "Integrate successivamente",
+      });
+    expect(saved.status, saved.text).toBe(200);
+    expect(saved.body).toMatchObject({
+      stato: "concluso",
+      risultato: "Colloquio svolto",
+      esito: "Contatto stabilito",
+      note: "Integrate successivamente",
+    });
+    expect(
+      (
+        await session.post(`/interventi/${id}/salva-operativita`).send({
+          versione: version,
+          note: "Versione superata",
+        })
+      ).status,
+    ).toBe(409);
+    const [row] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, id));
+    expect(row.dataOraConclusione?.toISOString()).toBe(
+      "2026-08-20T09:00:00.000Z",
+    );
   });
 
   it("annulla con motivo e registra la mancata presentazione senza falso avvio", async () => {

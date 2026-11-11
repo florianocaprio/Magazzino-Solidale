@@ -4930,6 +4930,8 @@ export interface Intervento {
   /** @nullable */
   areaOperativaId: number | null;
   /** @nullable */
+  areaOperativaNome?: string | null;
+  /** @nullable */
   areaOperativaIdSnapshot?: number | null;
   /** @nullable */
   zonaUdsIdSnapshot?: number | null;
@@ -5062,6 +5064,7 @@ export interface BeneficiarioDettaglio {
   /** @minimum 0 */
   versioneFascicolo?: number;
   id: number;
+  udsAttivo?: boolean;
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
@@ -5949,6 +5952,7 @@ export interface ZonaUdsVersioneInput {
 }
 
 export interface UdsDirectoryExportInput {
+  includiInattiviUds?: boolean;
   /**
    * @minLength 2
    * @maxLength 120
@@ -5996,6 +6000,7 @@ export interface UdsDirectoryItem {
   zonaUdsNome: string | null;
   canale: UdsDirectoryItemCanale;
   accessoCompleto: boolean;
+  udsAttivo?: boolean;
 }
 
 export type UdsLinkCandidateItemFasciaEtaCorrente =
@@ -6624,6 +6629,28 @@ export interface InterventiPagina {
   total: number;
   pagina: number;
   limite: number;
+}
+
+export interface InterventoTesseraLookupInput {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  codice: string;
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId?: number;
+}
+
+export interface InterventoTesseraLookupResult {
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  areaOperativaNome: string;
+  /** @nullable */
+  centroAscoltoNome: string | null;
 }
 
 /**
@@ -12391,6 +12418,29 @@ export type CercaBeneficiariSimili400 = {
   error: string;
 };
 
+export type DeleteBeneficiarioParams = {
+  /**
+   * Se true, elimina un beneficiario senza dati associati. Se false o omesso, disattiva il beneficiario.
+   */
+  permanente?: boolean;
+  /**
+   * Versione corrente obbligatoria per l'eliminazione definitiva.
+   * @minimum 1
+   */
+  versione?: number;
+  /**
+   * Perimetro e autorizzazione UDS per l’eliminazione definitiva.
+   */
+  contesto?: DeleteBeneficiarioContesto;
+};
+
+export type DeleteBeneficiarioContesto =
+  (typeof DeleteBeneficiarioContesto)[keyof typeof DeleteBeneficiarioContesto];
+
+export const DeleteBeneficiarioContesto = {
+  uds: "uds",
+} as const;
+
 export type AuthorizeBeneficiariExport200 = {
   autorizzato: boolean;
   auditId: number;
@@ -12696,6 +12746,7 @@ export type ListUdsDirectoryParams = {
    */
   areaOperativaId?: number;
   zonaUdsId?: number;
+  includiInattiviUds?: boolean;
 };
 
 export type ListUdsLinkCandidatesParams = {

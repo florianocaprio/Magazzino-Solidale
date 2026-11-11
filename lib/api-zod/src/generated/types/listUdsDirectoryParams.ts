@@ -26,4 +26,5 @@ export type ListUdsDirectoryParams = {
    */
   areaOperativaId?: number;
   zonaUdsId?: number;
+  includiInattiviUds?: boolean;
 };

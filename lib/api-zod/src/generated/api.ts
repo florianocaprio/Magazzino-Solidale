@@ -9759,6 +9759,7 @@ export const GetBeneficiarioResponse = zod.object({
     .min(getBeneficiarioResponseVersioneFascicoloMin)
     .optional(),
   id: zod.number(),
+  udsAttivo: zod.boolean().optional(),
   codice: zod.string(),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod.enum(["provvisoria", "completa"]),
@@ -9892,6 +9893,7 @@ export const GetBeneficiarioResponse = zod.object({
         centroAscoltoId: zod.number().nullable(),
         centroAscoltoNome: zod.string().nullable(),
         areaOperativaId: zod.number().nullable(),
+        areaOperativaNome: zod.string().nullish(),
         areaOperativaIdSnapshot: zod.number().nullish(),
         zonaUdsIdSnapshot: zod.number().nullish(),
         dataIntervento: zod.coerce.date().nullable(),
@@ -10163,6 +10165,24 @@ export const UpdateBeneficiarioResponse = zod
 
 export const DeleteBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const DeleteBeneficiarioQueryParams = zod.object({
+  permanente: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "Se true, elimina un beneficiario senza dati associati. Se false o omesso, disattiva il beneficiario.",
+    ),
+  versione: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("Versione corrente obbligatoria per l'eliminazione definitiva."),
+  contesto: zod
+    .enum(["uds"])
+    .optional()
+    .describe("Perimetro e autorizzazione UDS per l’eliminazione definitiva."),
 });
 
 /**
@@ -10567,6 +10587,7 @@ export const ListInterventiResponseItem = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -10878,6 +10899,7 @@ export const ListInterventiPaginaResponse = zod.object({
       centroAscoltoId: zod.number().nullable(),
       centroAscoltoNome: zod.string().nullable(),
       areaOperativaId: zod.number().nullable(),
+      areaOperativaNome: zod.string().nullish(),
       areaOperativaIdSnapshot: zod.number().nullish(),
       zonaUdsIdSnapshot: zod.number().nullish(),
       dataIntervento: zod.coerce.date().nullable(),
@@ -10995,6 +11017,29 @@ export const ListInterventiOperatoriResponseItem = zod.object({
 export const ListInterventiOperatoriResponse = zod.array(
   ListInterventiOperatoriResponseItem,
 );
+
+/**
+ * Cerca una tessera attiva nell'Area e nell'eventuale Centro selezionato per un intervento Sociale.
+ */
+export const cercaBeneficiarioInterventoPerTesseraBodyCodiceMax = 255;
+
+export const CercaBeneficiarioInterventoPerTesseraBody = zod.object({
+  codice: zod
+    .string()
+    .min(1)
+    .max(cercaBeneficiarioInterventoPerTesseraBodyCodiceMax),
+  areaOperativaId: zod.number().min(1),
+  centroAscoltoId: zod.number().min(1).optional(),
+});
+
+export const CercaBeneficiarioInterventoPerTesseraResponse = zod.object({
+  id: zod.number(),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaNome: zod.string(),
+  centroAscoltoNome: zod.string().nullable(),
+});
 
 /**
  * Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
@@ -11133,6 +11178,7 @@ export const GetInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11299,6 +11345,7 @@ export const UpdateInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11536,6 +11583,7 @@ export const AvviaInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -11591,7 +11639,7 @@ export const AvviaInterventoResponse = zod.object({
 });
 
 /**
- * Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+ * Salva in una transazione i dati operativi senza chiudere l'intervento. Su un intervento Sociale concluso consente di aggiornare risultato, esito e note.
  */
 export const SalvaInterventoOperativitaParams = zod.object({
   id: zod.coerce.number(),
@@ -11800,7 +11848,7 @@ export const SalvaInterventoOperativitaResponse = zod.object({
 });
 
 /**
- * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
+ * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Risultato, esito e note sono facoltativi per gli interventi Sociali. Attività, materiali o documenti richiedono anche il permesso update.
  */
 export const ConcludiInterventoParams = zod.object({
   id: zod.coerce.number(),
@@ -12116,6 +12164,7 @@ export const ConcludiInterventoResponse = zod.object({
     centroAscoltoId: zod.number().nullable(),
     centroAscoltoNome: zod.string().nullable(),
     areaOperativaId: zod.number().nullable(),
+    areaOperativaNome: zod.string().nullish(),
     areaOperativaIdSnapshot: zod.number().nullish(),
     zonaUdsIdSnapshot: zod.number().nullish(),
     dataIntervento: zod.coerce.date().nullable(),
@@ -12290,6 +12339,7 @@ export const ConcludiInterventoResponse = zod.object({
       centroAscoltoId: zod.number().nullable(),
       centroAscoltoNome: zod.string().nullable(),
       areaOperativaId: zod.number().nullable(),
+      areaOperativaNome: zod.string().nullish(),
       areaOperativaIdSnapshot: zod.number().nullish(),
       zonaUdsIdSnapshot: zod.number().nullish(),
       dataIntervento: zod.coerce.date().nullable(),
@@ -12404,6 +12454,7 @@ export const AnnullaInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -12515,6 +12566,7 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -12647,6 +12699,7 @@ export const TransitionInterventoResponse = zod.object({
   centroAscoltoId: zod.number().nullable(),
   centroAscoltoNome: zod.string().nullable(),
   areaOperativaId: zod.number().nullable(),
+  areaOperativaNome: zod.string().nullish(),
   areaOperativaIdSnapshot: zod.number().nullish(),
   zonaUdsIdSnapshot: zod.number().nullish(),
   dataIntervento: zod.coerce.date().nullable(),
@@ -12934,6 +12987,7 @@ export const ListUdsDirectoryQueryParams = zod.object({
     .optional()
     .describe("Disponibile soltanto ai profili amministrativi globali."),
   zonaUdsId: zod.coerce.number().optional(),
+  includiInattiviUds: zod.coerce.boolean().optional(),
 });
 
 export const ListUdsDirectoryResponseItem = zod
@@ -12954,11 +13008,21 @@ export const ListUdsDirectoryResponseItem = zod
     zonaUdsNome: zod.string().nullable(),
     canale: zod.enum(["uds", "uds_centro"]),
     accessoCompleto: zod.boolean(),
+    udsAttivo: zod.boolean().optional(),
   })
   .describe(
     "Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.",
   );
 export const ListUdsDirectoryResponse = zod.array(ListUdsDirectoryResponseItem);
+
+export const UpdateUdsBeneficiarioStatoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateUdsBeneficiarioStatoBody = zod.object({
+  attivo: zod.boolean(),
+  versione: zod.number().min(1),
+});
 
 /**
  * Ricerca anti-duplicazione Area-wide di persone attive non ancora UDS, con risposta anagrafica minimizzata.
@@ -13008,6 +13072,7 @@ export const exportUdsDirectoryBodySearchMin = 2;
 export const exportUdsDirectoryBodySearchMax = 120;
 
 export const ExportUdsDirectoryBody = zod.object({
+  includiInattiviUds: zod.boolean().optional(),
   search: zod
     .string()
     .min(exportUdsDirectoryBodySearchMin)
@@ -13035,6 +13100,7 @@ export const ExportUdsDirectoryResponseItem = zod
     zonaUdsNome: zod.string().nullable(),
     canale: zod.enum(["uds", "uds_centro"]),
     accessoCompleto: zod.boolean(),
+    udsAttivo: zod.boolean().optional(),
   })
   .describe(
     "Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.",

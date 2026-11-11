@@ -40,6 +40,7 @@ import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
 import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiarioError } from "../lib/tesseraBeneficiarioService";
 import { requirePermission } from "../middlewares/auth";
 import { requireCurrentUdsScope } from "../lib/udsInterventoPolicy";
+import { deleteUnusedBeneficiario } from "../lib/deleteBeneficiario";
 import {
   canAccessBeneficiarioRecord,
   hasPermission,
@@ -434,6 +435,7 @@ function fmtBenef(
     areaOperativaNome: areaOperativaNome ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
+    udsAttivo: r.udsAttivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
     noteInterne: r.noteInterne ?? null,
     versione: r.versione,
@@ -686,6 +688,14 @@ export async function createBeneficiarioOne(
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
     if (fascicolo?.trim()) await saveBeneficiarioFascicolo(executor, row.id, fascicolo, 0, req.user?.id ?? null);
+    await issueTesseraBeneficiario({
+      beneficiarioId: row.id,
+      dataScadenza: null,
+      motivoSostituzione: null,
+      operatoreId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      areaAudit: "beneficiari",
+    }, executor);
     await executor.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `beneficiario:${row.id}`,
@@ -898,14 +908,22 @@ router.post("/beneficiari/:id/tessera-documento", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0 || Object.keys(req.body ?? {}).length) { res.status(400).json({ error: "Richiesta tessera non valida" }); return; }
   const fullManager = hasPermission(req, "beneficiari.cards.manage");
-  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view") || !req.user?.aree.includes("uds") || !(await isModuloAttivo("UDS")))) { res.status(403).json({ error: "Tessera non autorizzata" }); return; }
+  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view"))) {
+    res.status(403).json({ error: "Tessera non autorizzata" }); return;
+  }
   try {
     const card = await issueTesseraBeneficiario({
       beneficiarioId: id, dataScadenza: null, motivoSostituzione: null,
       operatoreId: req.user!.id, ip: req.ip ?? null, areaAudit: "beneficiari", recoverExisting: true,
       authorize: async (tx, person) => {
         const actor = await requireCurrentCommandActor(tx, req.user!.id, fullManager ? "beneficiari.cards.manage" : "beneficiari.manage");
-        if (!fullManager && (!person.uds || (!actor.isAdmin && (!actor.aree.includes("uds") || !actor.permessi.includes("beneficiari.view"))))) throw new TesseraBeneficiarioError(403, "Gestione persona UDS non autorizzata");
+        if (!fullManager && !actor.isAdmin) {
+          const allowedContext = actor.aree.includes("sociale") ||
+            (person.uds && actor.aree.includes("uds") && await isModuloAttivo("UDS"));
+          if (!allowedContext || !actor.permessi.includes("beneficiari.view")) {
+            throw new TesseraBeneficiarioError(403, "Tessera non autorizzata");
+          }
+        }
         if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
       },
     });
@@ -1243,6 +1261,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     return;
   }
   const enablesUds = updates.uds === true && !existing.uds;
+  if (enablesUds) updates.udsAttivo = true;
   const assignsZonaUds =
     "zonaUdsId" in updates &&
     updates.zonaUdsId != null &&
@@ -1409,8 +1428,80 @@ router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate
   res.json(fmtBenefForRequest(updated, req));
 });
 
-router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), async (req, res) => {
+router.delete("/beneficiari/:id", (req, res, next) => {
+  const permission = req.query.contesto === "uds" && req.query.permanente === "true"
+    ? "uds.directory.view" : "beneficiari.deactivate";
+  requirePermission(permission)(req, res, next);
+}, async (req, res) => {
   const id = Number(req.params.id);
+  const permanent = req.query.permanente === "true";
+  const udsContext = req.query.contesto === "uds";
+  const version = Number(req.query.versione);
+  if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647 ||
+      (req.query.permanente != null && !permanent && req.query.permanente !== "false") ||
+      (req.query.contesto != null && (!udsContext || !permanent)) ||
+      (permanent && (typeof req.query.versione !== "string" || !Number.isSafeInteger(version) || version < 1))) {
+    res.status(400).json({ error: "Richiesta di rimozione non valida." });
+    return;
+  }
+  if (permanent) {
+    if (!hasPermission(req, "beneficiari.manage")) {
+      res.status(403).json({ error: "Eliminazione non autorizzata." });
+      return;
+    }
+    if (udsContext && (!(req.user?.isAdmin || req.user?.aree.includes("uds")) || !(await isModuloAttivo("UDS")))) {
+      res.status(403).json({ error: "Eliminazione UDS non autorizzata." });
+      return;
+    }
+    const linked = "Il beneficiario ha dati associati. Puoi disattivarlo conservando lo storico.";
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const [person] = await tx.select().from(beneficiariTable)
+          .where(eq(beneficiariTable.id, id)).for("update");
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, udsContext ? "uds.directory.view" : "beneficiari.deactivate");
+        if (!actor.isAdmin && (!actor.permessi.includes("beneficiari.manage") ||
+            (udsContext && !actor.aree.includes("uds"))))
+          throw new CurrentCommandActorError("Eliminazione non autorizzata.");
+        if (!person) return { status: 204 } as const;
+        if ((udsContext && !person.uds) || !canAccessBeneficiarioRecord(person, req, callerCentroId(req)) ||
+            !canAccessBeneficiarioScope(person, actor))
+          return { status: 403, error: "Beneficiario non accessibile." } as const;
+        const boundary = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);
+        if (boundary) {
+          const [allowed] = await tx.select({ id: beneficiariTable.id }).from(beneficiariTable)
+            .where(and(eq(beneficiariTable.id, id), boundary));
+          if (!allowed) return { status: 403, error: "Beneficiario non accessibile." } as const;
+        }
+        if (person.versione !== version)
+          return { status: 409, error: "Versione Beneficiario superata." } as const;
+        if (!(await deleteUnusedBeneficiario(tx, id)))
+          return { status: 409, error: linked } as const;
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "beneficiari",
+          chiave: `beneficiario:${id}`,
+          azione: "eliminazione",
+          valorePrecedente: { beneficiarioId: id, codice: person.codice, versione: person.versione },
+          utenteId: actor.id,
+          ip: req.ip ?? null,
+        });
+        return { status: 204 } as const;
+      });
+      if (outcome.status === 204) res.status(204).send();
+      else res.status(outcome.status).json({ error: outcome.error });
+    } catch (error) {
+      if (error instanceof CurrentCommandActorError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      const pg = error as { code?: string; cause?: { code?: string } };
+      if ((pg.code ?? pg.cause?.code) === "23503") {
+        res.status(409).json({ error: linked });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, callerCentroId(req))) {
