@@ -937,6 +937,13 @@ test("F2 B14/B15/B19/B24: service transitions update the beneficiary profile and
     name: "Pianifica accesso",
     exact: true,
   });
+  const waitForServiceChange = (action: "attivazione-credito" | "abilitazione") =>
+    page.waitForResponse((response) => response.request().method() === "POST" &&
+      new URL(response.url()).pathname === `/api/emporio/beneficiari/${f.beneficiary}/${action}`);
+  const reopenProfileEditor = async () => {
+    await page.goto(`/beneficiari/${f.beneficiary}`);
+    await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  };
   await expect(card.getByText("NON ABILITATO", { exact: true })).toBeVisible();
   await expect(planning).toHaveCount(0);
   await card
@@ -947,13 +954,12 @@ test("F2 B14/B15/B19/B24: service transitions update the beneficiary profile and
   await card
     .getByRole("button", { name: "Abilita all'Emporio", exact: true })
     .click();
+  const activated = waitForServiceChange("attivazione-credito");
   await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
+  expect((await activated).ok()).toBe(true);
+  await reopenProfileEditor();
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(planning).toBeVisible();
-  await page.goBack();
-  await profile.click();
-  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
-  await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await planning.click();
   await page
     .getByRole("button", { name: "Nuovo Accesso Emporio", exact: true })
@@ -971,14 +977,14 @@ test("F2 B14/B15/B19/B24: service transitions update the beneficiary profile and
   await expect(
     dialog.getByRole("button", { name: "Salva", exact: true }),
   ).toBeEnabled();
-  await page.goBack();
-  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  await reopenProfileEditor();
   for (const state of ["sospeso", "attivo", "revocato"]) {
     await card
       .getByRole("textbox", {
         name: "Motivo dell'abilitazione o della variazione",
       })
       .fill(`F2 variazione ${state}`);
+    const changed = waitForServiceChange(state === "attivo" ? "attivazione-credito" : "abilitazione");
     await card
       .getByRole("button", {
         name:
@@ -991,12 +997,8 @@ test("F2 B14/B15/B19/B24: service transitions update the beneficiary profile and
       })
       .click();
     if(state==="attivo")await page.getByRole("dialog",{name:"Conferma Emporio e Credito Solidale",exact:true}).getByRole("button",{name:"Conferma attivazione e quota",exact:true}).click();
-    await expect(
-      card.getByText(state.toUpperCase(), { exact: true }),
-    ).toBeVisible();
-    await page.goBack();
-    await profile.click();
-    await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+    expect((await changed).ok()).toBe(true);
+    await reopenProfileEditor();
     await expect(
       card.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();
