@@ -135,6 +135,7 @@ test("MAPS carica tile e marker, conserva la lista in errore e recupera al retry
   ).toBeLessThanOrEqual(1);
   await assertViewportSafe(page);
   await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator('[role="dialog"][data-state="open"]')).toHaveCount(0);
 
   await visibleMarker.click();
   await expect(page.getByRole("dialog")).toContainText("Via Test 1, Roma");

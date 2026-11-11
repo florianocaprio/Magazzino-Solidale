@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   areeOperativeTable,
   auditEventiTable,
+  beneficiariTable,
   bollaRigheTable,
   bolleTable,
   caricoIntegrazioneRigheTable,
@@ -593,12 +594,21 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
       });
     expect(excessive.status).toBe(409);
 
+    const [{ id: beneficiarioId }] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `M3AB-${suffix}`,
+        nome: "Beneficiario",
+        cognome: "Test M3A",
+        areaOperativaId: areaAId,
+      })
+      .returning({ id: beneficiariTable.id });
     const [{ id: bollaId }] = await db
       .insert(bolleTable)
       .values({
         numeroBolla: `M3A-${suffix}`.slice(0, 30),
         dataBolla: "2026-09-17",
-        beneficiarioId: 999999,
+        beneficiarioId,
         magazzinoId: magazzinoAId,
         areaOperativaIdSnapshot: areaAId,
       })
@@ -640,6 +650,7 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
       .where(eq(prenotazioniMagazzinoTable.id, reservationId));
     await db.delete(bollaRigheTable).where(eq(bollaRigheTable.id, bollaRigaId));
     await db.delete(bolleTable).where(eq(bolleTable.id, bollaId));
+    await db.delete(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));
 
     const [beforeAuditFailure] = await db
       .select({ quantita: lottiTable.quantitaResidua })

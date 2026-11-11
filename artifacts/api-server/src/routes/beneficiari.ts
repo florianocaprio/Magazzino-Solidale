@@ -688,14 +688,6 @@ export async function createBeneficiarioOne(
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
     if (fascicolo?.trim()) await saveBeneficiarioFascicolo(executor, row.id, fascicolo, 0, req.user?.id ?? null);
-    await issueTesseraBeneficiario({
-      beneficiarioId: row.id,
-      dataScadenza: null,
-      motivoSostituzione: null,
-      operatoreId: req.user?.id ?? null,
-      ip: req.ip ?? req.socket.remoteAddress ?? null,
-      areaAudit: "beneficiari",
-    }, executor);
     await executor.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `beneficiario:${row.id}`,

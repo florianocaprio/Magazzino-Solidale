@@ -45,8 +45,8 @@ export async function issueTesseraBeneficiario(input: {
   areaAudit: "mensa" | "beneficiari";
   recoverExisting?: boolean;
   authorize?: (tx: TesseraBeneficiarioTx, beneficiary: typeof beneficiariTable.$inferSelect) => Promise<void>;
-}, executor?: TesseraBeneficiarioTx) {
-  const issue = async (tx: TesseraBeneficiarioTx) => {
+}) {
+  return db.transaction(async (tx) => {
     // Blocca anche il caso senza tessere: due prime emissioni non possono gareggiare.
     const [beneficiary] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, input.beneficiarioId)).for("update");
     if (!beneficiary) throw new TesseraBeneficiarioError(404, "Beneficiario non trovato");
@@ -110,6 +110,5 @@ export async function issueTesseraBeneficiario(input: {
       note: input.motivoSostituzione,
     });
     return row;
-  };
-  return executor ? issue(executor) : db.transaction(issue);
+  });
 }

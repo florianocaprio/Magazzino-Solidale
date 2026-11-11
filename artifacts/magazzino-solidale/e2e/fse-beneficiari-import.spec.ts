@@ -307,7 +307,9 @@ test("FSE+ accettato: Area e Centro in modifica, Emporio attiva il Credito e pol
   await page.screenshot({ path: testInfo.outputPath("servizi-politica-in-modifica.png") });
   await edit.getByRole("button", { name: "Salva", exact: true }).click();
   await expect(edit).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Stati dei servizi" }).getByText("ATTIVO", { exact: true })).toBeVisible();
+  const emporioStatus = page.getByRole("region", { name: "Stati dei servizi" })
+    .getByRole("heading", { name: "Emporio", exact: true }).locator("..");
+  await expect(emporioStatus.getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Abilita all'Emporio", exact: true })).toHaveCount(0);
   const newer = await page.request.post("/api/politiche-credito-solidale", { data: {
     nome: `Politica successiva ${suffix}`, creditoBaseNucleo: 77, creditoPerComponente: 0,

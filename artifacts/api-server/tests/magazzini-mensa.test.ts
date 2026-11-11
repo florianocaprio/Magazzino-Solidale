@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
 import {
+  beneficiariTable,
   bolleTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -18,6 +19,7 @@ const magazzinoIds: number[] = [];
 const centroIds: number[] = [];
 const areaOperativaIds: number[] = [];
 const bollaIds: number[] = [];
+const beneficiarioIds: number[] = [];
 
 function makeApp(): Express {
   const result = express();
@@ -57,6 +59,20 @@ async function createMensaMagazzino(areaOperativaId: number) {
   return response.body as { id: number; codice: string };
 }
 
+async function createBeneficiario(areaOperativaId: number): Promise<number> {
+  const [row] = await db
+    .insert(beneficiariTable)
+    .values({
+      codice: `BEN-MENSA-${areaOperativaId}`,
+      nome: "Beneficiario",
+      cognome: "Test Mensa",
+      areaOperativaId,
+    })
+    .returning({ id: beneficiariTable.id });
+  beneficiarioIds.push(row.id);
+  return row.id;
+}
+
 beforeEach(() => {
   app = makeApp();
 });
@@ -65,6 +81,10 @@ afterEach(async () => {
   if (bollaIds.length > 0) {
     await db.delete(bolleTable).where(inArray(bolleTable.id, bollaIds));
     bollaIds.length = 0;
+  }
+  if (beneficiarioIds.length > 0) {
+    await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds));
+    beneficiarioIds.length = 0;
   }
   if (magazzinoIds.length > 0) {
     await db
@@ -228,7 +248,7 @@ describe("Magazzino con tag Mensa", () => {
       .values({
         numeroBolla: `BM-${Date.now()}`,
         dataBolla: "2026-08-15",
-        beneficiarioId: 1,
+        beneficiarioId: await createBeneficiario(areaOperativaId),
         magazzinoId: magazzino.id,
       })
       .returning({ id: bolleTable.id });
@@ -258,7 +278,7 @@ describe("Magazzino con tag Mensa", () => {
       .values({
         numeroBolla: `BL-${Date.now()}`,
         dataBolla: "2026-08-15",
-        beneficiarioId: 1,
+        beneficiarioId: await createBeneficiario(areaOperativaId),
         magazzinoId: created.body.id,
       })
       .returning({ id: bolleTable.id });

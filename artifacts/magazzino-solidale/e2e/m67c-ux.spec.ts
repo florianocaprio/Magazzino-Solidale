@@ -162,7 +162,9 @@ test.describe("Explicit touch and rotation matrix", () => {
       if (width < 768) {
         const menu = page.getByRole("dialog");
         await expect(menu).toBeVisible();
-        const groups = menu.locator('[data-slot="sidebar-group-label"]');
+        const groups = menu.locator('[data-slot="sidebar-group-label"]').filter({
+          hasNot: page.locator('[data-nav-group-icon="uds"]'),
+        });
         for (const group of await groups.all()) await group.click();
         await menu.getByRole("button", { name: "Chiudi", exact: true }).tap();
         await expect(menu).toBeHidden();
