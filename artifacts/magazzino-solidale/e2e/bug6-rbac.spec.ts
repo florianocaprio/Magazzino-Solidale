@@ -437,6 +437,45 @@ for (const profile of profiles)
     }
   });
 
+test("Operatore UDS salva il nome dalla rettifica e conserva i dati riservati", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Anagrafica sintetica creata una volta");
+  const reserved = { codiceFiscale: "RSSMRA90A01H501U", restrizioniAlimentari: "Dato sintetico riservato" };
+  const created = await admin.post("/api/beneficiari", {
+    data: {
+      ...reserved,
+      nome: "Nome iniziale",
+      cognome: `Rettifica ${suffix}`,
+      sesso: "M",
+      fasciaEtaPresunta: "30_64",
+      areaProvenienza: "UE",
+      uds: true,
+      statoAnagrafica: "provvisoria",
+      areaOperativaId: areaId,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const intervention = await admin.post("/api/uds/interventi", {
+    data: { beneficiarioId: person.id, tipoIntervento: "ascolto" },
+  });
+  expect(intervention.status(), await intervention.text()).toBe(201);
+
+  await login(page, users.get("Operatore UDS")!.username);
+  await page.goto(`/uds/interventi?beneficiarioId=${person.id}`);
+  await page.getByTestId("uds-interventi-desktop").getByRole("button", { name: /rettifica/i }).click();
+  const rectification = page.getByRole("dialog", { name: /rettifica intervento/i });
+  await rectification.getByRole("button", { name: /nome iniziale/i }).click();
+  const edit = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await edit.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  await expect(edit.getByRole("textbox", { name: /codice fiscale|restrizioni alimentari/i })).toHaveCount(0);
+  const saved = page.waitForResponse((response) => response.request().method() === "PATCH" &&
+    new URL(response.url()).pathname === `/api/beneficiari/${person.id}`);
+  await edit.getByRole("button", { name: /^salva$/i }).and(edit.locator('button[type="submit"]')).click();
+  expect((await saved).status()).toBe(200);
+  await expect(rectification.getByRole("button", { name: /nome aggiornato/i })).toBeVisible();
+  expect(await (await admin.get(`/api/beneficiari/${person.id}`)).json()).toMatchObject(reserved);
+});
+
 test("Volontario: PDF reale della bolla, altra Area e tutti i comandi restano negati", async ({
   page,
 }) => {

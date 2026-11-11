@@ -1633,6 +1633,7 @@ export function EditBeneficiarioSheet({
   const editSchema = useMemo(() => makeEditSchema(t, Boolean(b.fascicolo)), [t, b.fascicolo]);
   const { user, hasPermission } = useAuth();
   const canManageAnagrafica = hasPermission("beneficiari.manage");
+  const canViewSensitive = hasPermission("beneficiari.sensitive.view");
   const servizio = emporioReadableData(useBeneficiarioEmporio(b.id, !udsContext));
   const canManageCredito =
     !udsContext && hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
@@ -1736,6 +1737,8 @@ export function EditBeneficiarioSheet({
 
   const onSubmit = async (data: EditValues, complete = false) => {
     const {
+      codiceFiscale,
+      restrizioniAlimentari,
       uds,
       areaOperativaId,
       zonaUdsId,
@@ -1778,9 +1781,10 @@ export function EditBeneficiarioSheet({
       dataNascita: data.dataNascita || null,
       sesso: data.sesso || undefined,
       areaProvenienza: data.areaProvenienza || undefined,
-      codiceFiscale: data.codiceFiscale?.trim()
-        ? data.codiceFiscale.trim().toUpperCase()
-        : null,
+      ...(canViewSensitive && {
+        codiceFiscale: codiceFiscale?.trim().toUpperCase() || null,
+        restrizioniAlimentari,
+      }),
       centroAscoltoId: centroAscoltoIdFinale,
       versione: b.versione,
       versioneFascicolo: b.versioneFascicolo ?? 0,
@@ -1877,7 +1881,7 @@ export function EditBeneficiarioSheet({
                 name="fascicolo"
                 render={({ field }) => <FormItem><FormLabel>{t("blocco07.fascicolo")}</FormLabel><FormControl><Input {...field} maxLength={255} /></FormControl></FormItem>}
               />
-              <FormField control={form.control}
+              {canViewSensitive && <FormField control={form.control}
                 name="codiceFiscale"
                 render={({ field }) => (
                   <FormItem>
@@ -1893,7 +1897,7 @@ export function EditBeneficiarioSheet({
                     </FormControl>
                   </FormItem>
                 )}
-              />
+              />}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -2200,7 +2204,7 @@ export function EditBeneficiarioSheet({
                   )}
                 />
               )}
-              <FormField
+              {canViewSensitive && <FormField
                 control={form.control}
                 name="restrizioniAlimentari"
                 render={({ field }) => (
@@ -2213,7 +2217,7 @@ export function EditBeneficiarioSheet({
                     </FormControl>
                   </FormItem>
                 )}
-              />
+              />}
 
               </fieldset>
               {canManageCredito && (
