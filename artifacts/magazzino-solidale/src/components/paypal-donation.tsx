@@ -2,28 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Heart } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { sostieniProgettoConfig } from "@/lib/sostieni-progetto";
+import {
+  readPaypalReminderDeadline,
+  sostieniProgettoConfig,
+  writePaypalReminderDeadline,
+} from "@/lib/sostieni-progetto";
 
 const firstReminderMs = 5 * 60_000;
 const repeatReminderMs = 20 * 60_000;
 const reminderDurationMs = 8_000;
 const paypalOpenedEvent = "magazzino:paypal-opened";
-let paypalOpenedWithoutStorage = false;
-
-function hasOpenedPaypal() {
-  try {
-    return paypalOpenedWithoutStorage || sessionStorage.getItem(paypalOpenedEvent) === "1";
-  } catch {
-    return paypalOpenedWithoutStorage;
-  }
-}
 
 function rememberPaypalOpening() {
-  try {
-    sessionStorage.setItem(paypalOpenedEvent, "1");
-  } catch {
-    paypalOpenedWithoutStorage = true;
-  }
+  writePaypalReminderDeadline(null);
   window.dispatchEvent(new Event(paypalOpenedEvent));
 }
 
@@ -55,20 +46,38 @@ export function PaypalDonationBanner() {
   const banner = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (hasOpenedPaypal()) return;
+    const savedDeadline = readPaypalReminderDeadline();
+    if (savedDeadline === null) return;
+    if (savedDeadline === undefined) {
+      writePaypalReminderDeadline(Date.now() + firstReminderMs);
+    }
 
-    const showReminder = () => {
+    let nextReminder: number | undefined;
+    const checkReminder = () => {
+      window.clearTimeout(nextReminder);
+      const deadline = readPaypalReminderDeadline();
+      if (deadline == null || document.visibilityState === "hidden") return;
+
+      const now = Date.now();
+      if (deadline > now) {
+        nextReminder = window.setTimeout(checkReminder, deadline - now);
+        return;
+      }
+
+      writePaypalReminderDeadline(now + repeatReminderMs);
       setVisible(true);
-      nextReminder = window.setTimeout(showReminder, repeatReminderMs);
+      nextReminder = window.setTimeout(checkReminder, repeatReminderMs);
     };
-    let nextReminder = window.setTimeout(showReminder, firstReminderMs);
     const stopReminders = () => {
       window.clearTimeout(nextReminder);
       setVisible(false);
     };
+    document.addEventListener("visibilitychange", checkReminder);
     window.addEventListener(paypalOpenedEvent, stopReminders);
+    checkReminder();
     return () => {
       window.clearTimeout(nextReminder);
+      document.removeEventListener("visibilitychange", checkReminder);
       window.removeEventListener(paypalOpenedEvent, stopReminders);
     };
   }, []);

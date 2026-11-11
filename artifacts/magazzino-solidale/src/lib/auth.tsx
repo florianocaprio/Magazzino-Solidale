@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useState, Fragment, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { authorizationSignature, isIdentityQuery } from "./auth-cache";
+import { writePaypalReminderDeadline } from "./sostieni-progetto";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCurrentUser,
@@ -118,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const setUser = (next: AuthUser) => {
+    writePaypalReminderDeadline(undefined);
     queryClient.setQueryData(CURRENT_USER_KEY, next);
   };
 
