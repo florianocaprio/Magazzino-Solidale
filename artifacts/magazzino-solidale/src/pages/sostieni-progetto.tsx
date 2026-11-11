@@ -3,10 +3,8 @@ import { useTranslation } from "react-i18next";
 import {
   CheckCircle2,
   Copy,
-  ExternalLink,
   Gift,
   HandHeart,
-  Heart,
   Landmark,
   Mail,
 } from "lucide-react";
@@ -21,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { PaypalDonationButton } from "@/components/paypal-donation";
 import { useToast } from "@/hooks/use-toast";
 import { buildSupportMailto, sostieniProgettoConfig } from "@/lib/sostieni-progetto";
 
@@ -221,18 +220,7 @@ export default function SostieniProgetto() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild className="w-full">
-              <a
-                href={sostieniProgettoConfig.paypalDonationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("sostieniProgetto.paypal.openExternalAria")}
-              >
-                <Heart className="h-4 w-4" />
-                {t("sostieniProgetto.paypal.donate")}
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
+            <PaypalDonationButton />
           </CardContent>
         </Card>
       </div>

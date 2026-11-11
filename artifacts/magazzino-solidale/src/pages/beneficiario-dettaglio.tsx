@@ -1132,6 +1132,7 @@ const makeEditSchema = (t: (k: string) => string, imported = false) =>
   z.object({
     cognome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     nome: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
+    soprannome: z.string().trim().max(80).optional(),
     codiceFiscale: z.string().optional(),
     fascicolo: z.string().trim().max(255).optional(),
     dataNascita: z
@@ -1662,6 +1663,7 @@ export function EditBeneficiarioSheet({
     defaultValues: {
       cognome: b.cognome ?? "",
       nome: b.nome ?? "",
+      soprannome: b.soprannome ?? "",
       codiceFiscale: b.codiceFiscale ?? "",
       fascicolo: b.fascicolo ?? "",
       dataNascita: b.dataNascita ? b.dataNascita.slice(0, 10) : "",
@@ -1739,6 +1741,7 @@ export function EditBeneficiarioSheet({
     const {
       codiceFiscale,
       restrizioniAlimentari,
+      soprannome,
       uds,
       areaOperativaId,
       zonaUdsId,
@@ -1806,6 +1809,9 @@ export function EditBeneficiarioSheet({
       if (udsContext) {
         delete payload.centroAscoltoId; delete payload.zonaUdsId; delete payload.areaOperativaId;
         delete payload.magazzinoEmporioPreferitoId; delete payload.uds;
+        if (soprannome !== undefined && soprannome !== (b.soprannome ?? "").trim()) {
+          payload.soprannome = soprannome;
+        }
       }
       const saved = await updateBeneficiario.mutateAsync({
         id: b.id,
@@ -1875,6 +1881,22 @@ export function EditBeneficiarioSheet({
                   )}
                 />
               </div>
+
+              {udsContext && (
+                <FormField
+                  control={form.control}
+                  name="soprannome"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} maxLength={80} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

@@ -88,6 +88,7 @@ import { currentNavigationItem } from "@/lib/navigation-current";
 import { useNavigationGroups } from "@/hooks/use-navigation-groups";
 import { hasServiceMenuAccess } from "@/lib/service-menu-access";
 import { Badge } from "@/components/ui/badge";
+import { PaypalDonationBanner } from "@/components/paypal-donation";
 
 export type NavItem = {
   key: string;
@@ -990,6 +991,7 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
           </header>
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
+        <PaypalDonationBanner />
       </div>
   );
 }

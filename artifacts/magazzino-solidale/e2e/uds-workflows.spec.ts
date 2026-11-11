@@ -196,6 +196,7 @@ test("la rettifica aperta mostra il nome salvato in anagrafica e conserva la boz
     data: {
       nome: "Nome iniziale",
       cognome: `Rettifica${Date.now()}`,
+      soprannome: "Soprannome iniziale",
       sesso: "M",
       fasciaEtaPresunta: "30_64",
       areaProvenienza: "UE",
@@ -220,12 +221,15 @@ test("la rettifica aperta mostra il nome salvato in anagrafica e conserva la boz
   await rectification.getByRole("button", { name: /nome iniziale/i }).click();
 
   const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  const nickname = editPerson.getByRole("textbox", { name: "Soprannome", exact: true });
+  await expect(nickname).toHaveValue("Soprannome iniziale");
+  await nickname.fill("Soprannome aggiornato");
   await editPerson.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
   const savePerson = editPerson.getByRole("button", { name: /^salva$/i })
     .and(editPerson.locator('button[type="submit"]'));
   await savePerson.click();
   await expect(editPerson).toBeHidden();
-  await expect(rectification.getByRole("button", { name: /nome aggiornato/i })).toBeVisible();
+  await expect(rectification.getByRole("button", { name: /nome aggiornato \(soprannome aggiornato\)/i })).toBeVisible();
   await expect(draft).toHaveValue("Bozza della rettifica");
 });
 
@@ -261,6 +265,15 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   }
   const cards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
   expect(cards).toHaveLength(1);
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  const nickname = edit.getByRole("textbox", { name: "Soprannome", exact: true });
+  await expect(nickname).toHaveValue("");
+  await nickname.fill("Nuovo soprannome");
+  await edit.getByRole("button", { name: /^salva$/i }).and(edit.locator('button[type="submit"]')).click();
+  await expect(edit).toBeHidden();
+  const updated = await page.request.get(`/api/beneficiari/${person.id}`);
+  expect(await updated.json()).toMatchObject({ soprannome: "Nuovo soprannome" });
   // I pulsanti sono nel contenitore immediato del rispettivo selettore.
   const centrePicker = page.getByRole("combobox", { name: /centro di ascolto di riferimento/i });
   await selectOption(page, centrePicker, centre.nome);

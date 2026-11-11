@@ -1,5 +1,6 @@
 export const sostieniProgetto = {
   it: {
+    freeVersion: "Versione gratuita",
     title: "Sostieni Magazzino Solidale",
     subtitle:
       "Informazioni su donazioni libere e supporto annuale per contribuire alla continuità del progetto.",
@@ -65,6 +66,7 @@ export const sostieniProgetto = {
       "La donazione e il servizio di supporto annuale sono facoltativi e non costituiscono un requisito per l'utilizzo della piattaforma. Magazzino Solidale continua a essere reso disponibile gratuitamente secondo le condizioni previste dal progetto.",
   },
   es: {
+    freeVersion: "Versión gratuita",
     title: "Apoya Magazzino Solidale",
     subtitle:
       "Información sobre donaciones libres y soporte anual para contribuir a la continuidad del proyecto.",
@@ -129,6 +131,7 @@ export const sostieniProgetto = {
       "La donación y el servicio de soporte anual son opcionales y no constituyen un requisito para utilizar la plataforma. Magazzino Solidale sigue estando disponible gratuitamente según las condiciones previstas por el proyecto.",
   },
   en: {
+    freeVersion: "Free version",
     title: "Support Magazzino Solidale",
     subtitle:
       "Information about voluntary donations and annual support to help sustain the project.",
@@ -191,6 +194,7 @@ export const sostieniProgetto = {
       "The donation and annual support service are optional and are not a requirement for using the platform. Magazzino Solidale continues to be made available free of charge according to the conditions set by the project.",
   },
   fr: {
+    freeVersion: "Version gratuite",
     title: "Soutenir Magazzino Solidale",
     subtitle:
       "Informations sur les dons libres et le support annuel pour contribuer à la continuité du projet.",
@@ -256,6 +260,7 @@ export const sostieniProgetto = {
       "Le don et le service de support annuel sont facultatifs et ne constituent pas une condition d'utilisation de la plateforme. Magazzino Solidale continue d'être mis à disposition gratuitement selon les conditions prévues par le projet.",
   },
   de: {
+    freeVersion: "Kostenlose Version",
     title: "Magazzino Solidale unterstützen",
     subtitle:
       "Informationen zu freiwilligen Spenden und jährlichem Support, um zur Kontinuität des Projekts beizutragen.",
@@ -320,6 +325,7 @@ export const sostieniProgetto = {
       "Die Spende und der jährliche Support-Service sind freiwillig und keine Voraussetzung für die Nutzung der Plattform. Magazzino Solidale bleibt gemäß den Bedingungen des Projekts kostenlos verfügbar.",
   },
   ar: {
+    freeVersion: "النسخة المجانية",
     title: "ادعم Magazzino Solidale",
     subtitle:
       "معلومات عن التبرعات الاختيارية والدعم السنوي للمساهمة في استمرارية المشروع.",

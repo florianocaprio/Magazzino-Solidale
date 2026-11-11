@@ -1,6 +1,6 @@
 export const reportUds = {
   it: {
-    title: "Report UDS",
+    title: "Dashboard UDS",
     subtitle: "Analisi delle attività di Unità di Strada.",
     from: "Dal",
     to: "Al",
@@ -33,7 +33,7 @@ export const reportUds = {
     tipo_altro: "Altro",
   },
   es: {
-    title: "Informes UDS",
+    title: "Panel UDS",
     subtitle: "Análisis de las actividades de Unidad de Calle.",
     from: "Desde",
     to: "Hasta",
@@ -66,7 +66,7 @@ export const reportUds = {
     tipo_altro: "Otro",
   },
   en: {
-    title: "UDS Reports",
+    title: "UDS Dashboard",
     subtitle: "Street outreach activity analytics.",
     from: "From",
     to: "To",
@@ -99,7 +99,7 @@ export const reportUds = {
     tipo_altro: "Other",
   },
   fr: {
-    title: "Rapports UDS",
+    title: "Tableau de bord UDS",
     subtitle: "Analyse des activités d'Unité de Rue.",
     from: "Du",
     to: "Au",
@@ -132,7 +132,7 @@ export const reportUds = {
     tipo_altro: "Autre",
   },
   de: {
-    title: "UDS-Berichte",
+    title: "UDS-Dashboard",
     subtitle: "Auswertung der Straßeneinsatz-Aktivitäten.",
     from: "Von",
     to: "Bis",
@@ -165,7 +165,7 @@ export const reportUds = {
     tipo_altro: "Sonstiges",
   },
   ar: {
-    title: "تقارير وحدة الشارع",
+    title: "لوحة معلومات وحدة الشارع",
     subtitle: "تحليل أنشطة وحدة الشارع.",
     from: "من",
     to: "إلى",
