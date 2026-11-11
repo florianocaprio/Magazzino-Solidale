@@ -16958,6 +16958,14 @@ components:
         priorita: { type: string, enum: [bassa, media, alta, urgente] }
         consegnaDomicilio: { type: boolean }
         versione: { type: integer, minimum: 1 }
+        servizi:
+          type: object
+          description: Disponibilità attuale dei servizi, senza codici tessera o informazioni economiche.
+          properties:
+            tessera: { type: boolean }
+            emporio: { type: boolean }
+            mensa: { type: boolean }
+          required: [tessera, emporio, mensa]
       required:
         [
           id,

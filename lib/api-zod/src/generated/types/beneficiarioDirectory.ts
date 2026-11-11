@@ -9,6 +9,7 @@ import type { BeneficiarioDirectoryFasciaEtaCorrente } from "./beneficiarioDirec
 import type { BeneficiarioDirectoryFasciaEtaOrigine } from "./beneficiarioDirectoryFasciaEtaOrigine";
 import type { BeneficiarioDirectoryFasciaEtaPresunta } from "./beneficiarioDirectoryFasciaEtaPresunta";
 import type { BeneficiarioDirectoryPriorita } from "./beneficiarioDirectoryPriorita";
+import type { BeneficiarioDirectoryServizi } from "./beneficiarioDirectoryServizi";
 import type { BeneficiarioDirectoryStatoAnagrafica } from "./beneficiarioDirectoryStatoAnagrafica";
 
 /**
@@ -51,4 +52,6 @@ export interface BeneficiarioDirectory {
   consegnaDomicilio: boolean;
   /** @minimum 1 */
   versione: number;
+  /** Disponibilità attuale dei servizi, senza codici tessera o informazioni economiche. */
+  servizi?: BeneficiarioDirectoryServizi;
 }

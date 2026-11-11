@@ -228,6 +228,7 @@ export function BeneficiarioMensaCard({
           path.startsWith("/api/mensa/abilitazioni") ||
           path === "/api/mensa/accessi" ||
           path === "/api/mensa/beneficiari/ricerca" ||
+          path === "/api/beneficiari" ||
           path === `/api/beneficiari/${beneficiario.id}` ||
           path.startsWith(`/api/beneficiari/${beneficiario.id}/`)
         );

@@ -310,6 +310,15 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
   await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa/i })).toHaveCount(0);
+  const socialCard = page.waitForResponse((response) =>
+    response.request().method() === "POST" && response.url().endsWith(`/api/beneficiari/${person.id}/tessera-documento`),
+  );
+  const reprint = page.waitForEvent("download");
+  await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
+  const cardResponse = await socialCard;
+  expect(cardResponse.status()).toBe(200);
+  expect(await cardResponse.json()).toEqual(cards[0]);
+  expect((await reprint).suggestedFilename()).toMatch(/\.pdf$/i);
   await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   await expect(page.getByRole("dialog", { name: /modifica anagrafica/i }).getByLabel(/fascicolo/i)).toHaveValue(fascicolo);
 });

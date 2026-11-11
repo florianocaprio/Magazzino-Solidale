@@ -118,6 +118,7 @@ export * from "./beneficiarioDirectoryFasciaEtaCorrente";
 export * from "./beneficiarioDirectoryFasciaEtaOrigine";
 export * from "./beneficiarioDirectoryFasciaEtaPresunta";
 export * from "./beneficiarioDirectoryPriorita";
+export * from "./beneficiarioDirectoryServizi";
 export * from "./beneficiarioDirectoryStatoAnagrafica";
 export * from "./beneficiarioFasciaEtaCorrente";
 export * from "./beneficiarioFasciaEtaOrigine";

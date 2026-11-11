@@ -119,9 +119,11 @@ export function UdsServiceStates({ id }: { id: number }) {
 export function TesseraDocumentoSection({
   b,
   udsContext = false,
+  compact = false,
 }: {
   b: BeneficiarioDettaglio;
   udsContext?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { user, hasArea, hasPermission } = useAuth();
@@ -148,7 +150,12 @@ export function TesseraDocumentoSection({
     try {
       const stored = await mutation.mutateAsync({ id: b.id });
       setCard(stored);
-      await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith(`/api/beneficiari/${b.id}/`) });
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return key === "/api/beneficiari" || key.startsWith(`/api/beneficiari/${b.id}/`);
+        },
+      });
       const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
       await generateTesseraPdf({
         beneficiario: {
@@ -175,14 +182,11 @@ export function TesseraDocumentoSection({
     (card.stato !== "attiva" ||
       card.dataRevoca != null ||
       (card.dataScadenza != null && card.dataScadenza < todayEuropeRome()));
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("blocco04.card")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {card && (
-          <p>
+  if (compact && !canDownload) return null;
+  const content = (
+    <>
+        {!compact && card && (
+          <div>
             {invalid ? (
               <Badge variant="destructive">
                 {t("blocco04.cardInvalid", {
@@ -195,7 +199,7 @@ export function TesseraDocumentoSection({
             ) : (
               <Badge>{t("common.active")}</Badge>
             )}
-          </p>
+          </div>
         )}
         <Button
           type="button"
@@ -206,7 +210,16 @@ export function TesseraDocumentoSection({
         </Button>
         {!canDownload && <p>{t("blocco04.noPermission")}</p>}
         {error && <p role="alert">{error}</p>}
-      </CardContent>
+    </>
+  );
+  if (compact) return <div className="space-y-2">{content}</div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("blocco04.card")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">{content}</CardContent>
     </Card>
   );
 }

@@ -36,7 +36,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
+import { NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
 import { getEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey } from "@workspace/api-client-react";
 import { createBeneficiarioWithOptionalServices, type BeneficiarioServicesResult } from "@/lib/beneficiario-mensa-workflow";
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
@@ -173,7 +173,7 @@ export default function Beneficiari() {
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
     query: {
       queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(mensaSummaryParams),
-      enabled: canViewMensa && beneficiarioIds.length > 0,
+      enabled: canViewMensa && canExport && beneficiarioIds.length > 0,
     },
   });
   const mensaSummaryByBeneficiario = useMemo(() => new Map<number, MensaAbilitazioneRiepilogoBeneficiario>(
@@ -636,7 +636,7 @@ export default function Beneficiari() {
                 <TableHead>{t("common.code")}</TableHead>
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
-                {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
+                <TableHead className="text-center">{t("beneficiari.colServizi")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -649,14 +649,14 @@ export default function Beneficiari() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
-                    {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
+                    <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -680,17 +680,19 @@ export default function Beneficiari() {
                     </TableCell>
                   )}
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
-                  {canViewMensa && (
-                    <TableCell className="text-center">
-                      {mensaSummary.isLoading ? (
-                        <Skeleton className="h-6 w-24 mx-auto rounded-full" />
-                      ) : mensaSummary.isError ? (
-                        <span className="text-muted-foreground">-</span>
-                      ) : (
-                        <MensaStatusBadge state={mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato"} />
-                      )}
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {(["tessera", "emporio", "mensa"] as const).map((service) => {
+                        const active = b.servizi?.[service] === true;
+                        return (
+                          <Badge key={service} variant={active ? "default" : "outline"} className={active ? "" : "text-muted-foreground"}>
+                            {service === "tessera" ? t("blocco04.card") : service === "emporio" ? "Emporio" : "Mensa"}
+                            <span className="sr-only"> {t(active ? "common.active" : "common.inactive")}</span>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center">
                       <Switch

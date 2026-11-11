@@ -9150,6 +9150,16 @@ export const ListBeneficiariResponseItem = zod
     priorita: zod.enum(["bassa", "media", "alta", "urgente"]),
     consegnaDomicilio: zod.boolean(),
     versione: zod.number().min(1),
+    servizi: zod
+      .object({
+        tessera: zod.boolean(),
+        emporio: zod.boolean(),
+        mensa: zod.boolean(),
+      })
+      .optional()
+      .describe(
+        "Disponibilità attuale dei servizi, senza codici tessera o informazioni economiche.",
+      ),
   })
   .describe(
     "Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.",

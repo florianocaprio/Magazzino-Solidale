@@ -703,7 +703,11 @@ export default function BeneficiarioDettaglio() {
         <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} readOnly />
       )}
 
-      {udsContext ? <><UdsServiceStates id={b.id} /><UdsTerritoryFields b={b} /><TesseraDocumentoSection b={b} udsContext /></> : <BeneficiarioServiziRiepilogo id={b.id} />}
+      {udsContext ? (
+        <><UdsServiceStates id={b.id} /><UdsTerritoryFields b={b} /><TesseraDocumentoSection b={b} udsContext /></>
+      ) : (
+        <BeneficiarioServiziRiepilogo id={b.id} cardAction={<TesseraDocumentoSection b={b} compact />} />
+      )}
 
       {canViewRequests && (
         <Card>

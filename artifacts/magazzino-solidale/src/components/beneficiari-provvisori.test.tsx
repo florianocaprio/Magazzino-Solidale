@@ -159,6 +159,7 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
           uds: false,
           attivo: true,
           versione: 3,
+          servizi: { tessera: true, emporio: false, mensa: true },
         },
       ],
       isLoading: false,
@@ -211,22 +212,20 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     );
   });
 
-  it("mantiene la colonna Mensa per i ruoli abilitati", async () => {
-    mocks.permissions.add("mensa.view");
-    mocks.getMensaRiepilogo.mockReturnValue({
-      data: [{ beneficiarioId: 10, stato: "attiva" }],
-      isLoading: false,
-    });
+  it("mostra i tre tag Servizi e colora quelli attivi per il Centro di Ascolto", async () => {
+    mocks.areas = new Set(["sociale"]);
     await act(async () => root.render(<Beneficiari />));
-    expect(container.querySelector("tbody")?.textContent).toContain("ATTIVA");
-    mocks.getMensaRiepilogo.mockReturnValue({
-      data: [{ beneficiarioId: 10, stato: "non_abilitato" }],
-      isLoading: false,
-    });
-    await act(async () => root.render(<Beneficiari />));
-    expect(container.querySelector("tbody")?.textContent).toContain(
-      "NON ABILITATO",
-    );
+    const headers = [...container.querySelectorAll("thead th")].map((cell) => cell.textContent);
+    expect(headers[headers.indexOf("beneficiari.colPriorita") + 1]).toBe("beneficiari.colServizi");
+    expect(headers).not.toContain("Mensa");
+    const tags = [...container.querySelectorAll("tbody .sr-only")]
+      .filter((label) => label.textContent?.includes("common.active") || label.textContent?.includes("common.inactive"));
+    expect(tags.map((label) => label.parentElement?.textContent?.trim())).toEqual([
+      "blocco04.card common.active",
+      "Emporio common.inactive",
+      "Mensa common.active",
+    ]);
+    expect(tags.map((label) => label.parentElement?.classList.contains("bg-primary"))).toEqual([true, false, true]);
   });
 
   it("mostra il badge Provvisoria e il filtro dedicato", async () => {
@@ -341,8 +340,8 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     );
   });
 
-  it("usa una sola query aggregata e mostra gli stati Mensa in tabella", async () => {
-    mocks.permissions = new Set(["mensa.view"]);
+  it("mantiene la query aggregata per gli stati Mensa dell'esportazione", async () => {
+    mocks.permissions = new Set(["mensa.view", "beneficiari.export"]);
     mocks.listBeneficiari.mockReturnValue({
       data: [
         {
@@ -417,9 +416,6 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
         }),
       ]);
     }
-    expect(document.body.textContent).toContain("ATTIVA");
-    expect(document.body.textContent).toContain("PROGRAMMATA");
-    expect(document.body.textContent).toContain("NON ABILITATO");
   });
 
   it("B19: naviga pagina 1, pagina 2, ritorna e resetta a pagina 1", async () => {

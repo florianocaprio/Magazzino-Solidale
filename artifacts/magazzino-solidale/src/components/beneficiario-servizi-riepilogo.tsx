@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { getGetBeneficiarioStatiServiziQueryKey, useGetBeneficiarioStatiServizi } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
@@ -5,7 +6,7 @@ import { documentAuthContext } from "@/hooks/use-documento-access";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export function BeneficiarioServiziRiepilogo({ id }: { id: number }) {
+export function BeneficiarioServiziRiepilogo({ id, cardAction }: { id: number; cardAction?: ReactNode }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const query = useGetBeneficiarioStatiServizi(id, { query: {
@@ -22,6 +23,7 @@ export function BeneficiarioServiziRiepilogo({ id }: { id: number }) {
       <Badge variant={data?.[key].stato === "attivo" || data?.[key].stato === "attiva" ? "default" : "outline"}>
         {query.isLoading ? t("common.loading") : !data ? t("blocco04.unavailable") : !data[key].disponibile ? t("blocco04.disabled") : label(data[key].stato)}
       </Badge>
+      {key === "tessera" && cardAction}
     </div>)}
     {query.isError && <Button type="button" variant="outline" onClick={() => void query.refetch()}>{t("common.retry", { defaultValue: "Riprova" })}</Button>}
   </section>;

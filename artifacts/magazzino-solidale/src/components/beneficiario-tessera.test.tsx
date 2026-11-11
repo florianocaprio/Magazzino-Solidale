@@ -289,7 +289,8 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
   it("riconosce la tessera legacy attiva e richiede il motivo prima della sostituzione", async () => {
     await act(async () => root.render(<BeneficiarioDettaglio />));
     expect(document.body.textContent).toContain("Tessera attiva legacy");
-    expect(document.body.textContent).not.toContain("blocco04.cardDownload");
+    expect(document.querySelector('[aria-label="blocco04.services"]')?.textContent).toContain("blocco04.cardDownload");
+    expect(recoverCard).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("Sostituisci tessera");
     const edit = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"));
     await act(async () => edit?.click());

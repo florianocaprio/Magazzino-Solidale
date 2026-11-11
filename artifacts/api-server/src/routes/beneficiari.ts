@@ -3,8 +3,8 @@ import { readBeneficiarioFascicolo, saveBeneficiarioFascicolo, BeneficiarioFasci
 import { isModuloAttivo } from "../lib/featureFlags";
 import { requireCurrentCommandActor, CurrentCommandActorError } from "../lib/currentCommandActor";
 import { beneficiarioAccessScopeFromRequest, canAccessBeneficiarioScope } from "../lib/beneficiarioPolicy";
-import { emporioAbilitazioniTable, mensaAbilitazioniTable } from "@workspace/db";
-import { emporioEligibilityState } from "../lib/emporioScope";
+import { emporioAbilitazioniTable, mensaAbilitazioniTable, menseTable } from "@workspace/db";
+import { emporioEligibilityCondition, emporioEligibilityState } from "../lib/emporioScope";
 import { riepilogoAbilitazioneMensa, type MensaRiepilogoHistoryRow } from "../lib/mensaEligibilitySummary";
 import { allocateBeneficiaryCode, BeneficiaryCodeError } from "../lib/beneficiariCodice";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
@@ -561,6 +561,11 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const [{ total }] = await db.select({ total: sql<number>`count(*)::int` })
     .from(beneficiariTable).where(where);
+  const today = dataCivileEuropeRome();
+  const [emporioEnabled, mensaEnabled] = await Promise.all([
+    isModuloAttivo("EMPORIO_SOLIDALE"),
+    isModuloAttivo("MENSA"),
+  ]);
   const rows = await db
     .select({
       b: beneficiariTable,
@@ -568,6 +573,24 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
       areaOperativaNome: areeOperativeTable.nome,
       magazzinoEmporioPreferitoNome: magazziniTable.nome,
       zonaUdsNome: zoneUdsTable.nome,
+      tesseraAttiva: sql<boolean>`exists (
+        select 1 from ${tessereBeneficiariTable}
+        where ${tessereBeneficiariTable.beneficiarioId} = ${beneficiariTable.id}
+          and ${tessereBeneficiariTable.stato} = 'attiva'
+          and ${tessereBeneficiariTable.dataRevoca} is null
+          and (${tessereBeneficiariTable.dataScadenza} is null or ${tessereBeneficiariTable.dataScadenza} >= ${today})
+      )`,
+      emporioAttivo: emporioEnabled ? sql<boolean>`${emporioEligibilityCondition()}` : sql<boolean>`false`,
+      mensaAttiva: mensaEnabled ? sql<boolean>`exists (
+        select 1 from ${mensaAbilitazioniTable}
+        join ${menseTable} on ${menseTable.id} = ${mensaAbilitazioniTable.mensaId}
+        where ${mensaAbilitazioniTable.beneficiarioId} = ${beneficiariTable.id}
+          and ${menseTable.areaOperativaId} = ${beneficiariTable.areaOperativaId}
+          and ${mensaAbilitazioniTable.mensaPrincipale}
+          and ${mensaAbilitazioniTable.stato} = 'attiva'
+          and ${mensaAbilitazioniTable.dataInizio} <= ${today}
+          and (${mensaAbilitazioniTable.dataFine} is null or ${mensaAbilitazioniTable.dataFine} >= ${today})
+      )` : sql<boolean>`false`,
     })
     .from(beneficiariTable)
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
@@ -581,7 +604,10 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   res.setHeader("X-Total-Count", String(total));
   res.setHeader("X-Page", String(page));
   res.setHeader("X-Page-Size", String(limit));
-  res.json(rows.map(r => fmtBeneficiarioDirectory(r.b, r.centroNome, r.areaOperativaNome, r.zonaUdsNome)));
+  res.json(rows.map((r) => ({
+    ...fmtBeneficiarioDirectory(r.b, r.centroNome, r.areaOperativaNome, r.zonaUdsNome),
+    servizi: { tessera: r.tesseraAttiva, emporio: r.emporioAttivo, mensa: r.mensaAttiva },
+  })));
 });
 
 type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];

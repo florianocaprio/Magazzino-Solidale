@@ -4525,6 +4525,15 @@ export const BeneficiarioDirectoryPriorita = {
 } as const;
 
 /**
+ * Disponibilità attuale dei servizi, senza codici tessera o informazioni economiche.
+ */
+export type BeneficiarioDirectoryServizi = {
+  tessera: boolean;
+  emporio: boolean;
+  mensa: boolean;
+};
+
+/**
  * Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.
  */
 export interface BeneficiarioDirectory {
@@ -4564,6 +4573,8 @@ export interface BeneficiarioDirectory {
   consegnaDomicilio: boolean;
   /** @minimum 1 */
   versione: number;
+  /** Disponibilità attuale dei servizi, senza codici tessera o informazioni economiche. */
+  servizi?: BeneficiarioDirectoryServizi;
 }
 
 export type BeneficiarioStatoAnagrafica =

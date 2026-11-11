@@ -221,7 +221,7 @@ it("F02 inactive Area denies ordinary UDS, while explicit administrative global 
 });
 
 it("emette una sola tessera alla prima richiesta PDF dell'operatore sociale nella sua Area", async () => {
-  const { f, user, agent } = await fixture(["sociale"]);
+  const { f, user, agent, person } = await fixture(["sociale"]);
   const scope = newScope();
   const centre = await createCentroRec(scope, { areaOperativaId: f.area });
   const otherArea = await createAreaOperativa(scope);
@@ -247,6 +247,34 @@ it("emette una sola tessera alla prima richiesta PDF dell'operatore sociale nell
   expect((await agent.post(endpoint).send({})).body).toEqual(download.body);
   expect((await agent.post(`/api/beneficiari/${foreign}/tessera-documento`).send({})).status).toBe(403);
   expect((await agent.post(`/api/beneficiari/${id}/tessere`).send({})).status).toBe(403);
+
+  // La persona UDS senza Centro compare nella lista sociale della stessa Area.
+  const profile = await agent.get(`/api/beneficiari/${person}`);
+  expect(profile.status, profile.text).toBe(200);
+  expect(profile.body).toMatchObject({ uds: true, centroAscoltoId: null });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", true, null);
+  await pool.query(
+    "insert into emporio_abilitazioni (beneficiario_id, area_operativa_id, stato, operatore_id, motivo) values ($1,$2,'attivo',$3,'Test')",
+    [person, f.area, user.id],
+  );
+  await pool.query(
+    "insert into mensa_abilitazioni (beneficiario_id, mensa_id, data_inizio) values ($1,$2,'2020-01-01')",
+    [person, f.canteens[0].id],
+  );
+  const listServices = async () => {
+    const list = await agent.get("/api/beneficiari").query({ search: profile.body.codice });
+    expect(list.status, list.text).toBe(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].id).toBe(person);
+    return list.body[0].servizi;
+  };
+  expect(await listServices()).toEqual({ tessera: false, emporio: true, mensa: true });
+  const unassignedCard = await agent.post(`/api/beneficiari/${person}/tessera-documento`).send({});
+  expect(unassignedCard.status, unassignedCard.text).toBe(200);
+  expect(await listServices()).toEqual({ tessera: true, emporio: true, mensa: true });
+  const states = await agent.get(`/api/beneficiari/${person}/stati-servizi`);
+  expect(states.status, states.text).toBe(200);
+  expect(states.body.tessera).toEqual({ disponibile: true, stato: "attiva" });
 });
 
 it("BUG21: stati UDS minimi e prima tessera concorrente, senza concessione di gestione Mensa/tessere", async () => {
