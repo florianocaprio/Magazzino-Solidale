@@ -150,6 +150,8 @@ useListMagazziniOperativi: () => ({ data: [] }),
     isPending: false,
   }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), mutateAsync: patchPerson, isPending: false }),
+  useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateUdsBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateCreditoSolidaleBeneficiarioConfigurazione: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -364,6 +366,18 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     const save = Array.from(picker.parentElement!.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent === "common.save")!;
     await act(async () => save.click());
     expect(patchPerson).toHaveBeenCalledWith({ id: 42, data: { zonaUdsId: null, versione: 7 } });
+  });
+
+  it("apre il modulo per aggiungere un componente dalla scheda Beneficiari", async () => {
+    window.history.replaceState(null, "", "/beneficiari/42");
+    await act(async () => root.render(<BeneficiarioDettaglio />));
+
+    const add = buttonByText("beneficiarioDettaglio.aggiungiComponente");
+    expect(add).toBeDefined();
+    await act(async () => add!.click());
+
+    const form = document.querySelector('[role="dialog"] form');
+    expect(form?.querySelector('input[name="nome"]')).toBeInstanceOf(HTMLInputElement);
   });
 
   it("modifica un componente e mostra la fascia calcolata senza renderla editabile", async () => {

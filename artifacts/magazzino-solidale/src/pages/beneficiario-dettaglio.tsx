@@ -170,15 +170,12 @@ const formatCreditoQuota = (v: number | null | undefined): string =>
     ? "-"
     : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(v);
 
-export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
-  udsSheetId?: number;
-  onProfileSaved?: () => void;
-} = {}) {
+export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
   const { id } = useParams();
-  const numId = udsSheetId ?? Number(id);
+  const numId = Number(id);
   const [location, navigate] = useLocation();
-  const udsContext = udsSheetId != null || location.startsWith("/uds/anagrafica/");
+  const udsContext = location.startsWith("/uds/anagrafica/");
   const params = useSearch();
   const udsReturn = udsDirectoryReturnPath(new URLSearchParams(params).get("ritorno"));
   const emporioEligibility = emporioReadableData(useBeneficiarioEmporio(numId, !udsContext));
@@ -412,7 +409,7 @@ export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
   if (!b)
     return <div className="p-6">{t("beneficiarioDettaglio.notFound")}</div>;
 
-  const canManageUdsStatus = udsContext && udsSheetId == null && b.uds &&
+  const canManageUdsStatus = udsContext && b.uds &&
     canManage && hasPermission("uds.directory.view");
   const udsActionPending = deleteBeneficiario.isPending || updateUdsStato.isPending;
   const confirmation = udsConfirmation?.id === b.id ? udsConfirmation : null;
@@ -444,11 +441,11 @@ export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {udsContext && udsSheetId == null && <div className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="outline"><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button>
+      {udsContext && <div className="flex flex-wrap items-center gap-3">
+        <Button asChild><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button>
         <h2>{t("blocco04.udsPerson")}</h2>
         {hasPermission("uds.interventi.view") && (
-          <Button asChild variant="outline">
+          <Button asChild>
             <Link href={udsPersonInterventionsPath(b.id)}>
               {t("udsInterventi.personHistory")}
             </Link>
@@ -457,14 +454,14 @@ export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
       </div>}
       {canManageUdsStatus && (
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={udsActionPending} onClick={() => setUdsConfirmation({
+          <Button disabled={udsActionPending} onClick={() => setUdsConfirmation({
             id: b.id, versione: b.versione, action: b.udsAttivo === false ? "reactivate" : "deactivate",
           })}>
             {b.udsAttivo === false
               ? t("udsAnagrafica.reactivateUds")
               : t("udsAnagrafica.deactivateUds")}
           </Button>
-          <Button variant="outline" disabled={udsActionPending} className="text-destructive" onClick={() => setUdsConfirmation({
+          <Button variant="destructive" disabled={udsActionPending} onClick={() => setUdsConfirmation({
             id: b.id, versione: b.versione, action: "delete",
           })}>
             {t("beneficiari.deletePermanent")}
@@ -693,7 +690,6 @@ export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
             });
             void invalidateBeneficiarioTerritory(queryClient);
             void queryClient.invalidateQueries({queryKey:getCalcolaCreditoSolidaleBeneficiarioQueryKey(numId)});
-            onProfileSaved?.();
             toast({ title: t("beneficiarioDettaglio.toastUpdated") });
             setEditing(false);
           }}
@@ -964,6 +960,7 @@ export default function BeneficiarioDettaglio({ udsSheetId, onProfileSaved }: {
                 <NucleoSection
                   b={b}
                   canManage={udsContext && canManage}
+                  canAdd={canManage}
                   onChanged={() => { void queryClient.invalidateQueries({predicate:q=>/\/api\/(beneficiari|credito-solidale)(?:\/|$)/.test(String(q.queryKey[0]))}); }}
                 />
               </TabsContent>
@@ -1569,6 +1566,48 @@ function CreditoSolidaleSaldoPanel({
         />
       )}
     </Card>
+  );
+}
+
+export function EditUdsBeneficiarioSheet({ id, onClose, onSaved }: {
+  id: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: b, isLoading, isError } = useGetBeneficiario(id, {
+    query: { queryKey: getGetBeneficiarioQueryKey(id) },
+  });
+
+  if (isLoading || isError || !b) {
+    return (
+      <Sheet open onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="w-full sm:max-w-md" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle>{t("beneficiarioDettaglio.editAnagrafica")}</SheetTitle>
+          </SheetHeader>
+          {isLoading ? <Skeleton className="mt-6 h-32" /> : (
+            <p role="alert" className="mt-6">{t("beneficiarioDettaglio.notFound")}</p>
+          )}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <EditBeneficiarioSheet
+      b={b}
+      udsContext
+      onClose={onClose}
+      onSaved={() => {
+        void invalidateBeneficiarioTerritory(queryClient);
+        toast({ title: t("beneficiarioDettaglio.toastUpdated") });
+        onSaved();
+        onClose();
+      }}
+    />
   );
 }
 
@@ -2479,10 +2518,12 @@ type MembroValues = z.infer<ReturnType<typeof makeMembroSchema>>;
 function NucleoSection({
   b,
   canManage,
+  canAdd = canManage,
   onChanged,
 }: {
   b: BeneficiarioDettaglioType;
   canManage: boolean;
+  canAdd?: boolean;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
@@ -2576,8 +2617,9 @@ function NucleoSection({
         <CardTitle className="text-base">
           {t("beneficiarioDettaglio.composizione")}
         </CardTitle>
-        {canManage && (
+        {canAdd && (
           <Button
+            type="button"
             size="sm"
             variant="outline"
             className="gap-2"

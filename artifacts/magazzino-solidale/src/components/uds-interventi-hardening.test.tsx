@@ -224,6 +224,7 @@ describe("hardening UI Interventi UDS", () => {
     mocks.personaSheetProps = null;
     mocks.permissions = new Set([
       "uds.interventi.view",
+      "uds.directory.view",
       "uds.interventi.create",
       "uds.interventi.update",
       "uds.interventi.note",

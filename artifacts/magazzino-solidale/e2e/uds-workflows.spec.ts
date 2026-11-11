@@ -14,7 +14,7 @@ async function runUdsLifecycle(
   auditTablet = false,
 ) {
   await login(page);
-  await expect(page).toHaveURL(/\/uds\/interventi$/);
+  await expect(page).toHaveURL((url) => url.pathname === "/");
   const suffix = Date.now();
   const initialDescription = `Incontro UDS E2E ${suffix}`;
   const rectifiedDescription = `${initialDescription} rettificato`;
@@ -100,11 +100,9 @@ async function runUdsLifecycle(
     .getByRole("textbox", { name: /sintesi dell'incontro/i })
     .fill(rectifiedDescription);
   await rectification.getByRole("button", { name: /Demo 001/i }).click();
-  const profile = page.getByRole("dialog").filter({
-    has: page.getByRole("heading", { name: /Demo 001 Beneficiario/i }),
-  });
-  await expect(profile).toBeVisible();
-  await profile.getByRole("button", { name: "Close", exact: true }).click();
+  const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await expect(editPerson.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue("Beneficiario");
+  await editPerson.getByRole("button", { name: "Close", exact: true }).click();
   await expect(rectification.getByRole("textbox", { name: /sintesi dell'incontro/i })).toHaveValue(rectifiedDescription);
   await rectification
     .getByRole("textbox", { name: /motivo della rettifica/i })
@@ -160,7 +158,11 @@ async function runUdsLifecycle(
     ]),
   );
   await page.goto(`/uds/anagrafica/${created.beneficiarioId}`);
-  await page.getByRole("link", { name: /vedi tutti gli interventi uds/i }).click();
+  const historyLink = page.getByRole("link", { name: /vedi tutti gli interventi uds/i });
+  await expect(historyLink).toHaveClass(/\bbg-primary\b/);
+  await expect(page.getByRole("button", { name: /disattiva in uds/i })).toHaveClass(/\bbg-primary\b/);
+  await expect(page.getByRole("button", { name: /elimina definitivamente/i })).toHaveClass(/\btext-destructive-foreground\b/);
+  await historyLink.click();
   await expect(page).toHaveURL(new RegExp(`/uds/interventi\\?beneficiarioId=${created.beneficiarioId}$`));
   await expect(row).toContainText(rectifiedDescription);
 }

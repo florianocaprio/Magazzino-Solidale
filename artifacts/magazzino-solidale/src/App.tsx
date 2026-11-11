@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation, useSearch, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { MENSA_REQUEST_READ_PERMISSIONS } from "@/lib/mensa-request-access";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -357,12 +357,12 @@ function ReportingRoute({
 function AuthorizedHome() {
   const { user, hasArea, hasPermission } = useAuth();
   const flags = useConfigurazioneAmbienteFlags();
-  const search = useSearch();
   if (flags.isLoading) return <Loader2 className="m-auto h-6 w-6 animate-spin" />;
-  if (new URLSearchParams(search).get("accesso") === "uds") {
-    const canOpenUds = hasArea("uds") && hasPermission("uds.interventi.view") && flags.isModuloAttivo("UDS");
-    return <Redirect to={canOpenUds ? "/uds/interventi" : "/"} replace />;
-  }
+  if (
+    user?.ruoloNome === "Operatore UDS" && hasArea("uds") &&
+    hasPermission("uds.interventi.view") && flags.isModuloAttivo("UDS")
+  )
+    return <Redirect to="/uds/interventi" replace />;
   if (hasArea("generale") && flags.isModuloAttivo("REPORT")) return <Dashboard />;
   const destination = NAV_ITEMS.find((item) => item.url !== "/" && !item.public &&
     (!item.globalAdmin || canManageGlobalAdminResources(user)) &&

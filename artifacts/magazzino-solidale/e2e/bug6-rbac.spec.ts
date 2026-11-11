@@ -70,7 +70,7 @@ const profiles = [
   {
     name: "BUG6 multi",
     routes: ["/turni", "/uds/report-giornaliero"],
-    grants: ["logistica.turni.view", "uds.reports.view"],
+    grants: ["logistica.turni.view", "uds.reports.view", "uds.interventi.view"],
     areas: ["logistica", "uds"],
   },
   {
@@ -94,7 +94,7 @@ const expectedHome: Record<string, string> = {
   Operatore: "/",
   "Operatore Magazzino": "/prodotti",
   "Operatore Logistica": "/turni",
-  "Operatore UDS": "/uds/anagrafica",
+  "Operatore UDS": "/uds/interventi",
   Emporio: "/emporio/cassa",
   "Operatore Mensa": "/mensa/postazione",
   Volontario: "/consegne",
@@ -361,6 +361,16 @@ for (const profile of profiles)
     await expect(page).toHaveURL(
       (url) => url.pathname === expectedHome[profile.name],
     );
+    if (profile.name === "BUG6 multi") {
+      const mobileMenu = page.viewportSize()!.width < 768;
+      const openMenu = page.getByRole("button", { name: "Apri menu", exact: true });
+      if (mobileMenu) await openMenu.click();
+      await page.getByRole("button", { name: "Unità di Strada", exact: true }).click();
+      await expect(page).toHaveURL(/\/uds\/interventi$/);
+      if (mobileMenu) await openMenu.click();
+      await expect(page.getByRole("link", { name: "Interventi UDS", exact: true }))
+        .toHaveAttribute("aria-current", "page");
+    }
     const identity = await (await page.request.get("/api/auth/me")).json();
     expect(identity.isAdmin).toBe("admin" in profile);
     expect(identity.isSuperAdmin).toBe(profile.name === "SuperAdmin");

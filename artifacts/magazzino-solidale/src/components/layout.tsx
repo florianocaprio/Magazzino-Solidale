@@ -795,7 +795,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   // AuthGate unmounts on logout, including re-entry with the same account.
   // Key the owner of group state for an identity switch without a logout.
-  return user ? <SessionLayout key={user.id}>{children}</SessionLayout> : null;
+  return user ? (
+    <SidebarProvider key={user.id}>
+      <SessionLayout>{children}</SessionLayout>
+    </SidebarProvider>
+  ) : null;
 }
 
 const GROUP_ICONS: Record<string, LucideIcon> = {
@@ -813,8 +817,9 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 };
 
 function SessionLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { t, i18n } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canAskMaps = canAccessMapsApplication(user, hasArea, hasPermission);
@@ -873,7 +878,6 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <SidebarProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <Sidebar
           side={
@@ -903,7 +907,13 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
                 <Collapsible
                   key={group}
                   open={openGroups.has(group)}
-                  onOpenChange={(open) => changeGroup(group, open)}
+                  onOpenChange={(open) => {
+                    changeGroup(group, open);
+                    if (open && group === "uds" && location !== items[0].url) {
+                      navigate(items[0].url);
+                      if (isMobile) setOpenMobile(false);
+                    }
+                  }}
                   className="group/collapsible"
                 >
                   <SidebarGroup>
@@ -981,6 +991,5 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
-    </SidebarProvider>
   );
 }

@@ -167,7 +167,11 @@ function personLabel(b: {
   return b.soprannome ? `${base} (${b.soprannome})` : base;
 }
 
-const BeneficiarioDettaglio = lazy(() => import("@/pages/beneficiario-dettaglio"));
+const EditUdsBeneficiarioSheet = lazy(() =>
+  import("@/pages/beneficiario-dettaglio").then(({ EditUdsBeneficiarioSheet }) => ({
+    default: EditUdsBeneficiarioSheet,
+  })),
+);
 
 function initialUdsFilters(
   beneficiarioId: number | undefined,
@@ -190,6 +194,8 @@ export default function UdsInterventi() {
   const { toast } = useToast();
   const schema = makeSchema(t);
   const canView = hasArea("uds") && hasPermission("uds.interventi.view");
+  const canViewDirectory = canView && hasPermission("uds.directory.view");
+  const canEditPerson = hasPermission("beneficiari.view") && hasPermission("beneficiari.manage");
   const queryPerson = Number(new URLSearchParams(useSearch()).get("beneficiarioId"));
   const historyPersonId = Number.isSafeInteger(queryPerson) && queryPerson > 0 && queryPerson <= 2147483647
     ? queryPerson : undefined;
@@ -204,7 +210,7 @@ export default function UdsInterventi() {
   const [selectedPersonFallback, setSelectedPersonFallback] =
     useState<UdsPersonaSelection | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [personEditOpen, setPersonEditOpen] = useState(false);
   const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
   const [bisogniEditingId, setBisogniEditingId] = useState<number | null>(null);
   const [noteText, setNoteText] = useState("");
@@ -232,7 +238,7 @@ export default function UdsInterventi() {
     setFilterZona(ALL_ZONE);
     setPage(1);
     setIsFormOpen(false);
-    setProfileOpen(false);
+    setPersonEditOpen(false);
     setIsNewPersonOpen(false);
     setNoteEditing(null);
     setBisogniEditingId(null);
@@ -257,7 +263,7 @@ export default function UdsInterventi() {
     {
       query: {
         queryKey: ["zoneUds", "udsInt", effectiveAreaOperativa],
-        enabled: effectiveAreaOperativa != null,
+        enabled: canViewDirectory && effectiveAreaOperativa != null,
       },
     },
   );
@@ -283,7 +289,7 @@ export default function UdsInterventi() {
     {
       query: {
         queryKey: ["/api/uds/directory", personeParams],
-        enabled: canView && effectiveAreaOperativa != null,
+        enabled: canViewDirectory && effectiveAreaOperativa != null,
       },
     },
   );
@@ -711,6 +717,7 @@ export default function UdsInterventi() {
               </span>
               <Select
                 value={filterZona}
+                disabled={!canViewDirectory}
                 onValueChange={(v) => {
                   setFilterZona(v);
                   setSelectedPerson("");
@@ -744,6 +751,7 @@ export default function UdsInterventi() {
               <BeneficiarioCombobox
                 items={persone ?? []}
                 value={selectedPerson}
+                disabled={!canViewDirectory}
                 onChange={(id) => {
                   setSelectedPerson(id);
                   if (!id && dateMode === "all") setDateMode("day");
@@ -1289,8 +1297,8 @@ export default function UdsInterventi() {
                 : t("udsInterventi.newTitle")}
             </SheetTitle>
             <SheetDescription>
-              {editingId != null && formPerson && hasPermission("beneficiari.view") ? (
-                <button type="button" className="min-h-11 text-primary underline underline-offset-4" onClick={() => setProfileOpen(true)}>
+              {editingId != null && formPerson && canEditPerson ? (
+                <button type="button" className="min-h-11 text-primary underline underline-offset-4" onClick={() => setPersonEditOpen(true)}>
                   {personLabel(formPerson)}
                 </button>
               ) : formPerson
@@ -1464,19 +1472,15 @@ export default function UdsInterventi() {
           </div>
         </SheetContent>
       </Sheet>
-      <Sheet open={isFormOpen && profileOpen && hasPermission("beneficiari.view")} onOpenChange={setProfileOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-4xl">
-          <SheetHeader>
-            <SheetTitle>{t("blocco04.udsPerson")}</SheetTitle>
-            <SheetDescription>{formPerson ? personLabel(formPerson) : ""}</SheetDescription>
-          </SheetHeader>
-          {isFormOpen && profileOpen && formPerson && hasPermission("beneficiari.view") && (
-            <Suspense fallback={<Skeleton className="mt-6 h-64" />}>
-              <BeneficiarioDettaglio udsSheetId={formPerson.id} onProfileSaved={invalidateList} />
-            </Suspense>
-          )}
-        </SheetContent>
-      </Sheet>
+      {isFormOpen && personEditOpen && formPerson && canEditPerson && (
+        <Suspense fallback={null}>
+          <EditUdsBeneficiarioSheet
+            id={formPerson.id}
+            onClose={() => setPersonEditOpen(false)}
+            onSaved={invalidateList}
+          />
+        </Suspense>
+      )}
       <UnsavedChangesDialog guard={unsavedGuard} />
 
       <Dialog
