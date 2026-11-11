@@ -37,6 +37,7 @@ import {
   useListTessereBeneficiarioDaAnagrafica,
   getListTessereBeneficiarioDaAnagraficaQueryKey,
   type TesseraBeneficiario,
+  type Beneficiario,
   type BeneficiarioDettaglio as BeneficiarioDettaglioType,
   type CreditoSolidaleMovimento,
   type Intervento,
@@ -1572,7 +1573,7 @@ function CreditoSolidaleSaldoPanel({
 export function EditUdsBeneficiarioSheet({ id, onClose, onSaved }: {
   id: number;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: Beneficiario) => void;
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -1601,10 +1602,10 @@ export function EditUdsBeneficiarioSheet({ id, onClose, onSaved }: {
       b={b}
       udsContext
       onClose={onClose}
-      onSaved={() => {
+      onSaved={(saved) => {
         void invalidateBeneficiarioTerritory(queryClient);
         toast({ title: t("beneficiarioDettaglio.toastUpdated") });
-        onSaved();
+        onSaved(saved);
         onClose();
       }}
     />
@@ -1621,7 +1622,7 @@ export function EditBeneficiarioSheet({
   b: BeneficiarioDettaglioType;
   udsContext?: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: Beneficiario) => void;
   onReplaceTessera?: () => void;
 }) {
   const { t } = useTranslation();
@@ -1802,7 +1803,7 @@ export function EditBeneficiarioSheet({
         delete payload.centroAscoltoId; delete payload.zonaUdsId; delete payload.areaOperativaId;
         delete payload.magazzinoEmporioPreferitoId; delete payload.uds;
       }
-      await updateBeneficiario.mutateAsync({
+      const saved = await updateBeneficiario.mutateAsync({
         id: b.id,
         data: payload as never,
       });
@@ -1820,7 +1821,7 @@ export function EditBeneficiarioSheet({
           },
         });
       }
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       const message = apiErrorMessage(
         err,

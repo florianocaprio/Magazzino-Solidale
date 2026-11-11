@@ -1477,7 +1477,12 @@ export default function UdsInterventi() {
           <EditUdsBeneficiarioSheet
             id={formPerson.id}
             onClose={() => setPersonEditOpen(false)}
-            onSaved={invalidateList}
+            onSaved={({ id, nome, cognome, soprannome }) => {
+              setFormPerson((person) =>
+                person?.id === id ? { ...person, nome, cognome, soprannome } : person,
+              );
+              invalidateList();
+            }}
           />
         </Suspense>
       )}

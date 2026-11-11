@@ -187,6 +187,48 @@ test("tablet 820: crea e rettifica un intervento UDS dalla card", async ({
   await runUdsLifecycle(page, "uds-interventi-mobile", true);
 });
 
+test("la rettifica aperta mostra il nome salvato in anagrafica e conserva la bozza", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Anagrafica sintetica creata una volta");
+  await login(page);
+  const areas = await (await page.request.get("/api/aree-operative")).json();
+  const area = areas.find((item: { nome: string }) => item.nome === "Area Demo");
+  const created = await page.request.post("/api/beneficiari", {
+    data: {
+      nome: "Nome iniziale",
+      cognome: `Rettifica${Date.now()}`,
+      sesso: "M",
+      fasciaEtaPresunta: "30_64",
+      areaProvenienza: "UE",
+      uds: true,
+      statoAnagrafica: "provvisoria",
+      areaOperativaId: area.id,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const intervention = await page.request.post("/api/uds/interventi", {
+    data: { beneficiarioId: person.id, tipoIntervento: "ascolto" },
+  });
+  expect(intervention.status(), await intervention.text()).toBe(201);
+
+  await page.goto(`/uds/interventi?beneficiarioId=${person.id}`);
+  const list = page.getByTestId("uds-interventi-desktop");
+  await list.getByRole("button", { name: /rettifica/i }).click();
+  const rectification = page.getByRole("dialog", { name: /rettifica intervento/i });
+  const draft = rectification.getByRole("textbox", { name: /sintesi dell'incontro/i });
+  await draft.fill("Bozza della rettifica");
+  await rectification.getByRole("button", { name: /nome iniziale/i }).click();
+
+  const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await editPerson.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  const savePerson = editPerson.getByRole("button", { name: /^salva$/i })
+    .and(editPerson.locator('button[type="submit"]'));
+  await savePerson.click();
+  await expect(editPerson).toBeHidden();
+  await expect(rectification.getByRole("button", { name: /nome aggiornato/i })).toBeVisible();
+  await expect(draft).toHaveValue("Bozza della rettifica");
+});
+
 test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno filtrato", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop-1440x900", "Lifecycle mutante desktop una volta");
   await login(page);
