@@ -170,7 +170,7 @@ afterAll(async () => {
 });
 
 describe("hardening Beneficiari: RBAC, DTO e scope", () => {
-  it("elimina soltanto anagrafiche senza storico operativo, compresa la tessera iniziale", async () => {
+  it("elimina soltanto anagrafiche senza storico operativo, compresa la tessera scaricata", async () => {
     const [role] = await db.insert(ruoliTable).values({
       nome: `R5-sociale-${suffix}`, aree: ["sociale"], permessi: SOCIAL_PERMISSIONS,
     }).returning();
@@ -185,6 +185,8 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
       expect(created.status, created.text).toBe(201);
       const person = created.body as { id: number; versione: number };
       beneficiaryIds.push(person.id);
+      const issued = await api.post(`/beneficiari/${person.id}/tessera-documento`).send({});
+      expect(issued.status, issued.text).toBe(200);
       expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(1);
       expect((await api.delete(path({ ...person, versione: person.versione + 1 }))).status).toBe(409);
       const removed = await api.delete(path(person));
