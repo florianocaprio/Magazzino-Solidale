@@ -101,7 +101,7 @@ async function runUdsLifecycle(
     .fill(rectifiedDescription);
   await rectification.getByRole("button", { name: /Demo 001/i }).click();
   const editPerson = page.getByRole("dialog", { name: /modifica anagrafica/i });
-  await expect(editPerson.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue("Beneficiario");
+  await expect(editPerson.getByRole("textbox", { name: /^Nome\b/ })).toHaveValue("Beneficiario");
   await editPerson.getByRole("button", { name: "Close", exact: true }).click();
   await expect(rectification.getByRole("textbox", { name: /sintesi dell'incontro/i })).toHaveValue(rectifiedDescription);
   await rectification
@@ -224,7 +224,7 @@ test("la rettifica aperta mostra il nome salvato in anagrafica e conserva la boz
   const nickname = editPerson.getByRole("textbox", { name: "Soprannome", exact: true });
   await expect(nickname).toHaveValue("Soprannome iniziale");
   await nickname.fill("Soprannome aggiornato");
-  await editPerson.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  await editPerson.getByRole("textbox", { name: /^Nome\b/ }).fill("Nome aggiornato");
   const savePerson = editPerson.getByRole("button", { name: /^salva$/i })
     .and(editPerson.locator('button[type="submit"]'));
   await savePerson.click();
@@ -245,7 +245,8 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   const zoneResponse = await page.request.post("/api/zone-uds", { data: { nome: `BUG21Zona${Date.now()}`, areaOperativaId: area.id } });
   expect(zoneResponse.status(), await zoneResponse.text()).toBe(201);
   const zone = await zoneResponse.json();
-  const created = await page.request.post("/api/beneficiari", { data: { nome: "Persona", cognome: `BUG21Browser${Date.now()}`, sesso: "M", fasciaEtaPresunta: "30_64", areaProvenienza: "UE", uds: true, statoAnagrafica: "provvisoria", areaOperativaId: area.id, centroAscoltoId: null } });
+  const fascicolo = `CDA-${Date.now()}`;
+  const created = await page.request.post("/api/beneficiari", { data: { nome: "Persona", cognome: `BUG21Browser${Date.now()}`, sesso: "M", fasciaEtaPresunta: "30_64", areaProvenienza: "UE", uds: true, statoAnagrafica: "provvisoria", areaOperativaId: area.id, centroAscoltoId: null, fascicolo } });
   expect(created.status(), await created.text()).toBe(201);
   const person = await created.json();
   const directoryPath = `/uds/anagrafica?search=${person.cognome}`;
@@ -267,13 +268,21 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   expect(cards).toHaveLength(1);
   await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   const edit = page.getByRole("dialog", { name: /modifica anagrafica/i });
+  await expect(edit.getByLabel(/fascicolo/i)).toHaveCount(0);
+  await expect(edit.getByTestId("fascia-eta-corrente")).toContainText("30–64 anni");
   const nickname = edit.getByRole("textbox", { name: "Soprannome", exact: true });
   await expect(nickname).toHaveValue("");
   await nickname.fill("Nuovo soprannome");
+  await edit.locator("summary").click();
+  const familyCount = edit.getByRole("spinbutton", { name: "N. Componenti Famiglia", exact: true });
+  await expect(familyCount).toHaveValue("1");
+  await familyCount.fill("3");
+  const editPatch = page.waitForRequest((request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/beneficiari/${person.id}`);
   await edit.getByRole("button", { name: /^salva$/i }).and(edit.locator('button[type="submit"]')).click();
+  expect(Object.keys((await editPatch).postDataJSON()).sort()).toEqual(["numComponenti", "soprannome", "versione"]);
   await expect(edit).toBeHidden();
   const updated = await page.request.get(`/api/beneficiari/${person.id}`);
-  expect(await updated.json()).toMatchObject({ soprannome: "Nuovo soprannome" });
+  expect(await updated.json()).toMatchObject({ soprannome: "Nuovo soprannome", numComponenti: 3, fascicolo });
   // I pulsanti sono nel contenitore immediato del rispettivo selettore.
   const centrePicker = page.getByRole("combobox", { name: /centro di ascolto di riferimento/i });
   await selectOption(page, centrePicker, centre.nome);
@@ -301,6 +310,8 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
   await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa/i })).toHaveCount(0);
+  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: /modifica anagrafica/i }).getByLabel(/fascicolo/i)).toHaveValue(fascicolo);
 });
 
 test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza sostituire la tessera", async ({ page }, info) => {

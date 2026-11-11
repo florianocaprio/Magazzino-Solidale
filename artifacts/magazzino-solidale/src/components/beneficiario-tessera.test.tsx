@@ -14,6 +14,13 @@ const { createCardMutate, updateNucleoMutate, recoverCard, pdf, requests, getZon
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  getCercaBeneficiariSimiliQueryKey: () => ["beneficiari-simili"],
+  getListUdsDirectoryQueryKey: () => ["uds-directory"],
+  getListUdsLinkCandidatesQueryKey: () => ["uds-link-candidates"],
+  useCercaBeneficiariSimili: () => ({}),
+  useListUdsDirectory: () => ({}),
+  useListUdsLinkCandidates: () => ({}),
+  useCreateBeneficiario: () => ({ isPending: false }),
   useGetBeneficiarioStatiServizi: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" }, tessera: { disponibile: true, stato: "attiva" } } }),
   getGetBeneficiarioStatiServiziQueryKey: (id: number) => ["stati-servizi", id],
   useGetBeneficiarioStatiServiziUds: () => ({ data: { emporio: { disponibile: true, stato: "attivo" }, mensa: { disponibile: true, stato: "sospesa" } } }),
@@ -349,6 +356,8 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     expect(pdf).toHaveBeenLastCalledWith(expect.objectContaining({ beneficiario: expect.objectContaining({ codice: "BEN-42", codiceTessera: card.codice }), dataEmissione: card.dataEmissione }));
     expect(createCardMutate).not.toHaveBeenCalled();
     await act(async () => buttonByText("beneficiarioDettaglio.editAnagrafica")?.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("udsAnagrafica.familyMembersCount");
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("blocco07.fascicolo");
     expect(document.body.textContent).not.toContain("Abilita alla Mensa");
     expect(document.querySelectorAll('[data-testid="beneficiario-mensa-card"]')).toHaveLength(0);
   });

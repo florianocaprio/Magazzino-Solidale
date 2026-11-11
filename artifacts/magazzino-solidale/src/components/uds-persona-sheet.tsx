@@ -9,7 +9,10 @@ import {
   getListAreeOperativeQueryKey,
   getListUdsDirectoryQueryKey,
   getListUdsLinkCandidatesQueryKey,
+  type Beneficiario,
+  type BeneficiarioDettaglio,
   type BeneficiarioSimile,
+  type BeneficiarioUpdate,
   type UdsDirectoryItem,
   type UdsLinkCandidateItem,
   useCercaBeneficiariSimili,
@@ -84,12 +87,12 @@ const NO_CENTRO = "__nocentro__";
 const NO_FASCIA_ETA = "__non_determinata__";
 const KEEP_ORIGIN = "__keep_origin__";
 
-function makeSchema(t: (key: string) => string, isGlobal: boolean) {
+function makeSchema(t: (key: string) => string, isGlobal: boolean, person?: BeneficiarioDettaglio) {
   return z
     .object({
       nome: z.string().trim().min(1, t("common.requiredField")),
       cognome: z.string().trim().min(1, t("common.requiredField")),
-      soprannome: z.string().optional(),
+      soprannome: z.string().trim().max(80).optional(),
       codiceFiscale: z.string().optional(),
       dataNascita: z
         .string()
@@ -99,17 +102,17 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
           "La data di nascita non può essere successiva alla data odierna.",
         ),
       fasciaEtaPresunta: z.string().optional(),
-      sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
+      sesso: person?.fascicolo ? z.string() : z.string().trim().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
-      areaProvenienza: z.string().trim().min(1, t("common.requiredField")),
+      areaProvenienza: person?.fascicolo ? z.string() : z.string().trim().min(1, t("common.requiredField")),
       residenza: z.string().optional(),
       domicilio: z.string().optional(),
       telefono: z.string().optional(),
       email: z.string().optional(),
       comune: z.string().optional(),
       zonaMunicipio: z.string().optional(),
-      numComponenti: z.string().optional(),
-      priorita: z.string().optional(),
+      numComponenti: person ? z.string().min(1, t("common.requiredField")) : z.string().optional(),
+      priorita: z.enum(["bassa", "media", "alta", "urgente"]).optional(),
       consegnaDomicilio: z.boolean().optional(),
       motivoConsegnaDomicilio: z.string().optional(),
       restrizioniAlimentari: z.string().optional(),
@@ -122,7 +125,8 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       if (
         (data.uds ?? true) &&
         !data.dataNascita &&
-        !isFasciaEtaPresunta(data.fasciaEtaPresunta)
+        !isFasciaEtaPresunta(data.fasciaEtaPresunta) &&
+        (!person || person.dataNascita || person.fasciaEtaPresunta)
       ) {
         ctx.addIssue({
           code: "custom",
@@ -130,7 +134,7 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
           message: t("udsAnagrafica.ageClassificationRequired"),
         });
       }
-      if (isGlobal && (data.uds ?? true) && !data.areaOperativaId) {
+      if (isGlobal && !person && (data.uds ?? true) && !data.areaOperativaId) {
         ctx.addIssue({
           code: "custom",
           path: ["areaOperativaId"],
@@ -158,6 +162,7 @@ interface UdsPersonaSheetProps {
   onOpenChange: (open: boolean) => void;
   initialAreaOperativaId?: number | null;
   initialZonaUdsId?: number | null;
+  edit?: { person: BeneficiarioDettaglio; onSaved: (saved: Beneficiario) => void };
   onPersonReady?: (
     person: UdsPersonaSelection,
     outcome: UdsPersonaOutcome,
@@ -213,18 +218,47 @@ function emptyFormValues(
   };
 }
 
+function editFormValues(person: BeneficiarioDettaglio): FormValues {
+  return {
+    ...emptyFormValues(person.areaOperativaId, person.zonaUdsId),
+    nome: person.nome,
+    cognome: person.cognome,
+    soprannome: person.soprannome ?? "",
+    codiceFiscale: person.codiceFiscale ?? "",
+    dataNascita: person.dataNascita?.slice(0, 10) ?? "",
+    fasciaEtaPresunta: person.fasciaEtaPresunta ?? NO_FASCIA_ETA,
+    sesso: person.sesso ?? "",
+    cittadinanza: person.cittadinanza ?? "",
+    areaProvenienza: person.areaProvenienza ?? "",
+    residenza: person.residenza ?? "",
+    domicilio: person.domicilio ?? "",
+    telefono: person.telefono ?? "",
+    email: person.email ?? "",
+    comune: person.comune ?? "",
+    zonaMunicipio: person.zonaMunicipio ?? "",
+    numComponenti: String(person.numComponenti ?? 1),
+    priorita: person.priorita ?? "media",
+    restrizioniAlimentari: person.restrizioniAlimentari ?? "",
+    centroAscoltoId: person.centroAscoltoId != null ? String(person.centroAscoltoId) : NO_CENTRO,
+  };
+}
+
 export function UdsPersonaSheet({
   open,
   onOpenChange,
   initialAreaOperativaId,
   initialZonaUdsId,
   onPersonReady,
+  edit,
   selectionMode = false,
 }: UdsPersonaSheetProps) {
   const [, navigate] = useLocation();
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const canManage = !selectionMode || Boolean(user?.isAdmin || user?.isSuperAdmin || user?.permessi?.includes("beneficiari.manage"));
+  const { user, hasPermission } = useAuth();
+  const person = edit?.person;
+  const initialVersion = useRef(person?.versione);
+  const canManage = person ? hasPermission("beneficiari.manage") :
+    !selectionMode || Boolean(user?.isAdmin || user?.isSuperAdmin || user?.permessi?.includes("beneficiari.manage"));
   const canViewDirectory = Boolean(user?.isAdmin || user?.permessi?.includes("uds.directory.view"));
   const canViewSensitive = Boolean(
     user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"),
@@ -238,7 +272,7 @@ export function UdsPersonaSheet({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isGlobal = user?.areaOperativaId == null;
-  const schema = useMemo(() => makeSchema(t, isGlobal), [t, isGlobal]);
+  const schema = useMemo(() => makeSchema(t, isGlobal, person), [t, isGlobal, person]);
   const [linkCandidate, setLinkCandidate] = useState<
     BeneficiarioSimile | UdsLinkCandidateItem | null
   >(null);
@@ -258,12 +292,12 @@ export function UdsPersonaSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyFormValues(
+    defaultValues: person ? editFormValues(person) : emptyFormValues(
       initialAreaOperativaId,
       user?.zonaUdsId ?? initialZonaUdsId,
     ),
   });
-  const { reset } = form;
+  const { reset, formState: { dirtyFields } } = form;
   const wasOpenRef = useRef(false);
 
   const { data: areaOperativaList } = useListAreeOperative({
@@ -285,7 +319,7 @@ export function UdsPersonaSheet({
   useEffect(() => {
     const hasJustOpened = open && !wasOpenRef.current;
     wasOpenRef.current = open;
-    if (!hasJustOpened) return;
+    if (!hasJustOpened || person) return;
 
     reset({
       ...emptyFormValues(initialAreaOperativaId ?? user?.areaOperativaId, user?.zonaUdsId ?? initialZonaUdsId),
@@ -297,7 +331,7 @@ export function UdsPersonaSheet({
     setDebouncedExistingSearch("");
     setDupDebouncing(false);
     setLinkCandidate(null);
-  }, [initialAreaOperativaId, initialZonaUdsId, open, reset, user?.zonaUdsId]);
+  }, [initialAreaOperativaId, initialZonaUdsId, open, person, reset, user?.zonaUdsId]);
 
   const wNome = form.watch("nome");
   const wCognome = form.watch("cognome");
@@ -310,7 +344,7 @@ export function UdsPersonaSheet({
     isFasciaEtaPresunta(wFasciaEtaPresunta) ? wFasciaEtaPresunta : null,
   );
   useEffect(() => {
-    if (!open) return;
+    if (!open || person) return;
     const rawIdentityLength = [wNome, wCognome, wSoprannome, wTelefono]
       .map((value) => (value ?? "").trim())
       .join("").length;
@@ -333,6 +367,7 @@ export function UdsPersonaSheet({
   }, [
     existingSearch,
     open,
+    person,
     wCognome,
     wDataNascita,
     wNome,
@@ -363,7 +398,7 @@ export function UdsPersonaSheet({
       query: {
         queryKey: getCercaBeneficiariSimiliQueryKey(dupQueryParams),
         enabled:
-          canUseFullDuplicateSearch &&
+          !person && canUseFullDuplicateSearch &&
           open &&
           !dupDismissed &&
           dupHasInput &&
@@ -392,7 +427,7 @@ export function UdsPersonaSheet({
       query: {
         queryKey: getListUdsDirectoryQueryKey(directoryParams),
         enabled:
-          canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+          !person && canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
       },
     });
   const linkCandidateParams = {
@@ -407,7 +442,7 @@ export function UdsPersonaSheet({
     query: {
       queryKey: getListUdsLinkCandidatesQueryKey(linkCandidateParams),
       enabled:
-        canManage && canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+        !person && canManage && canViewDirectory && open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
     },
   });
   const lookupFailed = selectionMode && (directoryError || (canManage && linkCandidatesError));
@@ -422,7 +457,7 @@ export function UdsPersonaSheet({
     ? (dupMatches ?? []).filter((item) => !minimizedMatchIds.has(item.id))
     : [];
 
-  const formAreaOperativa = isGlobal
+  const formAreaOperativa = person ? person.areaOperativaId ?? undefined : isGlobal
     ? selectedAreaOperativa
       ? parseInt(selectedAreaOperativa)
       : undefined
@@ -432,7 +467,7 @@ export function UdsPersonaSheet({
     {
       query: {
         queryKey: ["zoneUds", "personaForm", formAreaOperativa],
-        enabled: canViewDirectory && open && formAreaOperativa != null,
+        enabled: (person ? canManage : canViewDirectory) && open && formAreaOperativa != null,
       },
     },
   );
@@ -522,7 +557,46 @@ export function UdsPersonaSheet({
   };
 
   const onSubmit = (data: FormValues) => {
-    if (!canManage || lookupFailed || createBenef.isPending) return;
+    if (!canManage || lookupFailed || createBenef.isPending || updateBenef.isPending) return;
+    if (edit) {
+      const patch: BeneficiarioUpdate = { versione: initialVersion.current ?? edit.person.versione };
+      const textFields = [
+        "nome", "cognome", "soprannome", "areaProvenienza", "cittadinanza",
+        "residenza", "domicilio", "telefono", "email", "comune", "zonaMunicipio",
+      ] as const;
+      for (const field of textFields) {
+        if (dirtyFields[field]) patch[field] = data[field];
+      }
+      if (dirtyFields.sesso) patch.sesso = SESSO_OPTIONS.find((option) => option.value === data.sesso)?.value;
+      if (dirtyFields.dataNascita || dirtyFields.fasciaEtaPresunta) {
+        patch.dataNascita = data.dataNascita || null;
+        patch.fasciaEtaPresunta = !data.dataNascita && isFasciaEtaPresunta(data.fasciaEtaPresunta)
+          ? data.fasciaEtaPresunta : null;
+      }
+      if (dirtyFields.numComponenti && data.numComponenti) patch.numComponenti = Number(data.numComponenti);
+      if (dirtyFields.priorita) patch.priorita = data.priorita;
+      if (canViewSensitive && dirtyFields.codiceFiscale) patch.codiceFiscale = data.codiceFiscale?.trim().toUpperCase() || null;
+      if (canViewSensitive && dirtyFields.restrizioniAlimentari) patch.restrizioniAlimentari = data.restrizioniAlimentari;
+      if (dirtyFields.centroAscoltoId && operationalCentroId(user) == null) {
+        patch.centroAscoltoId = data.centroAscoltoId === NO_CENTRO ? null : Number(data.centroAscoltoId);
+      }
+      if (dirtyFields.zonaUdsId && user?.zonaUdsId == null) {
+        patch.zonaUdsId = data.zonaUdsId === NO_ZONE ? null : Number(data.zonaUdsId);
+      }
+      if (Object.keys(patch).length === 1) {
+        onOpenChange(false);
+        return;
+      }
+      updateBenef.mutate({ id: edit.person.id, data: patch }, {
+        onSuccess: edit.onSaved,
+        onError: (err) => toast({
+          title: t("beneficiarioDettaglio.error"),
+          description: extractError(err, t("beneficiarioDettaglio.errorSave")),
+          variant: "destructive",
+        }),
+      });
+      return;
+    }
     const scope = latestOperationScope.current;
     if (
       !dupDismissed &&
@@ -624,12 +698,12 @@ export function UdsPersonaSheet({
           onOpenChange(nextOpen);
         }}
       >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto" {...(person && { "aria-describedby": undefined })}>
           <SheetHeader>
-            <SheetTitle>{t(selectionMode ? "udsInterventi.identifyPerson" : "udsAnagrafica.newTitle")}</SheetTitle>
-            <SheetDescription className="sr-only">
+            <SheetTitle>{t(person ? "beneficiarioDettaglio.editAnagrafica" : selectionMode ? "udsInterventi.identifyPerson" : "udsAnagrafica.newTitle")}</SheetTitle>
+            {!person && <SheetDescription className="sr-only">
               {t("udsAnagrafica.existingSearchHint")}
-            </SheetDescription>
+            </SheetDescription>}
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -648,6 +722,7 @@ export function UdsPersonaSheet({
                         </FormLabel>
                         <Select
                           value={field.value || ""}
+                          disabled={person != null}
                           onValueChange={(value) => {
                             field.onChange(value);
                             form.setValue("zonaUdsId", NO_ZONE);
@@ -667,7 +742,7 @@ export function UdsPersonaSheet({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {areaOperativaList?.filter((area) => area.attivo).map((areaOperativa) => (
+                            {areaOperativaList?.filter((area) => area.attivo || area.id === person?.areaOperativaId).map((areaOperativa) => (
                               <SelectItem
                                 key={areaOperativa.id}
                                 value={String(areaOperativa.id)}
@@ -706,7 +781,7 @@ export function UdsPersonaSheet({
                           <SelectItem value={NO_CENTRO}>
                             {t("common.none")}
                           </SelectItem>
-                          {centri?.filter((centro) => centro.attivo && centro.areaOperativaId === formAreaOperativa).map((centro) => (
+                          {centri?.filter((centro) => (centro.attivo || centro.id === person?.centroAscoltoId) && centro.areaOperativaId === formAreaOperativa).map((centro) => (
                             <SelectItem
                               key={centro.id}
                               value={String(centro.id)}
@@ -719,6 +794,7 @@ export function UdsPersonaSheet({
                     </FormItem>
                   )}
                 />
+                {!person && <>
                 <div className="rounded-md border bg-muted/30 p-3 space-y-2">
                   <Label htmlFor="uds-persona-existing-search">
                     {t("udsAnagrafica.existingSearchLabel")}
@@ -931,6 +1007,7 @@ export function UdsPersonaSheet({
                       {t("udsAnagrafica.dupContinueNew")}
                     </Button>
                 )}
+                </>}
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -970,8 +1047,9 @@ export function UdsPersonaSheet({
                         {t("udsAnagrafica.fSoprannome")}
                       </FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input {...field} maxLength={80} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -1140,7 +1218,7 @@ export function UdsPersonaSheet({
                     </FormItem>
                   )}
                 />
-                <FormField
+                {(!person || canViewSensitive) && <FormField
                   control={form.control}
                   name="codiceFiscale"
                   render={({ field }) => (
@@ -1157,7 +1235,7 @@ export function UdsPersonaSheet({
                       </FormControl>
                     </FormItem>
                   )}
-                />
+                />}
                   <FormField
                     control={form.control}
                     name="cittadinanza"
@@ -1235,11 +1313,12 @@ export function UdsPersonaSheet({
                     render={({ field }) => (
                       <FormItem>
                             <FormLabel>
-                              {t("beneficiari.numComponenti")}
+                              {t("udsAnagrafica.familyMembersCount")}
                             </FormLabel>
                         <FormControl>
                           <Input type="number" min="1" {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1300,7 +1379,7 @@ export function UdsPersonaSheet({
                 </details>
 
                 <div className="rounded-md border p-3 space-y-3">
-                  {isGlobal && (
+                  {isGlobal && !person && (
                   <FormField
                     control={form.control}
                     name="uds"
@@ -1347,7 +1426,12 @@ export function UdsPersonaSheet({
                               <SelectItem value={NO_ZONE}>
                                 {t("blocco04.noZone")}
                               </SelectItem>
-                              {formZone?.filter((zona) => zona.attivo).map((zona) => (
+                              {person?.zonaUdsId != null && !formZone?.some((zona) => zona.id === person.zonaUdsId) && (
+                                <SelectItem value={String(person.zonaUdsId)}>
+                                  {person.zonaUdsNome ?? person.zonaUdsId}
+                                </SelectItem>
+                              )}
+                              {formZone?.filter((zona) => zona.attivo || zona.id === person?.zonaUdsId).map((zona) => (
                                 <SelectItem
                                   key={zona.id}
                                   value={String(zona.id)}
@@ -1376,7 +1460,7 @@ export function UdsPersonaSheet({
                     type="submit"
                     className="min-h-11 min-w-28"
                     disabled={
-                      !canManage || lookupFailed || createBenef.isPending ||
+                      !canManage || lookupFailed || createBenef.isPending || updateBenef.isPending ||
                       (!dupDismissed &&
                         (dupDebouncing ||
                           isDupFetching ||
@@ -1389,7 +1473,7 @@ export function UdsPersonaSheet({
                   >
                     {duplicateCheckPending
                       ? t("udsAnagrafica.duplicateCheckInProgress")
-                      : createBenef.isPending
+                      : createBenef.isPending || updateBenef.isPending
                         ? t("udsAnagrafica.savingPerson")
                         : t("common.save")}
                   </Button>
