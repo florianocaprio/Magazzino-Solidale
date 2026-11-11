@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
-import QRCode from "qrcode";
+import { cameraCardCode, useQrCamera } from "./qr-camera";
 import { updateModuloAmbiente } from "../../api-server/src/lib/configurazioneAmbiente";
 import {
   db,
@@ -34,7 +34,7 @@ test.afterAll(async () => {
 });
 test("M63 pagine reali, filtri, calendario bounded, dettaglio e revoca", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(60000);
   const suffix = randomUUID().slice(0, 8);
   const [area] = await db
@@ -165,33 +165,11 @@ test("M63 pagine reali, filtri, calendario bounded, dettaglio e revoca", async (
     .insert(tessereBeneficiariTable)
     .values({
       beneficiarioId: cardHolder.id,
-      codice: `MS-E2E-${suffix}`,
+      codice: cameraCardCode(testInfo),
     })
     .returning();
   await updateModuloAmbiente("BARCODE", true, null);
-  // Feed the real browser decoder a synthetic frame without a physical camera.
-  await page.addInitScript(
-    async (qr) => {
-      navigator.mediaDevices.getUserMedia = async () => {
-        const image = new Image();
-        image.src = qr;
-        await image.decode();
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 400;
-        const context = canvas.getContext("2d")!;
-        const stream = canvas.captureStream(10);
-        const track = stream.getVideoTracks()[0];
-        const draw = () => {
-          if (track.readyState === "ended") return;
-          context.drawImage(image, 0, 0, 400, 400);
-          requestAnimationFrame(draw);
-        };
-        draw();
-        return stream;
-      };
-    },
-    await QRCode.toDataURL(card.codice, { width: 400 }),
-  );
+  await useQrCamera(page, card.codice);
   await page.goto("/interventi");
   await page.getByRole("button", { name: "Nuovo intervento" }).click();
   await page

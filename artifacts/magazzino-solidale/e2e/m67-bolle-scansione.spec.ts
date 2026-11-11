@@ -1,6 +1,4 @@
-import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import QRCode from "qrcode";
 import { m67aMensaFixture } from "../../api-server/tests/helpers/m67a-mensa-fixture";
 import { updateModuloAmbiente } from "../../api-server/src/lib/configurazioneAmbiente";
 import {
@@ -10,6 +8,7 @@ import {
 } from "../../api-server/tests/scope-helpers";
 import { pool } from "../../../lib/db/src/index";
 import { selectOption } from "./helpers";
+import { cameraCardCode, useQrCamera } from "./qr-camera";
 
 test.afterAll(async () => {
   await pool.end();
@@ -17,7 +16,7 @@ test.afterAll(async () => {
 
 test("Bolle: tessera da lettore e fotocamera, ricerca prodotto con giacenze ancora in caricamento", async ({
   page,
-}) => {
+}, testInfo) => {
   const fixture = await m67aMensaFixture();
   for (const code of ["BOLLE", "CENTRO_ASCOLTO", "BARCODE"])
     await updateModuloAmbiente(code, true, null);
@@ -33,7 +32,7 @@ test("Bolle: tessera da lettore e fotocamera, ricerca prodotto con giacenze anco
   const person = await createBeneficiario(scope, centre.id, {
     areaOperativaId: fixture.area,
   });
-  const cardCode = `MS-${randomUUID()}`;
+  const cardCode = cameraCardCode(testInfo);
   await pool.query(
     "insert into tessere_beneficiari (beneficiario_id, codice) values ($1, $2)",
     [person, cardCode],
@@ -59,29 +58,7 @@ test("Bolle: tessera da lettore e fotocamera, ricerca prodotto con giacenze anco
     )
   ).rows[0];
 
-  // Feed a synthetic camera frame to the real browser decoder.
-  await page.addInitScript(
-    (qr) => {
-      navigator.mediaDevices.getUserMedia = async () => {
-        const image = new Image();
-        image.src = qr;
-        await image.decode();
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 400;
-        const context = canvas.getContext("2d")!;
-        const stream = canvas.captureStream(10);
-        const track = stream.getVideoTracks()[0];
-        const draw = () => {
-          if (track.readyState === "ended") return;
-          context.drawImage(image, 0, 0, 400, 400);
-          requestAnimationFrame(draw);
-        };
-        draw();
-        return stream;
-      };
-    },
-    await QRCode.toDataURL(cardCode, { width: 400 }),
-  );
+  await useQrCamera(page, cardCode);
 
   await page.goto("/login");
   await page.getByLabel(/username|nome utente/i).fill(user.username);
