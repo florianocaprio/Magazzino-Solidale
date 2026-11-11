@@ -253,6 +253,7 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa|nuova richiesta/i })).toHaveCount(0);
   await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
   const download = page.getByRole("button", { name: /scarica tessera pdf/i });
+  expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual([]);
   for (let attempt = 0; attempt < 2; attempt++) {
     const downloaded = page.waitForEvent("download");
     await download.click();
