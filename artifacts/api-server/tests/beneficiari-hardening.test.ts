@@ -170,7 +170,7 @@ afterAll(async () => {
 });
 
 describe("hardening Beneficiari: RBAC, DTO e scope", () => {
-  it("elimina soltanto anagrafiche senza storico operativo, compresa la tessera iniziale", async () => {
+  it("elimina soltanto anagrafiche senza storico operativo e conserva quelle con tessera scaricata", async () => {
     const [role] = await db.insert(ruoliTable).values({
       nome: `R5-sociale-${suffix}`, aree: ["sociale"], permessi: SOCIAL_PERMISSIONS,
     }).returning();
@@ -185,13 +185,12 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
       expect(created.status, created.text).toBe(201);
       const person = created.body as { id: number; versione: number };
       beneficiaryIds.push(person.id);
-      expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(1);
+      expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(0);
       expect((await api.delete(path({ ...person, versione: person.versione + 1 }))).status).toBe(409);
       const removed = await api.delete(path(person));
       expect(removed.status, removed.text).toBe(204);
       expect((await api.get(`/beneficiari/${person.id}`)).status).toBe(404);
       expect((await api.delete(path(person))).status).toBe(204);
-      expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, person.id))).toHaveLength(0);
       expect(await db.select().from(auditConfigurazioniTable).where(and(
         eq(auditConfigurazioniTable.chiave, `beneficiario:${person.id}`),
         eq(auditConfigurazioniTable.azione, "eliminazione"),
@@ -199,7 +198,10 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
 
       const withBolla = await insertBeneficiary({ centroAscoltoId: centerA });
       const withIntervento = await insertBeneficiary({ centroAscoltoId: centerA });
+      const withCard = await insertBeneficiary({ centroAscoltoId: centerA });
       const outside = await insertBeneficiary({ areaOperativaId: areaB, centroAscoltoId: centerB });
+      const issued = await api.post(`/beneficiari/${withCard.id}/tessera-documento`).send({});
+      expect(issued.status, issued.text).toBe(200);
       const bolla = {
         numeroBolla: `R5-${suffix}`, dataBolla: "2026-11-01", magazzinoId: emporioA,
       };
@@ -210,13 +212,14 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
           beneficiarioId: withIntervento.id, tipoIntervento: "colloquio", ambito: "sociale", stato: "da_pianificare",
         }).returning();
         interventionIds.push(intervention.id);
-        for (const linked of [withBolla, withIntervento]) {
+        for (const linked of [withBolla, withIntervento, withCard]) {
           const denied = await api.delete(path(linked));
           expect(denied.status, denied.text).toBe(409);
           expect(denied.body.error).toContain("dati associati");
           const [unchanged] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, linked.id));
           expect(unchanged.attivo).toBe(true);
         }
+        expect(await db.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, withCard.id))).toHaveLength(1);
         expect((await api.delete(path(outside))).status).toBe(403);
         const deactivateOnly = request(makeApp({
           areaOperativaId: areaA, centroAscoltoId: null, zonaUdsId: null,
