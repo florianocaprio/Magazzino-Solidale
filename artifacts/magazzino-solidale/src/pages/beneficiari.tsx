@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, Power, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
@@ -193,7 +193,7 @@ export default function Beneficiari() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [removal, setRemoval] = useState<{ beneficiary: BeneficiarioDirectory; permanent: boolean } | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [schedaId, setSchedaId] = useState<number | null>(null);
 
@@ -715,7 +715,16 @@ export default function Beneficiari() {
                         </DropdownMenuItem>}
                         {canManage && <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>}
                         {canExport && <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>}
-                        {canDeactivate && <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>}
+                        {canDeactivate && b.attivo && (
+                          <DropdownMenuItem disabled={deleteBeneficiario.isPending} onClick={() => setRemoval({ beneficiary: b, permanent: false })}>
+                            <Power className="mr-2 h-4 w-4" /> {t("beneficiari.disattiva")}
+                          </DropdownMenuItem>
+                        )}
+                        {canManage && canDeactivate && (
+                          <DropdownMenuItem className="text-destructive" disabled={deleteBeneficiario.isPending} onClick={() => setRemoval({ beneficiary: b, permanent: true })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("beneficiari.deletePermanent")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1013,24 +1022,42 @@ export default function Beneficiari() {
       {editingId != null && <QuickEditBeneficiario id={editingId} onClose={() => setEditingId(null)} />}
       {schedaId != null && <SchedaExportDialog id={schedaId} onClose={() => setSchedaId(null)} />}
 
-      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+      <AlertDialog open={removal != null} onOpenChange={(open) => {
+        if (!open && !deleteBeneficiario.isPending) setRemoval(null);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disattiva Beneficiario</AlertDialogTitle>
-            <AlertDialogDescription>Il Beneficiario non potrà generare nuove attività operative. Lo storico resta preservato e potrà essere riattivato.</AlertDialogDescription>
+            <AlertDialogTitle>{removal?.permanent ? t("beneficiari.deleteTitle") : t("beneficiari.disattiva")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{removal?.beneficiary.cognome} {removal?.beneficiary.nome}</strong>{" "}
+              {t(removal?.permanent ? "beneficiari.deletePermanentDescription" : "beneficiari.deactivateDescription")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (deletingId) {
-                deleteBeneficiario.mutate({ id: deletingId }, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-                    setDeletingId(null);
-                  }
-                });
-              }
-            }} className="bg-destructive text-destructive-foreground">Disattiva</AlertDialogAction>
+            <AlertDialogCancel disabled={deleteBeneficiario.isPending}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction disabled={deleteBeneficiario.isPending} onClick={(event) => {
+              event.preventDefault();
+              if (!removal || deleteBeneficiario.isPending) return;
+              const { beneficiary, permanent } = removal;
+              deleteBeneficiario.mutate({
+                id: beneficiary.id,
+                ...(permanent ? { params: { permanente: true, versione: beneficiary.versione } } : {}),
+              }, {
+                onSuccess: () => {
+                  void queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+                  void queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(beneficiary.id) });
+                  toast({ title: t(permanent ? "beneficiari.toastDeleted" : "beneficiari.toastDisattivato") });
+                  setRemoval(null);
+                },
+                onError: (error) => {
+                  toast({ title: apiErrorMessage(error, t("beneficiari.removalError")), variant: "destructive" });
+                  void queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+                  setRemoval(null);
+                },
+              });
+            }} className="bg-destructive text-destructive-foreground">
+              {t(removal?.permanent ? "beneficiari.deletePermanent" : "beneficiari.disattiva")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

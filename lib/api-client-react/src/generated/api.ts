@@ -172,6 +172,7 @@ import type {
   CreditoSolidaleSaldo,
   CreditoSolidaleStornoInput,
   DashboardStats,
+  DeleteBeneficiarioParams,
   DeleteMezzo200,
   DeleteUtenteParams,
   DeleteVolontario200,
@@ -16122,35 +16123,51 @@ export const useUpdateBeneficiario = <
   return useMutation(getUpdateBeneficiarioMutationOptions(options));
 };
 
-export const getDeleteBeneficiarioUrl = (id: number) => {
-  return `/api/beneficiari/${id}`;
+export const getDeleteBeneficiarioUrl = (
+  id: number,
+  params?: DeleteBeneficiarioParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/beneficiari/${id}?${stringifiedParams}`
+    : `/api/beneficiari/${id}`;
 };
 
 export const deleteBeneficiario = async (
   id: number,
+  params?: DeleteBeneficiarioParams,
   options?: RequestInit,
 ): Promise<void> => {
-  return customFetch<void>(getDeleteBeneficiarioUrl(id), {
+  return customFetch<void>(getDeleteBeneficiarioUrl(id, params), {
     ...options,
     method: "DELETE",
   });
 };
 
 export const getDeleteBeneficiarioMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteBeneficiario>>,
     TError,
-    { id: number },
+    { id: number; params?: DeleteBeneficiarioParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteBeneficiario>>,
   TError,
-  { id: number },
+  { id: number; params?: DeleteBeneficiarioParams },
   TContext
 > => {
   const mutationKey = ["deleteBeneficiario"];
@@ -16164,11 +16181,11 @@ export const getDeleteBeneficiarioMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteBeneficiario>>,
-    { id: number }
+    { id: number; params?: DeleteBeneficiarioParams }
   > = (props) => {
-    const { id } = props ?? {};
+    const { id, params } = props ?? {};
 
-    return deleteBeneficiario(id, requestOptions);
+    return deleteBeneficiario(id, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -16178,23 +16195,23 @@ export type DeleteBeneficiarioMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteBeneficiario>>
 >;
 
-export type DeleteBeneficiarioMutationError = ErrorType<unknown>;
+export type DeleteBeneficiarioMutationError = ErrorType<void>;
 
 export const useDeleteBeneficiario = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteBeneficiario>>,
     TError,
-    { id: number },
+    { id: number; params?: DeleteBeneficiarioParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deleteBeneficiario>>,
   TError,
-  { id: number },
+  { id: number; params?: DeleteBeneficiarioParams },
   TContext
 > => {
   return useMutation(getDeleteBeneficiarioMutationOptions(options));

@@ -288,6 +288,7 @@ export * from "./creditoSolidaleSaldo";
 export * from "./creditoSolidaleSaldoCreditoSolidaleStato";
 export * from "./creditoSolidaleStornoInput";
 export * from "./dashboardStats";
+export * from "./deleteBeneficiarioParams";
 export * from "./deleteMezzo200";
 export * from "./deleteUtenteParams";
 export * from "./deleteVolontario200";

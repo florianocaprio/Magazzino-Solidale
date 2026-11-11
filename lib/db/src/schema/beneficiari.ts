@@ -86,7 +86,13 @@ export const nucleoFamiliareTable = pgTable("nucleo_familiare", {
   numeroScarpe: varchar("numero_scarpe", { length: 10 }),
   esigenzeParticolari: text("esigenze_particolari"),
   note: text("note"),
-});
+}, (table) => [
+  foreignKey({
+    name: "nucleo_familiare_beneficiario_fk",
+    columns: [table.beneficiarioId],
+    foreignColumns: [beneficiariTable.id],
+  }).onDelete("restrict"),
+]);
 
 export const insertBeneficiarioSchema = createInsertSchema(beneficiariTable).omit({ id: true, dataCreazione: true, dataAggiornamento: true });
 export type InsertBeneficiario = z.infer<typeof insertBeneficiarioSchema>;

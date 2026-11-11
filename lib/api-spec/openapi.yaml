@@ -4439,9 +4439,20 @@ paths:
           required: true
           schema:
             type: integer
+        - name: permanente
+          in: query
+          schema: { type: boolean }
+          description: Se true, elimina un beneficiario senza dati associati. Se false o omesso, disattiva il beneficiario.
+        - name: versione
+          in: query
+          schema: { type: integer, minimum: 1 }
+          description: Versione corrente obbligatoria per l'eliminazione definitiva.
       responses:
         "204":
-          description: Beneficiario disattivato; storico preservato
+          description: Operazione completata
+        "400": { description: Richiesta non valida }
+        "403": { description: Permesso o perimetro insufficiente }
+        "409": { description: Dati associati o versione superata }
 
   /beneficiari/{id}/stato:
     patch:

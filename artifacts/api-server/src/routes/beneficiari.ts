@@ -40,6 +40,7 @@ import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
 import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiarioError } from "../lib/tesseraBeneficiarioService";
 import { requirePermission } from "../middlewares/auth";
 import { requireCurrentUdsScope } from "../lib/udsInterventoPolicy";
+import { deleteUnusedBeneficiario } from "../lib/deleteBeneficiario";
 import {
   canAccessBeneficiarioRecord,
   hasPermission,
@@ -1427,6 +1428,67 @@ router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate
 
 router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), async (req, res) => {
   const id = Number(req.params.id);
+  const permanent = req.query.permanente === "true";
+  const version = Number(req.query.versione);
+  if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647 ||
+      (req.query.permanente != null && !permanent && req.query.permanente !== "false") ||
+      (permanent && (typeof req.query.versione !== "string" || !Number.isSafeInteger(version) || version < 1))) {
+    res.status(400).json({ error: "Richiesta di rimozione non valida." });
+    return;
+  }
+  if (permanent) {
+    if (!hasPermission(req, "beneficiari.manage")) {
+      res.status(403).json({ error: "Eliminazione non autorizzata." });
+      return;
+    }
+    const linked = "Il beneficiario ha dati associati. Puoi disattivarlo conservando lo storico.";
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const [person] = await tx.select().from(beneficiariTable)
+          .where(eq(beneficiariTable.id, id)).for("update");
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.deactivate");
+        if (!actor.isAdmin && !actor.permessi.includes("beneficiari.manage"))
+          throw new CurrentCommandActorError("Eliminazione non autorizzata.");
+        if (!person) return { status: 204 } as const;
+        if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) ||
+            !canAccessBeneficiarioScope(person, actor))
+          return { status: 403, error: "Beneficiario non accessibile." } as const;
+        const boundary = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);
+        if (boundary) {
+          const [allowed] = await tx.select({ id: beneficiariTable.id }).from(beneficiariTable)
+            .where(and(eq(beneficiariTable.id, id), boundary));
+          if (!allowed) return { status: 403, error: "Beneficiario non accessibile." } as const;
+        }
+        if (person.versione !== version)
+          return { status: 409, error: "Versione Beneficiario superata." } as const;
+        if (!(await deleteUnusedBeneficiario(tx, id)))
+          return { status: 409, error: linked } as const;
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "beneficiari",
+          chiave: `beneficiario:${id}`,
+          azione: "eliminazione",
+          valorePrecedente: { beneficiarioId: id, codice: person.codice, versione: person.versione },
+          utenteId: actor.id,
+          ip: req.ip ?? null,
+        });
+        return { status: 204 } as const;
+      });
+      if (outcome.status === 204) res.status(204).send();
+      else res.status(outcome.status).json({ error: outcome.error });
+    } catch (error) {
+      if (error instanceof CurrentCommandActorError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      const pg = error as { code?: string; cause?: { code?: string } };
+      if ((pg.code ?? pg.cause?.code) === "23503") {
+        res.status(409).json({ error: linked });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, callerCentroId(req))) {

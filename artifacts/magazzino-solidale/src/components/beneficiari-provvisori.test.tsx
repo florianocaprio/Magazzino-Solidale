@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   listBeneficiari: vi.fn(),
+  deleteBeneficiario: vi.fn(),
   getMensaRiepilogo: vi.fn(),
   getEmporioRiepilogo: vi.fn(),
   areas: new Set<string>(),
@@ -40,7 +41,7 @@ vi.mock("@workspace/api-client-react", () => ({
     params: unknown,
     options: unknown,
   ) => mocks.getMensaRiepilogo(params, options),
-  useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteBeneficiario: () => ({ mutate: mocks.deleteBeneficiario, isPending: false }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }),
@@ -157,6 +158,7 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
           consegnaDomicilio: false,
           uds: false,
           attivo: true,
+          versione: 3,
         },
       ],
       isLoading: false,
@@ -185,6 +187,28 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(headers).not.toContain("emporioServizio.colonna");
     expect(container.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
     expect(mocks.getEmporioRiepilogo).not.toHaveBeenCalled();
+  });
+
+  it("chiede conferma e invia una cancellazione definitiva con la versione corrente", async () => {
+    await act(async () => root.render(<Beneficiari />));
+    const trigger = container.querySelector<HTMLButtonElement>('tbody button[aria-haspopup="menu"]')!;
+    trigger.focus();
+    await act(async () =>
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })),
+    );
+    const action = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes("beneficiari.deletePermanent"))!;
+    await act(async () => action.click());
+    expect(mocks.deleteBeneficiario).not.toHaveBeenCalled();
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    expect(dialog.textContent).toContain("Provvisoria Persona");
+    const confirm = [...dialog.querySelectorAll("button")]
+      .find((button) => button.textContent === "beneficiari.deletePermanent")!;
+    await act(async () => confirm.click());
+    expect(mocks.deleteBeneficiario).toHaveBeenCalledWith(
+      { id: 10, params: { permanente: true, versione: 3 } },
+      expect.any(Object),
+    );
   });
 
   it("mantiene la colonna Mensa per i ruoli abilitati", async () => {

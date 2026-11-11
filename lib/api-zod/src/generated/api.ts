@@ -10166,6 +10166,20 @@ export const DeleteBeneficiarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const DeleteBeneficiarioQueryParams = zod.object({
+  permanente: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "Se true, elimina un beneficiario senza dati associati. Se false o omesso, disattiva il beneficiario.",
+    ),
+  versione: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("Versione corrente obbligatoria per l'eliminazione definitiva."),
+});
+
 /**
  * @summary Disattiva o riattiva un beneficiario preservandone lo storico
  */

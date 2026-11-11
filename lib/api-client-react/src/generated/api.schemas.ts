@@ -12415,6 +12415,18 @@ export type CercaBeneficiariSimili400 = {
   error: string;
 };
 
+export type DeleteBeneficiarioParams = {
+  /**
+   * Se true, elimina un beneficiario senza dati associati. Se false o omesso, disattiva il beneficiario.
+   */
+  permanente?: boolean;
+  /**
+   * Versione corrente obbligatoria per l'eliminazione definitiva.
+   * @minimum 1
+   */
+  versione?: number;
+};
+
 export type AuthorizeBeneficiariExport200 = {
   autorizzato: boolean;
   auditId: number;

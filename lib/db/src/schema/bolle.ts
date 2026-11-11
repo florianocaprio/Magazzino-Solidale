@@ -13,6 +13,7 @@ import {
   decimal,
   integer,
   date,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -20,6 +21,7 @@ import { utentiTable } from "./auth";
 import { areeOperativeTable } from "./areeOperative";
 import { centriAscoltoTable } from "./centri";
 import { entiDestinatariTable } from "./entiDestinatari";
+import { beneficiariTable } from "./beneficiari";
 
 export const bolleTable = pgTable(
   "bolle",
@@ -91,6 +93,11 @@ export const bolleTable = pgTable(
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },
   (table) => [
+    foreignKey({
+      name: "bolle_beneficiario_fk",
+      columns: [table.beneficiarioId],
+      foreignColumns: [beneficiariTable.id],
+    }).onDelete("restrict"),
     index("bolle_reporting_snapshot_idx").on(
       table.stato,
       table.dataBolla,
