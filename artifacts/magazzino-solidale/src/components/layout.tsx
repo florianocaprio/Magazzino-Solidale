@@ -110,6 +110,21 @@ export type NavItem = {
   requiresMapsLayer?: boolean;
 };
 
+const logisticsReportNavigation = {
+  icon: Warehouse,
+  anyPermissions: ["magazzino.view", "approvvigionamenti.view", "logistica.mezzi.view", "logistica.volontari.view", "richieste_magazzino.view", ...MENSA_REQUEST_READ_PERMISSIONS],
+  moduloCodice: "REPORT",
+  moduloCodiciAny: [
+    "MAGAZZINO_SOLIDALE",
+    "LOTTI",
+    "TRASFERIMENTI",
+    "MEZZI",
+    "VOLONTARI",
+    "FORNITORI",
+    "APPROVVIGIONAMENTI",
+  ],
+};
+
 export const NAV_ITEMS: NavItem[] = [
   {
     key: "dashboard",
@@ -261,6 +276,13 @@ export const NAV_ITEMS: NavItem[] = [
     area: "magazzino",
     moduloCodice: "SCARICHI",
     permission: "magazzino.view",
+  },
+  {
+    ...logisticsReportNavigation,
+    key: "reportMagazzino",
+    url: "/report/magazzino",
+    groupKey: "magazzino",
+    area: "magazzino",
   },
 
   {
@@ -455,23 +477,11 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "approvvigionamenti.view",
   },
   {
+    ...logisticsReportNavigation,
     key: "reportLogistica",
     url: "/report/magazzino-logistica",
-    icon: Warehouse,
     groupKey: "logistica",
-    area: ["magazzino", "logistica"],
-    anyPermissions: ["magazzino.view", "approvvigionamenti.view", "logistica.mezzi.view", "logistica.volontari.view", "richieste_magazzino.view", ...MENSA_REQUEST_READ_PERMISSIONS],
-    sourceAreas: ["magazzino", "logistica"],
-    moduloCodice: "REPORT",
-    moduloCodiciAny: [
-      "MAGAZZINO_SOLIDALE",
-      "LOTTI",
-      "TRASFERIMENTI",
-      "MEZZI",
-      "VOLONTARI",
-      "FORNITORI",
-      "APPROVVIGIONAMENTI",
-    ],
+    area: "logistica",
   },
   {
     key: "maps",
@@ -848,7 +858,8 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
     }
     return (
       isNavItemEnabledByAccess(item, hasArea, hasPermission, user?.permessiSpeciali) &&
-      (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, isModuloAttivo)) &&
+      (!["reportLogistica", "reportMagazzino"].includes(item.key) ||
+        hasLogisticsReportSource(hasArea, hasPermission, isModuloAttivo)) &&
       isNavItemEnabledByCapabilities(
         item,
         mapsCapabilities?.layers.length ?? 0,

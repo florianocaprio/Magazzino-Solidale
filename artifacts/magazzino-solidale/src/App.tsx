@@ -368,7 +368,8 @@ function AuthorizedHome() {
     (!item.globalAdmin || canManageGlobalAdminResources(user)) &&
     (item.superAdmin ? user?.isSuperAdmin : isNavItemEnabledByAccess(item, hasArea, hasPermission, user?.permessiSpeciali)) &&
     isNavItemEnabledByModules(item, flags.isModuloAttivo) &&
-    (item.key !== "reportLogistica" || hasLogisticsReportSource(hasArea, hasPermission, flags.isModuloAttivo)));
+    (!["reportLogistica", "reportMagazzino"].includes(item.key) ||
+      hasLogisticsReportSource(hasArea, hasPermission, flags.isModuloAttivo)));
   return destination ? <Redirect to={destination.url} replace /> : <NotAuthorized />;
 }
 
@@ -877,7 +878,7 @@ export function AppRoutes() {
               </Guard>
             )}
           </Route>
-          <Route path="/report/magazzino-logistica">
+          <Route path={/^\/report\/(?:magazzino-logistica|magazzino)\/?$/i}>
             {() => (
               <Guard area={["magazzino", "logistica"]}>
                 <RequireModulo codice="REPORT">
@@ -889,7 +890,7 @@ export function AppRoutes() {
                       "LOTTI",
                       "TRASFERIMENTI",
                       "MEZZI",
-      "VOLONTARI",
+                      "VOLONTARI",
                       "FORNITORI",
                       "APPROVVIGIONAMENTI",
                     ]}

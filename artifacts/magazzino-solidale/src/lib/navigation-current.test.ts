@@ -5,6 +5,8 @@ const entries = [
   "/",
   "/report",
   "/report/mensa",
+  "/report/magazzino",
+  "/report/magazzino-logistica",
   "/mensa/report",
   "/report/uds",
   "/carico-merce",
@@ -25,12 +27,20 @@ describe("posizione corrente sulle sole voci autorizzate", () => {
     ["/lotti?magazzino=3", "/carico-merce"],
     ["/report-uds", "/report/uds"],
     ["/report/mensa", "/report/mensa"],
+    ["/report/magazzino?areaOperativaId=1", "/report/magazzino"],
+    ["/report/magazzino-logistica", "/report/magazzino-logistica"],
     ["/mensa/report", "/mensa/report"],
     ["/report/mensa/dettaglio", "/report/mensa"],
     ["/bolle/9", "/bolle"],
     ["/trasferimenti", "/trasferimenti"],
   ])("%s identifica %s", (route, expected) => {
     expect(currentNavigationItem(route, entries)?.url).toBe(expected);
+  });
+  it("riconosce i collegamenti già salvati quando è visibile una sola voce del report", () => {
+    const warehouse = entries.find((entry) => entry.url === "/report/magazzino")!;
+    const logistics = entries.find((entry) => entry.url === "/report/magazzino-logistica")!;
+    expect(currentNavigationItem(logistics.url, [warehouse])).toBe(warehouse);
+    expect(currentNavigationItem(warehouse.url, [logistics])).toBe(logistics);
   });
   it("fallback documenti e dossier senza introdurre voci nascoste", () => {
     expect(

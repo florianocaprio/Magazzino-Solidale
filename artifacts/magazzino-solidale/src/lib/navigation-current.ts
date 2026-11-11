@@ -21,6 +21,10 @@ export function currentNavigationItem<T extends NavigationEntry>(
     )
     .sort((a, b) => b.url.length - a.url.length)[0];
   if (nested) return nested;
+  if (path === "/report/magazzino-logistica" || path === "/report/magazzino") {
+    const alternate = path === "/report/magazzino" ? "/report/magazzino-logistica" : "/report/magazzino";
+    return visible.find((item) => item.url === alternate);
+  }
   const context =
     path === "/lotti"
       ? "/carico-merce"

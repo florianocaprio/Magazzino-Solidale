@@ -63,12 +63,26 @@ describe("permission gate della navigazione operativa", () => {
     ["bolle", "sociale"],
     ["maps", "sociale"],
     ["maps", "magazzino"],
-    ["reportLogistica", "magazzino"],
+    ["reportLogistica", "logistica"],
+    ["reportMagazzino", "magazzino"],
   ])("mantiene %s nel menu assegnato %s senza duplicarlo", (key, area) => {
     const item = NAV_ITEMS.find((item) => item.key === key)!;
     expect(navigationGroupForItem(item, (key) => key === area)).toBe(area);
     expect(isNavItemEnabledByAccess(item, (key) => key === area, () => true)).toBe(true);
     expect(navigationGroupForItem(item, () => true)).toBe(item.groupKey);
+  });
+
+  it("espone una sola voce per area e colloca Dashboard Magazzino in fondo al menu", () => {
+    const warehouseItems = NAV_ITEMS.filter((item) => item.groupKey === "magazzino");
+    expect(warehouseItems.at(-1)?.key).toBe("reportMagazzino");
+    const reportItems = NAV_ITEMS.filter((item) =>
+      ["reportMagazzino", "reportLogistica"].includes(item.key),
+    );
+    for (const area of ["magazzino", "logistica"]) {
+      expect(reportItems.filter((item) =>
+        isNavItemEnabledByAccess(item, (key) => key === area, () => true),
+      ).map((item) => item.groupKey)).toEqual([area]);
+    }
   });
 
   it("preserva il gate legacy Trasferimenti prima del redirect alla facciata comune", () => {
