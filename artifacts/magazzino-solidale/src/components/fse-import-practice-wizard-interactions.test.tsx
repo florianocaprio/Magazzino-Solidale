@@ -1,14 +1,13 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
-import type { CaricoPraticaDettaglio } from "@workspace/api-client-react";
+import type { CaricoPraticaDettaglio, Prodotto } from "@workspace/api-client-react";
 const api = vi.hoisted(() => ({
   analyze: vi.fn(),
   fetchDetail: vi.fn(),
   resume: vi.fn(),
   reviseDate: vi.fn(),
   reviseRow: vi.fn(),
-  createProduct: vi.fn(),
   mapProduct: vi.fn(),
   attach: vi.fn(),
   invalidate: vi.fn().mockResolvedValue(undefined),
@@ -68,7 +67,6 @@ vi.mock("@workspace/api-client-react", () => ({
   }),
   resolveAutomaticFseImportSource: vi.fn().mockResolvedValue({ id: 1 }),
   useMapFseImportProduct: () => ({ isPending: false, mutateAsync: api.mapProduct }),
-  useCreateProdotto: () => ({ isPending: false, mutateAsync: api.createProduct }),
   useReviseFseImportRow: () => ({ isPending: false, mutateAsync: api.reviseRow }),
 }));
 vi.mock("@tanstack/react-query", () => ({
@@ -78,9 +76,6 @@ vi.mock("@/lib/auth", () => ({
   useAuth: () => ({ hasPermission: () => true, user: { isAdmin: true } }),
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@/components/barcode-scanner-button", () => ({
-  BarcodeScannerButton: () => null,
-}));
 import i18n from "@/lib/i18n";
 import { FseImportPracticeWizard } from "./fse-import-practice-wizard";
 const initialDetail = structuredClone(api.detail);
@@ -106,7 +101,6 @@ beforeEach(async () => {
   vi.clearAllMocks();
   Object.assign(api.detail, structuredClone(initialDetail));
   api.analyze.mockReset().mockResolvedValue({ sessionId: 10 });
-  api.createProduct.mockReset().mockResolvedValue({ id: 99 });
   api.mapProduct.mockReset().mockResolvedValue({ versione: 3 });
   api.fetchDetail.mockReset().mockImplementation(async () => api.detail);
   api.detail.modalita = "NUOVI_CARICHI";
@@ -134,7 +128,7 @@ beforeEach(async () => {
             versione: 1,
           } as CaricoPraticaDettaglio
         }
-        products={[]}
+        products={[{ id: 99, nome: "Pasta", codice: "ALI-000099", unitaMisura: "pz", attivo: true } as Prodotto]}
         onPracticeReady={api.ready}
         onResumePractice={api.resume}
       />,
@@ -279,18 +273,19 @@ it("conferma in sequenza solo le date senza altri errori e usa la versione resti
   expect(api.attach).not.toHaveBeenCalled();
 });
 
-it.each(["kg", "l"])("crea in pezzi e propone il contenuto %s del file", async (unit) => {
+it("consente anche all'amministratore solo di associare un prodotto esistente", async () => {
   Object.assign(api.detail, {
     rows: [{ ...api.detail.rows[0], stato: "DA_ASSOCIARE", tipoMovimento: "CARICO", quantitaPezzi: "10", quantitaKgLt: "5" }],
-    stockRows: [{ id: 30, prodottoEsterno: "Pasta", stato: "DA_ASSOCIARE", unitaMisuraPeso: unit, pesoUnita: "0.5", giacenzaPezzi: "10", giacenzaPesoVolume: "5", errorCodes: [], warningCodes: [] }],
   });
   api.analyze.mockResolvedValueOnce({ sessionId: 10 });
   await file("fse-registry-file", new File(["registro"], "Registro.csv"));
   await click(i18n.t("caricoPratiche.fseAnalyze"));
-  await click(i18n.t("caricoPratiche.fseCreateProduct"));
-  expect(document.querySelector('[aria-label="Unità di misura del prodotto"]')?.textContent).toBe("pz");
-  await click(i18n.t("caricoPratiche.fseCreateAndAssociate"));
-  expect(api.createProduct.mock.calls[0][0].data).toMatchObject({ nome: "Pasta", unitaMisura: "pz", quantitaFrazionabile: false, fattoreKgLtPezzo: 0.5, unitaMisuraPeso: unit });
+  expect([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Crea prodotto")).toBe(false);
+  await click("Associa a Pasta · ALI-000099 · pz");
+  expect(api.mapProduct).toHaveBeenCalledWith(expect.objectContaining({
+    id: 10,
+    data: expect.objectContaining({ prodottoId: 99, descrizioneEsterna: "Pasta" }),
+  }));
 });
 
 it("in correzione mantiene l'unità del catalogo e permette di riprendere la quantità corrispondente", async () => {
@@ -303,7 +298,6 @@ it("in correzione mantiene l'unità del catalogo e permette di riprendere la qua
   await click("Usa quantità della riga: 5 kg");
   const quantity = document.querySelector(`input[placeholder="${i18n.t("caricoPratiche.fseCorrectionQuantity")}"]`) as HTMLInputElement;
   expect(quantity.value).toBe("5");
-  expect(api.createProduct).not.toHaveBeenCalled();
   expect(api.mapProduct).not.toHaveBeenCalled();
 });
 

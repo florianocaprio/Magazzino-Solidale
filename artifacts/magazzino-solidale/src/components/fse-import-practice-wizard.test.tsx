@@ -120,10 +120,7 @@ describe("M3B — ingresso UI Importa file FSE+", () => {
     ]).toEqual([2]);
   });
 
-  it("protegge creazione prodotto e saldo iniziale con i permessi dedicati", () => {
-    expect(wizardSource).toContain(
-      'hasPermission("magazzino.products.manage")',
-    );
+  it("protegge associazione e saldo iniziale con i permessi dedicati", () => {
     expect(wizardSource).toContain('hasPermission("magazzino.agea.bootstrap")');
     expect(wizardSource).toContain(
       'hasPermission("magazzino.agea.mapping.manage")',

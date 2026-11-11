@@ -18,6 +18,35 @@ afterAll(async () => {
 });
 
 describe("BUG6 — persistenza e bonifica esplicita sul DB usa e getta", () => {
+  it("rende esplicita la gestione catalogo anche nei database già installati", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const grant = "magazzino.products.manage";
+      const operational = ["Operatore Magazzino", "Coordinatore Centro e Catalogo", "Amministratore"];
+      await client.query(
+        "UPDATE ruoli SET permessi = $1::jsonb WHERE nome = ANY($2::text[])",
+        [JSON.stringify(["magazzino.view", grant]), operational],
+      );
+      await client.query(readFileSync(new URL(
+        "../../../lib/db/updates/20261111_zz_catalogo_prodotti_permesso_esplicito.sql",
+        import.meta.url,
+      ), "utf8"));
+      const { rows } = await client.query<{ nome: string; permessi: string[] }>(
+        "SELECT nome, permessi FROM ruoli WHERE nome = ANY($1::text[])",
+        [operational],
+      );
+      expect(Object.fromEntries(rows.map(({ nome, permessi }) => [nome, permessi]))).toEqual({
+        "Operatore Magazzino": ["magazzino.view"],
+        "Coordinatore Centro e Catalogo": ["magazzino.view", grant],
+        "Amministratore": ["magazzino.view", grant],
+      });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
+
   it("CLI: un ruolo cambiato dopo il dry-run annulla l'intera transazione senza sovrascrivere la personalizzazione", async () => {
     const originals = await db
       .select()

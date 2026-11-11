@@ -4,17 +4,19 @@ import express, { type Express } from "express";
 import { db, pool, prodottiTable, utentiTable, magazziniTable, areeOperativeTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import prodottiRouter from "../src/routes/prodotti";
+import type { SessionUser } from "../src/middlewares/auth";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-function makeApp(): Express {
+function makeApp(access: Partial<SessionUser> = {}): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = { id: testUserId,
       username: `prodotti_${testUserId}`,
       isAdmin: true,
+      ...access,
     } as NonNullable<typeof req.user>;
     next();
   });
@@ -224,17 +226,21 @@ describe("Eliminazione definitiva dei soli prodotti inutilizzati", () => {
     finally { await pool.query("DELETE FROM movimenti WHERE id=$1", [movement.rows[0].id]); }
   });
 
-  it("non consente eliminazione o verifica senza permesso di gestione", async () => {
+  it("riserva l'eliminazione definitiva agli amministratori e lascia la disattivazione al gestore", async () => {
     const id = await product();
-    const restricted = express();
-    restricted.use((req, _res, next) => {
-      req.user = { id: testUserId, username: 'readonly', isAdmin: false, permessi: [] } as NonNullable<typeof req.user>;
-      next();
-    });
-    restricted.use(prodottiRouter);
-    expect((await request(restricted).get(`/prodotti/${id}/eliminazione`)).status).toBe(403);
-    expect((await request(restricted).delete(`/prodotti/${id}/eliminazione`)).status).toBe(403);
-    expect((await request(app).get(`/prodotti/${id}`)).status).toBe(200);
+    const operator = request(makeApp({ isAdmin: false, permessi: ["magazzino.view"] }));
+    const manager = request(makeApp({
+      isAdmin: false,
+      permessi: ["magazzino.view", "magazzino.products.manage"],
+    }));
+    expect((await operator.get(`/prodotti/${id}`)).status).toBe(200);
+    expect((await operator.patch(`/prodotti/${id}`).send({ nome: "Modifica vietata" })).status).toBe(403);
+    expect((await operator.delete(`/prodotti/${id}`)).status).toBe(403);
+    expect((await manager.get(`/prodotti/${id}/eliminazione`)).status).toBe(403);
+    expect((await manager.delete(`/prodotti/${id}/eliminazione`)).status).toBe(403);
+    expect((await manager.delete(`/prodotti/${id}`)).body.attivo).toBe(false);
+    const superAdmin = request(makeApp({ isAdmin: false, isSuperAdmin: true, permessi: [] }));
+    expect((await superAdmin.delete(`/prodotti/${id}/eliminazione`)).status).toBe(204);
   });
 
   it("serializza un carico concorrente prima di rivalutare l'eliminazione", async () => {

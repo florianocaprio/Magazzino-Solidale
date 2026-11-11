@@ -165,8 +165,9 @@ function parseOptionalBulkNumber(
 
 export default function Prodotti() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canManageProducts = hasPermission("magazzino.products.manage");
+  const canPermanentlyDelete = Boolean(user?.isAdmin || user?.isSuperAdmin);
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
 
@@ -193,13 +194,14 @@ export default function Prodotti() {
   const removalCheck = useGetProdottoEliminazione(removingProduct?.id ?? 0, {
     query: {
       queryKey: getGetProdottoEliminazioneQueryKey(removingProduct?.id ?? 0),
-      enabled: !!removingProduct && canManageProducts,
+      enabled: !!removingProduct && canPermanentlyDelete,
       staleTime: 0,
     },
   });
   const handlePermanentDelete = () => {
     if (
       !removingProduct ||
+      !canPermanentlyDelete ||
       !removalCheck.data?.eliminabile ||
       removalCheck.isFetching ||
       removeProdotto.isPending
@@ -878,7 +880,7 @@ export default function Prodotti() {
                               {t("prodotti.deactivate")}
                             </DropdownMenuItem>
                           )}
-                          {canManageProducts && (
+                          {canPermanentlyDelete && (
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => {

@@ -21,13 +21,14 @@ import type { SessionUser } from "../src/middlewares/auth";
 const profile = (name: string) =>
   STANDARD_ROLE_PROFILES.find((role) => role.nome === name)!;
 describe("BUG6 — contratti ruoli e manutenzione conservativa", () => {
-  it("copre tutti e nove i profili, con operatori non amministrativi e grant conosciuti", () => {
+  it("copre i profili standard con operatori non amministrativi e grant conosciuti", () => {
     expect(STANDARD_ROLE_PROFILES.map((role) => role.nome).sort()).toEqual(
       [
         "Amministratore",
         "SuperAdmin",
         "Operatore",
         "Operatore Magazzino",
+        "Coordinatore Centro e Catalogo",
         "Operatore Logistica",
         "Operatore UDS",
         "Emporio",
@@ -44,6 +45,10 @@ describe("BUG6 — contratti ruoli e manutenzione conservativa", () => {
         ),
       ).toBe(true);
     }
+    const catalogManagers = STANDARD_ROLE_PROFILES
+      .filter((role) => !role.isAdmin && (role.permessi as readonly string[]).includes("magazzino.products.manage"));
+    expect(catalogManagers.map((role) => role.nome)).toEqual(["Coordinatore Centro e Catalogo"]);
+    expect(ORDINARY_AREA_PERMISSION_MAP.magazzino).not.toContain("magazzino.products.manage");
   });
   it("Volontario ha solo la lettura concordata, UDS ed Emporio non acquisiscono privilegi estranei", () => {
     expect(profile("Volontario").permessi).toEqual([

@@ -228,7 +228,7 @@ export const MAGAZZINO_PERMISSIONS = [
     key: "magazzino.agea.bootstrap",
     label: "Magazzino AGEA: prima acquisizione",
   },
-  { key: "magazzino.products.manage", label: "Magazzino: gestione prodotti" },
+  { key: "magazzino.products.manage", label: "Magazzino: gestione catalogo prodotti" },
   { key: "magazzino.stock.receive", label: "Magazzino: carico merce" },
   { key: "magazzino.stock.issue", label: "Magazzino: scarico merce" },
   {

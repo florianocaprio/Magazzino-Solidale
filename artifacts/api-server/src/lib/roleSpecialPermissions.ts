@@ -1,4 +1,4 @@
-import { ORDINARY_AREA_PERMISSION_MAP, STANDARD_ROLE_PROFILES } from "./seedRoles";
+import { ORDINARY_AREA_PERMISSION_MAP, PRODUCT_CATALOG_MANAGER_ROLE_NAME, STANDARD_ROLE_PROFILES } from "./seedRoles";
 
 type RoleAccess = {
   aree: readonly string[];
@@ -14,6 +14,7 @@ export function specialRolePermissions(role: RoleAccess): string[] {
   // Reduced standard profiles (notably Volontario) include shared workflows
   // that are not all present in the area's editor preset.
   for (const profile of STANDARD_ROLE_PROFILES) {
+    if (profile.nome === PRODUCT_CATALOG_MANAGER_ROLE_NAME) continue;
     if (!profile.isAdmin && profile.aree.every((area) => role.aree.includes(area))) {
       for (const permission of profile.permessi) ordinary.add(permission);
     }

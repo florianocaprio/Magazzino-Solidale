@@ -13,7 +13,6 @@ import {
   getListProdottiQueryKey,
   useAddFseImportToPractice,
   resolveAutomaticFseImportSource,
-  useCreateProdotto,
   useGetFseImportSession,
   useListFseImportSessions,
   useListFseImportSources,
@@ -25,7 +24,6 @@ import {
   type Prodotto,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
-import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,7 +48,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
 import { suggestFseProducts } from "@/lib/fse-product-suggestions";
-import { suggestFseContent, suggestFseUnit, type FseUnit } from "@/lib/fse-unit-suggestion";
+import { suggestFseContent, suggestFseUnit } from "@/lib/fse-unit-suggestion";
 import { useAuth } from "@/lib/auth";
 import { newCommandKey } from "@/lib/carico-merce";
 import {
@@ -64,7 +62,6 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Loader2,
-  PackagePlus,
 } from "lucide-react";
 
 type Props = {
@@ -75,17 +72,6 @@ type Props = {
   onPracticeReady: (practiceId: number) => void;
   initialSessionId?: number | null;
   onResumePractice?: (practiceId: number, sessionId: number) => void;
-};
-
-type NewProduct = {
-  factor: string;
-  weightUnit: "kg" | "l" | "";
-  name: string;
-  unit: FseUnit | "";
-  barcode: string;
-  fractional: boolean;
-  physicalLot: boolean;
-  expiry: boolean;
 };
 
 type CorrectionDraft = {
@@ -123,17 +109,6 @@ function correctionFromRow(row: FseImportRow): CorrectionDraft {
   };
 }
 
-const emptyProduct: NewProduct = {
-  factor: "",
-  weightUnit: "",
-  name: "",
-  unit: "",
-  barcode: "",
-  fractional: false,
-  physicalLot: false,
-  expiry: false,
-};
-
 export function FseImportPracticeWizard({
   open,
   onOpenChange,
@@ -153,7 +128,6 @@ export function FseImportPracticeWizard({
         queryKey: getListProdottiQueryKey(),
       });
   }, [open, queryClient]);
-  const canManageProducts = hasPermission("magazzino.products.manage");
   const canManageMappings = hasPermission("magazzino.agea.mapping.manage");
   const canBootstrap = hasPermission("magazzino.agea.bootstrap");
   const [step, setStep] = useState(0);
@@ -183,7 +157,6 @@ export function FseImportPracticeWizard({
   } | null>(null);
   const registryInput = useRef<HTMLInputElement>(null),
     stockInput = useRef<HTMLInputElement>(null);
-  const createdProducts = useRef<Record<string, number>>({});
   const [mode, setMode] = useState<FseImportMode>("NUOVI_CARICHI");
   const [sourceId, setSourceId] = useState("");
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -198,8 +171,6 @@ export function FseImportPracticeWizard({
   const [mappingProduct, setMappingProduct] = useState<Record<string, string>>(
     {},
   );
-  const [newProduct, setNewProduct] = useState<NewProduct>(emptyProduct);
-  const [newProductFor, setNewProductFor] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [correction, setCorrection] = useState<CorrectionDraft | null>(null);
   const selectedSession = useRef<number | null>(null);
@@ -236,7 +207,6 @@ export function FseImportPracticeWizard({
   );
   const mapProduct = useMapFseImportProduct();
   const addToPractice = useAddFseImportToPractice();
-  const createProduct = useCreateProdotto();
   const reviseRow = useReviseFseImportRow();
   const reviseDate = useReviseFseReferenceDate();
   const detail = detailQuery.data;
@@ -250,7 +220,6 @@ export function FseImportPracticeWizard({
     busy ||
     mapProduct.isPending ||
     addToPractice.isPending ||
-    createProduct.isPending ||
     reviseRow.isPending ||
     reviseDate.isPending;
   const editingRow = detail?.rows.find((row) => row.id === editingRowId);
@@ -265,10 +234,6 @@ export function FseImportPracticeWizard({
       : ["kg", "l", "lt"].includes(editingUnit ?? "")
         ? editingRow?.quantitaKgLt
         : null;
-  const unitProposal =
-    detail && newProductFor
-      ? suggestFseUnit(newProductFor, detail.stockRows, detail.rows)
-      : null;
   const editingUnitProposal =
     detail && editingRow
       ? suggestFseUnit(
@@ -496,40 +461,6 @@ export function FseImportPracticeWizard({
     }
   };
 
-  const createAndMapProduct = async () => {
-    if (!newProductFor || !newProduct.name.trim() || !newProduct.unit) return;
-    try {
-      const created = createdProducts.current[`${detail?.id}:${newProductFor}`]
-        ? { id: createdProducts.current[`${detail?.id}:${newProductFor}`] }
-        : await createProduct.mutateAsync({
-            data: {
-              nome: newProduct.name.trim(),
-              tipoProdotto: "alimentare",
-              unitaMisura: newProduct.unit,
-              fattoreKgLtPezzo: newProduct.factor ? Number(newProduct.factor) : null,
-              unitaMisuraPeso: newProduct.factor ? (newProduct.weightUnit || null) : null,
-              codiceBarre: newProduct.barcode.trim() || undefined,
-              quantitaFrazionabile: newProduct.fractional,
-              lottoFisicoObbligatorio: newProduct.physicalLot,
-              gestioneScadenza: newProduct.expiry,
-              fsePlus: true,
-            },
-          });
-      createdProducts.current[`${detail?.id}:${newProductFor}`] = created.id;
-      setMappingProduct((current) => ({
-        ...current,
-        [newProductFor]: String(created.id),
-      }));
-      await queryClient.invalidateQueries({ queryKey: ["/api/prodotti"] });
-      if (await confirmMapping(newProductFor, created.id)) {
-        setNewProductFor(null);
-        setNewProduct(emptyProduct);
-      }
-    } catch (error) {
-      showError(error);
-    }
-  };
-
   const saveCorrection = async () => {
     if (!detail || editingRowId == null || !correction?.reason.trim()) return;
     try {
@@ -696,7 +627,6 @@ export function FseImportPracticeWizard({
     setSelectedRows(new Set());
     selectedSession.current = null;
     attachIntent.current = null;
-    setNewProductFor(null);
     setEditingRowId(null);
     setCorrection(null);
   };
@@ -1141,42 +1071,6 @@ export function FseImportPracticeWizard({
                     >
                       {t("caricoPratiche.fseAssociate")}
                     </Button>
-                    {canManageProducts && (
-                      <Button
-                        variant="outline"
-                        disabled={
-                          pending ||
-                          Boolean(
-                            createdProducts.current[
-                              `${detail?.id}:${description}`
-                            ],
-                          )
-                        }
-                        onClick={() => {
-                          if (newProductFor !== description) {
-                            const proposal = suggestFseUnit(
-                              description,
-                              detail.stockRows,
-                              detail.rows,
-                            );
-                            const content = suggestFseContent(description, detail.stockRows);
-                            setNewProduct({
-                              ...emptyProduct,
-                              factor: content.fattoreKgLtPezzo?.toString() ?? "",
-                              weightUnit: content.unitaMisuraPeso ?? "",
-                              name: description,
-                              unit: proposal.unit ?? "",
-                              fractional:
-                                proposal.unit === "kg" || proposal.unit === "l",
-                            });
-                          }
-                          setNewProductFor(description);
-                        }}
-                      >
-                        <PackagePlus className="mr-2 h-4 w-4" />
-                        {t("caricoPratiche.fseCreateProduct")}
-                      </Button>
-                    )}
                   </div>
                   {canManageMappings && (
                     <div
@@ -1213,119 +1107,6 @@ export function FseImportPracticeWizard({
                           ),
                         )}
                       </div>
-                    </div>
-                  )}
-                  {createdProducts.current[`${detail?.id}:${description}`] && (
-                    <p role="status" className="md:col-span-3">
-                      {t("caricoPratiche.fseSelectProduct")}: #
-                      {createdProducts.current[`${detail?.id}:${description}`]}{" "}
-                      · {newProduct.name}
-                    </p>
-                  )}
-                  {newProductFor === description && (
-                    <div className="grid gap-2 rounded bg-muted/40 p-3 md:grid-cols-3">
-                      <p className="text-sm text-muted-foreground md:col-span-3">
-                        {t(
-                          `blocco07.unitSuggestion.${unitProposal?.source ?? "unknown"}`,
-                          { unit: unitProposal?.unit },
-                        )}
-                      </p>
-                      <label className="text-sm">
-                        {t("blocco07.packContent")}
-                        <Input type="number" min="0.000000001" step="any" value={newProduct.factor}
-                          onChange={event => setNewProduct(current => ({ ...current, factor: event.target.value }))} />
-                      </label>
-                      <label className="text-sm">
-                        {t("blocco07.packUnit")}
-                        <Select value={newProduct.weightUnit} onValueChange={value => setNewProduct(current => ({ ...current, weightUnit: value as "kg" | "l" }))}>
-                          <SelectTrigger><SelectValue placeholder="kg / l" /></SelectTrigger>
-                          <SelectContent><SelectItem value="kg">kg</SelectItem><SelectItem value="l">l</SelectItem></SelectContent>
-                        </Select>
-                      </label>
-                      <p className="text-xs text-muted-foreground">{t("blocco07.packHelp")}</p>
-                      <Input
-                        value={newProduct.name}
-                        onChange={(event) =>
-                          setNewProduct((current) => ({
-                            ...current,
-                            name: event.target.value,
-                          }))
-                        }
-                        placeholder={t("caricoPratiche.fseProductName")}
-                      />
-                      <Select
-                        value={newProduct.unit}
-                        onValueChange={(value) =>
-                          setNewProduct((current) => ({
-                            ...current,
-                            unit: value as NewProduct["unit"],
-                            fractional: value !== "pz",
-                          }))
-                        }
-                      >
-                        <SelectTrigger aria-label={t("blocco07.productUnit")}>
-                          <SelectValue
-                            placeholder={t("blocco07.productUnit")}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pz">pz</SelectItem>
-                          <SelectItem value="kg">kg</SelectItem>
-                          <SelectItem value="l">l</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="flex gap-2">
-                        <Input
-                          value={newProduct.barcode}
-                          onChange={(event) =>
-                            setNewProduct((current) => ({
-                              ...current,
-                              barcode: event.target.value,
-                            }))
-                          }
-                          placeholder={t("caricoPratiche.fseBarcodeOptional")}
-                        />
-                        <BarcodeScannerButton
-                          onScan={(barcode) =>
-                            setNewProduct((current) => ({
-                              ...current,
-                              barcode,
-                            }))
-                          }
-                        />
-                      </div>
-                      <label className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={newProduct.physicalLot}
-                          onCheckedChange={(checked) =>
-                            setNewProduct((current) => ({
-                              ...current,
-                              physicalLot: checked === true,
-                            }))
-                          }
-                        />
-                        {t("caricoPratiche.fsePhysicalLotRequired")}
-                      </label>
-                      <label className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={newProduct.expiry}
-                          onCheckedChange={(checked) =>
-                            setNewProduct((current) => ({
-                              ...current,
-                              expiry: checked === true,
-                            }))
-                          }
-                        />
-                        {t("caricoPratiche.fseExpiryManaged")}
-                      </label>
-                      <Button
-                        disabled={
-                          !newProduct.name.trim() || !newProduct.unit || pending
-                        }
-                        onClick={() => void createAndMapProduct()}
-                      >
-                        {t("caricoPratiche.fseCreateAndAssociate")}
-                      </Button>
                     </div>
                   )}
                 </div>

@@ -443,7 +443,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await uploadStock(page, external, 10);
     await page.getByRole("button", { name: "Carica e analizza" }).click();
     await expect(page.getByRole("paragraph").filter({ hasText: external })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toHaveCount(0);
     // Session already exists before the catalog product is added.
     await page.getByRole("button", { name: "Sospendi importazione", exact: true }).click();
     const created = await page.request.post("/api/prodotti", { data: { nome: external, tipoProdotto: "alimentare", unitaMisura: "pz", quantitaFrazionabile: false, lottoFisicoObbligatorio: false, gestioneScadenza: false } });
@@ -456,7 +456,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
   });
 
-  test("crea prodotto e barcode con permesso e impedisce l'aggiramento senza products.manage", async ({
+  test("associa solo prodotti esistenti e impedisce le modifiche a chi non gestisce il catalogo", async ({
     page,
     browser,
   }) => {
@@ -467,6 +467,14 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await createPractice(page, context, description);
     const externalProduct = `Prodotto esterno nuovo ${suffix}`;
     const barcode = validEan13(suffix);
+    const productResponse = await page.request.post("/api/prodotti", {
+      data: {
+        nome: externalProduct, tipoProdotto: "alimentare", unitaMisura: "pz",
+        codiceBarre: barcode, fsePlus: true, fattoreKgLtPezzo: 0.5, unitaMisuraPeso: "l",
+      },
+    });
+    expect(productResponse.status()).toBe(201);
+    const product = await productResponse.json();
     const registryBook = XLSX.read(registryFixture(externalProduct, `DOC-NEW-${suffix}`));
     const registrySheet = registryBook.Sheets[registryBook.SheetNames[0]];
     registrySheet.D2 = { t: "n", v: 5 };
@@ -497,31 +505,14 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       buffer: Buffer.from(XLSX.write(stockBook, { type: "buffer", bookType: "xlsx" })),
     });
     await page.getByRole("button", { name: "Carica e analizza" }).click();
-    await page
-      .getByRole("button", { name: "Crea prodotto", exact: true })
-      .click();
-    await expect(page.getByPlaceholder("Nome del prodotto")).toHaveValue(
-      externalProduct,
-    );
-    await expect(page.getByRole("combobox", { name: "Unità di misura del prodotto" })).toHaveText("pz");
-    await page
-      .getByPlaceholder("Nome del prodotto")
-      .fill(`Catalogo da FSE ${suffix}`);
-    await page.getByPlaceholder(/Barcode/).fill(barcode);
-    await page
-      .getByRole("button", { name: "Crea e associa", exact: true })
-      .click();
+    const suggestion = page.getByRole("button", {
+      name: `Associa a ${externalProduct} · ${product.codice} · pz`,
+      exact: true,
+    });
+    await expect(suggestion).toBeVisible();
+    await expect(page.getByRole("button", { name: "Crea prodotto", exact: true })).toHaveCount(0);
+    await suggestion.click();
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
-    const productsResponse = await page.request.get("/api/prodotti");
-    const createdProduct = (
-      (await productsResponse.json()) as Array<
-        Product & { codiceBarre?: string; fattoreKgLtPezzo?: number; unitaMisuraPeso?: string }
-      >
-    ).find((product) => product.nome === `Catalogo da FSE ${suffix}`);
-    expect(createdProduct?.codiceBarre).toBe(barcode);
-    expect(createdProduct?.unitaMisura).toBe("pz");
-    expect(createdProduct?.fattoreKgLtPezzo).toBe(0.5);
-    expect(createdProduct?.unitaMisuraPeso).toBe("l");
     const sessions = await (await page.request.get(`/api/fse-importazioni/sessioni?magazzinoId=${context.warehouse.id}`)).json();
     const session = sessions.find((item: { sourceRegistryId: number }) => item.sourceRegistryId === source.id);
     const imported = await (await page.request.get(`/api/fse-importazioni/sessioni/${session.id}`)).json();
@@ -531,14 +522,14 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
 
     // A mapped import is a dependency even before stock is loaded.
     await page.goto("/prodotti");
-    await page.getByPlaceholder("Cerca per nome o codice...").fill(createdProduct!.nome);
-    await page.getByRole("row").filter({ hasText: createdProduct!.nome }).getByRole("button", { name: "Apri menu" }).click();
+    await page.getByPlaceholder("Cerca per nome o codice...").fill(product.nome);
+    await page.getByRole("row").filter({ hasText: product.nome }).getByRole("button", { name: "Apri menu" }).click();
     await page.getByRole("menuitem", { name: "Elimina definitivamente", exact: true }).click();
     const removalDialog = page.getByRole("alertdialog");
     await expect(removalDialog.getByText(/non può essere eliminato/)).toBeVisible();
     await expect(removalDialog.getByRole("button", { name: "Elimina definitivamente", exact: true })).toBeDisabled();
     await removalDialog.getByRole("button", { name: "Annulla", exact: true }).click();
-    expect((await page.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(409);
+    expect((await page.request.delete(`/api/prodotti/${product.id}/eliminazione`)).status()).toBe(409);
 
     const unusedResponse = await page.request.post("/api/prodotti", { data: { nome: `Inutilizzato ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "pz" } });
     expect(unusedResponse.status()).toBe(201);
@@ -635,7 +626,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       },
     });
     expect(forbidden.status()).toBe(403);
-    expect((await deniedPage.request.delete(`/api/prodotti/${createdProduct!.id}/eliminazione`)).status()).toBe(403);
+    expect((await deniedPage.request.delete(`/api/prodotti/${product.id}/eliminazione`)).status()).toBe(403);
     await deniedContext.close();
   });
 

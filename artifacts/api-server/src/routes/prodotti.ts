@@ -1,7 +1,7 @@
 import { parseProductContent } from "../lib/productContent";
 import { randomInt } from "node:crypto";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { db } from "@workspace/db";
 import {
   bollaRigheTable,
@@ -15,7 +15,7 @@ import {
   EMPORIO_DISABLED_MSG,
   isEmporioEnabled,
 } from "../lib/impostazioniModuli";
-import { requirePermission } from "../middlewares/auth";
+import { requireAdmin, requirePermission } from "../middlewares/auth";
 import {
   auditContextFromRequest,
   auditFields,
@@ -31,6 +31,14 @@ import {
 } from "../lib/prodottoRemoval";
 
 const router: IRouter = Router();
+
+const requireProductDeletionAdmin: RequestHandler = (req, res, next) => {
+  if (req.user?.isSuperAdmin) {
+    next();
+    return;
+  }
+  requireAdmin(req, res, next);
+};
 
 const CODICE_DUPLICATO_MSG =
   "Il codice prodotto indicato è già associato a un altro prodotto.";
@@ -685,7 +693,7 @@ router.delete(
 // The existing DELETE remains a reversible deactivation for all current clients.
 router.get(
   "/prodotti/:id/eliminazione",
-  requirePermission("magazzino.products.manage"),
+  requireProductDeletionAdmin,
   async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -715,7 +723,7 @@ router.get(
 
 router.delete(
   "/prodotti/:id/eliminazione",
-  requirePermission("magazzino.products.manage"),
+  requireProductDeletionAdmin,
   async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) {

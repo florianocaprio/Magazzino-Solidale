@@ -49,7 +49,7 @@ export const blocco07 = {
       MOLTEPLICITA_AMBIGUA: "Righe con la stessa identità: assegna un riferimento distintivo dopo la verifica.",
     },
     noProductSuggestions:
-      "Nessuna proposta sufficientemente simile nel catalogo attuale: scegli un prodotto esistente oppure creane uno.",
+      "Nessuna proposta sufficientemente simile. Cerca un prodotto nel catalogo. Se manca, contatta un gestore del catalogo.",
     fileFormat: { ELENCO: "Elenco semplice (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "Il Massivo deve contenere Configuratore file csv; l’Elenco semplice un solo foglio Table1.",
@@ -188,7 +188,7 @@ export const blocco07 = {
     noNewLoads: "Register aligned: no new receipts to import",
     noNewLoadsHelp: "All receipts are already recorded or covered by the opening balance. Historical movements need no corrections. Use Compare stock to check current inventory quantities.",
     noProductSuggestions:
-      "No sufficiently similar match in the current catalogue: select an existing product or create one.",
+      "No close match. Look for the product in the catalogue. If it is missing, contact a catalogue manager.",
     fileFormat: { ELENCO: "Simple list (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "The Massivo file must contain Configuratore file csv; the simple list must contain a single Table1 sheet.",
@@ -317,7 +317,7 @@ export const blocco07 = {
   },
   es: {
     noProductSuggestions:
-      "No hay coincidencias suficientemente similares: selecciona un producto existente o crea uno.",
+      "No hay coincidencias similares. Busca el producto en el catálogo. Si falta, contacta con un gestor del catálogo.",
     fileFormat: { ELENCO: "Lista simple (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "El Massivo debe contener Configuratore file csv; la lista simple, una sola hoja Table1.",
@@ -446,7 +446,7 @@ export const blocco07 = {
   },
   fr: {
     noProductSuggestions:
-      "Aucune correspondance suffisamment proche : choisissez un produit existant ou créez-en un.",
+      "Aucune correspondance proche. Cherchez le produit dans le catalogue. S’il manque, contactez un gestionnaire du catalogue.",
     fileFormat: { ELENCO: "Liste simple (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "Le Massivo doit contenir Configuratore file csv ; la liste simple, une seule feuille Table1.",
@@ -574,7 +574,7 @@ export const blocco07 = {
   },
   de: {
     noProductSuggestions:
-      "Kein ausreichend ähnlicher Treffer: vorhandenes Produkt wählen oder ein neues anlegen.",
+      "Keine passende Übereinstimmung. Suchen Sie das Produkt im Katalog. Falls es fehlt, wenden Sie sich an die Katalogverwaltung.",
     fileFormat: { ELENCO: "Einfache Liste (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "Massivo muss Configuratore file csv enthalten; die einfache Liste ein einziges Blatt Table1.",
@@ -703,7 +703,7 @@ export const blocco07 = {
   },
   ar: {
     noProductSuggestions:
-      "لا يوجد تطابق مشابه بما يكفي: اختر منتجاً موجوداً أو أنشئ منتجاً جديداً.",
+      "لا توجد نتيجة مشابهة بما يكفي. ابحث عن المنتج في الكتالوج. إذا لم تجده، تواصل مع مسؤول الكتالوج.",
     fileFormat: { ELENCO: "قائمة بسيطة (XLSX)", MASSIVO: "Massivo (XLSM)" },
     beneficiaryWorkbook:
       "يجب أن يحتوي Massivo على Configuratore file csv والقائمة البسيطة على ورقة Table1 فقط.",

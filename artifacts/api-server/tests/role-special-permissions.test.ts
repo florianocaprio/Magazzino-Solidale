@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { specialRolePermissions } from "../src/lib/roleSpecialPermissions";
-import { ORDINARY_AREA_PERMISSION_MAP, STANDARD_ROLE_PROFILES } from "../src/lib/seedRoles";
+import { ORDINARY_AREA_PERMISSION_MAP, PRODUCT_CATALOG_MANAGER_ROLE_NAME, STANDARD_ROLE_PROFILES } from "../src/lib/seedRoles";
 
 describe("permessi speciali rispetto ai menu assegnati", () => {
-  it.each(STANDARD_ROLE_PROFILES)("$nome è standard anche con un nome personalizzato", (profile) => {
+  it.each(STANDARD_ROLE_PROFILES.filter((role) => role.nome !== PRODUCT_CATALOG_MANAGER_ROLE_NAME))("$nome è standard anche con un nome personalizzato", (profile) => {
     expect(specialRolePermissions({ ...profile, nome: "Altro nome" })).toEqual([]);
     expect(specialRolePermissions({ ...profile, permessi: profile.permessi.slice(0, 1) })).toEqual([]);
+  });
+
+  it("mantiene la gestione catalogo come capacità aggiuntiva", () => {
+    const profile = STANDARD_ROLE_PROFILES.find((role) => role.nome === PRODUCT_CATALOG_MANAGER_ROLE_NAME)!;
+    expect(specialRolePermissions(profile)).toContain("magazzino.products.manage");
   });
 
   it("la dotazione dei cinque menu del Centro non è un'aggiunta speciale", () => {
