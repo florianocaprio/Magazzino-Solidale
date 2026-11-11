@@ -22,7 +22,7 @@ import {
   moduliFunzionaliTable,
 } from "@workspace/db";
 import app from "../src/app";
-import { STANDARD_ROLE_PROFILES, seedRoles } from "../src/lib/seedRoles";
+import { PRODUCT_CATALOG_MANAGER_ROLE_NAME, STANDARD_ROLE_PROFILES, seedRoles } from "../src/lib/seedRoles";
 import { ensureAmbienteModuli } from "../src/lib/configurazioneAmbiente";
 
 const suffix = randomUUID().slice(0, 8);
@@ -223,7 +223,9 @@ beforeAll(async () => {
     expect(login.status, profile.nome).toBe(200);
     expect(login.body.isAdmin).toBe(profile.isAdmin);
     expect(login.body.isSuperAdmin).toBe(profile.nome === "SuperAdmin");
-    expect(login.body.permessiSpeciali, profile.nome).toEqual([]);
+    expect(login.body.permessiSpeciali, profile.nome).toEqual(
+      profile.nome === PRODUCT_CATALOG_MANAGER_ROLE_NAME ? ["magazzino.products.manage"] : [],
+    );
     agents.set(profile.nome, agent);
   }
   for (let i = 0; i < areaIds.length; i++) {
