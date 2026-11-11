@@ -466,7 +466,7 @@ test("Operatore UDS salva il nome dalla rettifica e conserva i dati riservati", 
   const rectification = page.getByRole("dialog", { name: /rettifica intervento/i });
   await rectification.getByRole("button", { name: /nome iniziale/i }).click();
   const edit = page.getByRole("dialog", { name: /modifica anagrafica/i });
-  await edit.getByRole("textbox", { name: "Nome", exact: true }).fill("Nome aggiornato");
+  await edit.getByRole("textbox", { name: /^Nome\b/ }).fill("Nome aggiornato");
   await expect(edit.getByRole("textbox", { name: /codice fiscale|restrizioni alimentari/i })).toHaveCount(0);
   const saved = page.waitForResponse((response) => response.request().method() === "PATCH" &&
     new URL(response.url()).pathname === `/api/beneficiari/${person.id}`);
