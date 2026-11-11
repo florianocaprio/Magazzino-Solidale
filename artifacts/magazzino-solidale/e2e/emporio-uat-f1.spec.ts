@@ -916,7 +916,7 @@ test("T08/T15 C2B: conferma integrata autorizzata riconosce la prima quota", asy
   ).toBe("160.00");
 });
 
-test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-link eligibility without logout", async ({
+test("F2 B14/B15/B19/B24: service transitions update the beneficiary profile and deep-link eligibility without logout", async ({
   page,
 }) => {
   const f = await fixture(1, false, true);
@@ -924,10 +924,10 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await page.goto("/beneficiari");
   await expect(
     page.getByRole("columnheader", { name: "Emporio", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   const row = page.getByRole("row").filter({ hasText: f.code });
-  await expect(row.getByText("NON ABILITATO", { exact: true })).toBeVisible();
-  await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
+  const profile = row.locator(`a[href='/beneficiari/${f.beneficiary}']`);
+  await profile.click();
   await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   const card = page.getByRole("region", {
     name: "Emporio Solidale",
@@ -937,6 +937,7 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
     name: "Pianifica accesso",
     exact: true,
   });
+  await expect(card.getByText("NON ABILITATO", { exact: true })).toBeVisible();
   await expect(planning).toHaveCount(0);
   await card
     .getByRole("textbox", {
@@ -950,9 +951,9 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await expect(planning).toBeVisible();
   await page.goBack();
-  await expect(row.getByText("ATTIVO", { exact: true })).toBeVisible();
-  await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
+  await profile.click();
   await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+  await expect(card.getByText("ATTIVO", { exact: true })).toBeVisible();
   await planning.click();
   await page
     .getByRole("button", { name: "Nuovo Accesso Emporio", exact: true })
@@ -994,11 +995,11 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
       card.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();
     await page.goBack();
+    await profile.click();
+    await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
     await expect(
-      row.getByText(state.toUpperCase(), { exact: true }),
+      card.getByText(state.toUpperCase(), { exact: true }),
     ).toBeVisible();
-    await row.locator(`a[href='/beneficiari/${f.beneficiary}']`).click();
-  await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
   }
   await expect(planning).toHaveCount(0);
   await page.goto(`/emporio/accessi?beneficiarioId=${f.beneficiary}`);
