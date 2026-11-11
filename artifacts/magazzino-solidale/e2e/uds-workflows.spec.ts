@@ -359,8 +359,12 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
     } });
     expect(created.status()).toBe(201);
     const person = await created.json();
+    if (scenario === "dati già completi") {
+      const issued = await page.request.post(`/api/beneficiari/${person.id}/tessera-documento`, { data: {} });
+      expect(issued.status()).toBe(200);
+    }
     const initialCards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
-    expect(initialCards).toHaveLength(1);
+    expect(initialCards).toHaveLength(scenario === "dati già completi" ? 1 : 0);
     let creates = 0;
     page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/api/beneficiari") creates++; });
     await page.goto("/uds/anagrafica");
