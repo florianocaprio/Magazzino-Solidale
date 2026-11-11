@@ -65,15 +65,20 @@ vi.mock("@workspace/api-client-react", () => ({
 
 const translations: Record<string, string> = {
   "nav.groups.generale": "Generale",
+  "nav.groups.magazzino": "Magazzino",
   "nav.groups.logistica": "Logistica",
   "nav.groups.sociale": "Centro di Ascolto",
+  "nav.groups.emporio": "Emporio",
+  "nav.groups.uds": "Unità di Strada",
+  "nav.groups.analisi": "Analisi",
+  "mensa.nav.group": "Mensa",
   "nav.items.dashboard": "Dashboard",
   "nav.items.volontari": "Volontari",
   "nav.items.mezzi": "Mezzi",
   "nav.items.approvazioniLogistica": "Approva nuovi inserimenti",
   "nav.items.fornitori": "Fornitori",
   "nav.items.approvvigionamenti": "Approvvigionamenti",
-  "nav.items.reportLogistica": "Report operativi",
+  "nav.items.reportLogistica": "Dashboard Logistica",
   "nav.items.maps": "Mappa Operativa",
 };
 
@@ -345,7 +350,7 @@ describe("Sidebar - Mappa Operativa", () => {
     await renderLayout();
     expect(document.querySelector('a[href="/carico-merce"]')).toBeNull();
     expect(document.querySelector('a[aria-current="page"]')).toBeNull();
-    expect(trigger("nav.groups.magazzino").getAttribute("aria-expanded")).toBe("false");
+    expect(trigger("Magazzino").getAttribute("aria-expanded")).toBe("false");
   });
 
   it("all'accesso apre soltanto il gruppo della pagina corrente", async () => {
@@ -391,7 +396,7 @@ describe("Sidebar - Mappa Operativa", () => {
     expect(groupLinks("Logistica")).toHaveLength(0);
   });
 
-  it("mostra al SuperAdmin Mappa Operativa come ultima voce di Logistica", async () => {
+  it("mantiene Mappa Operativa in Logistica prima della Dashboard", async () => {
     mocks.isAdmin = true;
     mocks.isSuperAdmin = true;
     mocks.areas = new Set(["logistica"]);
@@ -407,15 +412,38 @@ describe("Sidebar - Mappa Operativa", () => {
       "Approva nuovi inserimenti",
       "Fornitori",
       "Approvvigionamenti",
-      "Report operativi",
       "Mappa Operativa",
+      "Dashboard Logistica",
     ]);
-    expect(links.at(-1)?.getAttribute("href")).toBe("/maps");
+    expect(links.at(-1)?.getAttribute("href")).toBe("/report/magazzino-logistica");
     expect(
       groupLinks("Generale").some(
         (link) => link.getAttribute("href") === "/maps",
       ),
     ).toBe(false);
+  });
+
+  it("usa la stessa icona e mette la Dashboard in fondo a ciascun menu", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/uds/interventi";
+    mocks.mapsLayerCount = 1;
+    await renderLayout();
+
+    for (const [group, path] of [
+      ["Generale", "/"],
+      ["Magazzino", "/report/magazzino"],
+      ["Centro di Ascolto", "/report/centro-ascolto"],
+      ["Emporio", "/report/emporio"],
+      ["Mensa", "/report/mensa"],
+      ["Unità di Strada", "/report/uds"],
+      ["Logistica", "/report/magazzino-logistica"],
+      ["Analisi", "/report/dashboard"],
+    ]) {
+      await expandGroup(group);
+      const dashboard = groupLinks(group).at(-1);
+      expect(dashboard?.getAttribute("href"), group).toBe(path);
+      expect(dashboard?.querySelector(".lucide-layout-dashboard"), group).not.toBeNull();
+    }
   });
 
   it("mostra Mappa Operativa all'Admin con almeno un layer", async () => {
@@ -449,6 +477,17 @@ describe("Sidebar - Mappa Operativa", () => {
     expect(groupLinks("Centro di Ascolto").at(-1)?.getAttribute("href")).toBe("/maps");
     expect(sidebarGroup("Logistica")).toBeUndefined();
     expect(document.body.textContent).toContain("Mappa Operativa");
+  });
+
+  it("lascia Dashboard Centro in fondo anche quando Mappa Operativa è nel Centro di Ascolto", async () => {
+    mocks.areas = new Set(["sociale"]);
+    mocks.permissions = new Set(["maps.operational", "beneficiari.view", "sociale.interventi.view"]);
+    mocks.mapsLayerCount = 1;
+    await renderLayout();
+
+    await expandGroup("Centro di Ascolto");
+    expect(groupLinks("Centro di Ascolto").slice(-2).map((link) => link.getAttribute("href")))
+      .toEqual(["/maps", "/report/centro-ascolto"]);
   });
 
   it.each([

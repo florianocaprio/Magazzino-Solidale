@@ -95,6 +95,7 @@ export type NavItem = {
   url: string;
   icon: LucideIcon;
   groupKey: string;
+  dashboard?: boolean;
   area?: string | readonly string[];
   menuArea?: string;
   moduloCodice?: string;
@@ -110,8 +111,10 @@ export type NavItem = {
   requiresMapsLayer?: boolean;
 };
 
+const dashboardNavigation = { icon: LayoutDashboard, dashboard: true };
+
 const logisticsReportNavigation = {
-  icon: Warehouse,
+  ...dashboardNavigation,
   anyPermissions: ["magazzino.view", "approvvigionamenti.view", "logistica.mezzi.view", "logistica.volontari.view", "richieste_magazzino.view", ...MENSA_REQUEST_READ_PERMISSIONS],
   moduloCodice: "REPORT",
   moduloCodiciAny: [
@@ -127,9 +130,9 @@ const logisticsReportNavigation = {
 
 export const NAV_ITEMS: NavItem[] = [
   {
+    ...dashboardNavigation,
     key: "dashboard",
     url: "/",
-    icon: LayoutDashboard,
     groupKey: "generale",
     area: "generale",
   },
@@ -502,9 +505,9 @@ export const NAV_ITEMS: NavItem[] = [
     moduloCodice: "REPORT",
   },
   {
+    ...dashboardNavigation,
     key: "reportDashboard",
     url: "/report/dashboard",
-    icon: BarChart3,
     groupKey: "analisi",
     area: "analisi",
     moduloCodice: "REPORT",
@@ -519,9 +522,9 @@ export const NAV_ITEMS: NavItem[] = [
     moduloCodiciAll: ["REPORT", "MAGAZZINO_SOLIDALE", "BOLLE"],
   },
   {
+    ...dashboardNavigation,
     key: "reportCentroAscolto",
     url: "/report/centro-ascolto",
-    icon: Building2,
     groupKey: "sociale",
     allPermissions: ["beneficiari.view", "sociale.interventi.view"],
     area: "sociale",
@@ -529,9 +532,9 @@ export const NAV_ITEMS: NavItem[] = [
     moduloCodiciAll: ["CENTRO_ASCOLTO", "REPORT"],
   },
   {
+    ...dashboardNavigation,
     key: "reportEmporio",
     url: "/report/emporio",
-    icon: Store,
     groupKey: "emporio",
     allPermissions: ["emporio.sales.view", "credito.view"],
     area: "emporio",
@@ -539,9 +542,9 @@ export const NAV_ITEMS: NavItem[] = [
     moduloCodiciAll: ["REPORT", "EMPORIO_SOLIDALE"],
   },
   {
+    ...dashboardNavigation,
     key: "reportMensa",
     url: "/report/mensa",
-    icon: Soup,
     groupKey: "mensa",
     area: "mensa",
     sourceAreas: ["mensa"],
@@ -549,9 +552,9 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "mensa.reports.view",
   },
   {
+    ...dashboardNavigation,
     key: "reportUds",
     url: "/report/uds",
-    icon: Footprints,
     groupKey: "uds",
     area: "uds",
     sourceAreas: ["uds"],
@@ -913,8 +916,12 @@ function SessionLayout({ children }: { children: React.ReactNode }) {
             />
           </div>
           <SidebarContent role="navigation">
-            {Object.entries(groupedNav).map(([group, items]) => {
+            {Object.entries(groupedNav).map(([group, groupItems]) => {
               const GroupIcon = GROUP_ICONS[group];
+              const items = [
+                ...groupItems.filter((item) => !item.dashboard),
+                ...groupItems.filter((item) => item.dashboard),
+              ];
               return (
                 <Collapsible
                   key={group}
