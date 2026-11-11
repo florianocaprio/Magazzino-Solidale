@@ -16,3 +16,7 @@ export function udsDirectoryReturnPath(value: string | null | undefined) {
     return "/uds/anagrafica";
   }
 }
+
+export function udsPersonInterventionsPath(id: number) {
+  return `/uds/interventi?beneficiarioId=${id}`;
+}

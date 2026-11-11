@@ -217,7 +217,7 @@ describe("paginazione UDS Anagrafica", () => {
     await act(async () => {
       await mocks.exportProps?.loadRows();
     });
-    expect(mocks.exportDirectory).toHaveBeenCalledWith({});
+    expect(mocks.exportDirectory).toHaveBeenCalledWith({ includiInattiviUds: true });
 
     mocks.permissions.delete("beneficiari.export");
     await act(async () => root.render(<UdsAnagrafica />));

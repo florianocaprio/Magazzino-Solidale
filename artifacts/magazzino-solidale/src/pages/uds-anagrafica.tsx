@@ -87,6 +87,7 @@ export default function UdsAnagrafica() {
 
   const listFilters = useMemo<UdsDirectoryExportInput>(
     () => ({
+      includiInattiviUds: true,
       ...(search.trim() ? { search: search.trim() } : {}),
       ...(isGlobal && effectiveAreaOperativa
         ? { areaOperativaId: effectiveAreaOperativa }
@@ -328,6 +329,11 @@ export default function UdsAnagrafica() {
                         >
                           {channel.label}
                         </Badge>
+                        {beneficiario.udsAttivo === false && (
+                          <Badge variant="secondary" className="ms-1">
+                            {t("udsAnagrafica.inactiveUds")}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

@@ -435,6 +435,7 @@ function fmtBenef(
     areaOperativaNome: areaOperativaNome ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
+    udsAttivo: r.udsAttivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
     noteInterne: r.noteInterne ?? null,
     versione: r.versione,
@@ -1260,6 +1261,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     return;
   }
   const enablesUds = updates.uds === true && !existing.uds;
+  if (enablesUds) updates.udsAttivo = true;
   const assignsZonaUds =
     "zonaUdsId" in updates &&
     updates.zonaUdsId != null &&
@@ -1426,12 +1428,18 @@ router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate
   res.json(fmtBenefForRequest(updated, req));
 });
 
-router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), async (req, res) => {
+router.delete("/beneficiari/:id", (req, res, next) => {
+  const permission = req.query.contesto === "uds" && req.query.permanente === "true"
+    ? "uds.directory.view" : "beneficiari.deactivate";
+  requirePermission(permission)(req, res, next);
+}, async (req, res) => {
   const id = Number(req.params.id);
   const permanent = req.query.permanente === "true";
+  const udsContext = req.query.contesto === "uds";
   const version = Number(req.query.versione);
   if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647 ||
       (req.query.permanente != null && !permanent && req.query.permanente !== "false") ||
+      (req.query.contesto != null && (!udsContext || !permanent)) ||
       (permanent && (typeof req.query.versione !== "string" || !Number.isSafeInteger(version) || version < 1))) {
     res.status(400).json({ error: "Richiesta di rimozione non valida." });
     return;
@@ -1441,16 +1449,21 @@ router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), a
       res.status(403).json({ error: "Eliminazione non autorizzata." });
       return;
     }
+    if (udsContext && (!(req.user?.isAdmin || req.user?.aree.includes("uds")) || !(await isModuloAttivo("UDS")))) {
+      res.status(403).json({ error: "Eliminazione UDS non autorizzata." });
+      return;
+    }
     const linked = "Il beneficiario ha dati associati. Puoi disattivarlo conservando lo storico.";
     try {
       const outcome = await db.transaction(async (tx) => {
         const [person] = await tx.select().from(beneficiariTable)
           .where(eq(beneficiariTable.id, id)).for("update");
-        const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.deactivate");
-        if (!actor.isAdmin && !actor.permessi.includes("beneficiari.manage"))
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, udsContext ? "uds.directory.view" : "beneficiari.deactivate");
+        if (!actor.isAdmin && (!actor.permessi.includes("beneficiari.manage") ||
+            (udsContext && !actor.aree.includes("uds"))))
           throw new CurrentCommandActorError("Eliminazione non autorizzata.");
         if (!person) return { status: 204 } as const;
-        if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) ||
+        if ((udsContext && !person.uds) || !canAccessBeneficiarioRecord(person, req, callerCentroId(req)) ||
             !canAccessBeneficiarioScope(person, actor))
           return { status: 403, error: "Beneficiario non accessibile." } as const;
         const boundary = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);

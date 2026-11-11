@@ -3,6 +3,7 @@ import { assertViewportSafe, login, selectOption } from "./helpers";
 
 type UdsIntervento = {
   id: number;
+  beneficiarioId: number;
   descrizione: string | null;
   dataAggiornamento: string;
 };
@@ -13,6 +14,7 @@ async function runUdsLifecycle(
   auditTablet = false,
 ) {
   await login(page);
+  await expect(page).toHaveURL(/\/uds\/interventi$/);
   const suffix = Date.now();
   const initialDescription = `Incontro UDS E2E ${suffix}`;
   const rectifiedDescription = `${initialDescription} rettificato`;
@@ -44,6 +46,7 @@ async function runUdsLifecycle(
 
   await page.getByRole("button", { name: /nuovo intervento/i }).click();
   const identify = page.getByRole("dialog", { name: /identifica la persona/i });
+  await expect(identify.getByLabel("Soprannome", { exact: true })).toBeVisible();
   await identify
     .getByLabel("Cerca una persona già presente", { exact: true })
     .fill("DEMO-BEN-001");
@@ -96,6 +99,13 @@ async function runUdsLifecycle(
   await rectification
     .getByRole("textbox", { name: /sintesi dell'incontro/i })
     .fill(rectifiedDescription);
+  await rectification.getByRole("button", { name: /Demo 001/i }).click();
+  const profile = page.getByRole("dialog").filter({
+    has: page.getByRole("heading", { name: /Demo 001 Beneficiario/i }),
+  });
+  await expect(profile).toBeVisible();
+  await profile.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(rectification.getByRole("textbox", { name: /sintesi dell'incontro/i })).toHaveValue(rectifiedDescription);
   await rectification
     .getByRole("textbox", { name: /motivo della rettifica/i })
     .fill("Correzione verificata dal test E2E");
@@ -149,6 +159,10 @@ async function runUdsLifecycle(
       }),
     ]),
   );
+  await page.goto(`/uds/anagrafica/${created.beneficiarioId}`);
+  await page.getByRole("link", { name: /vedi tutti gli interventi uds/i }).click();
+  await expect(page).toHaveURL(new RegExp(`/uds/interventi\\?beneficiarioId=${created.beneficiarioId}$`));
+  await expect(row).toContainText(rectifiedDescription);
 }
 
 test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una versione obsoleta", async ({
@@ -300,6 +314,8 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
     } });
     expect(created.status()).toBe(201);
     const person = await created.json();
+    const initialCards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+    expect(initialCards).toHaveLength(1);
     let creates = 0;
     page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/api/beneficiari") creates++; });
     await page.goto("/uds/anagrafica");
@@ -344,7 +360,7 @@ for (const scenario of ["provenienza mancante", "età mancante", "dati già comp
     if (scenario === "età mancante") expect(final.fasciaEtaPresunta).toBe("30_64");
     expect(creates).toBe(0);
     expect(await (await page.request.get(`/api/beneficiari?areaOperativaId=${area.id}`)).json()).toHaveLength(1);
-    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual([]);
+    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual(initialCards);
     expect(await (await page.request.get(`/api/credito-solidale/beneficiari/${person.id}/movimenti`)).json()).toEqual([]);
   });
 }

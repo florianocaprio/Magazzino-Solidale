@@ -62,6 +62,45 @@ async function fixture(areas = ["uds", "analisi"]) {
   return { f, user, agent, server, person, intervention, zone };
 }
 
+it("disattiva solo l'UDS, preserva lo storico e applica i vincoli alla cancellazione", async () => {
+  const { f, user, agent, person, intervention } = await fixture();
+  await pool.query("update ruoli set permessi=$1 where id=$2", [
+    JSON.stringify(["beneficiari.view", "beneficiari.manage", "uds.directory.view", "uds.interventi.view", "uds.interventi.create"]),
+    user.roleId,
+  ]);
+  const profile = await agent.get(`/api/beneficiari/${person}`);
+  expect(profile.status, profile.text).toBe(200);
+  const version = profile.body.versione;
+  const removalPath = (id: number, v: number) =>
+    `/api/beneficiari/${id}?contesto=uds&permanente=true&versione=${v}`;
+  expect((await agent.delete(removalPath(person, version))).status).toBe(409);
+  const statePath = `/api/uds/directory/${person}/stato`;
+  const disabled = await agent.patch(statePath).send({ attivo: false, versione: version });
+  expect(disabled.status, disabled.text).toBe(204);
+  const current = await agent.get(`/api/beneficiari/${person}`);
+  expect(current.body).toMatchObject({ attivo: true, uds: true, udsAttivo: false });
+  expect((await agent.get("/api/uds/directory")).body.some((row: { id: number }) => row.id === person)).toBe(false);
+  expect((await agent.get("/api/uds/directory?includiInattiviUds=true")).body).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: person, udsAttivo: false })]),
+  );
+  const history = await agent.get(`/api/interventi/pagina?ambito=uds&beneficiarioId=${person}&includiStorici=true`);
+  expect(history.status, history.text).toBe(200);
+  expect(history.body.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: intervention })]));
+  expect((await agent.post("/api/uds/interventi").send({ beneficiarioId: person, tipoIntervento: "ascolto" })).status).toBe(403);
+  expect((await agent.post("/api/interventi").send({ beneficiarioId: person, ambito: "uds", stato: "da_pianificare", tipoIntervento: "ascolto" })).status).toBe(403);
+  expect((await agent.patch(statePath).send({ attivo: true, versione: version })).status).toBe(409);
+  expect((await agent.patch(statePath).send({ attivo: true, versione: current.body.versione })).status).toBe(204);
+
+  const created = await agent.post("/api/beneficiari").send({
+    nome: "Test", cognome: "Eliminazione UDS", sesso: "M", uds: true,
+    areaProvenienza: "UE", fasciaEtaPresunta: "30_64", areaOperativaId: f.area,
+  });
+  expect(created.status, created.text).toBe(201);
+  const deleted = await agent.delete(removalPath(created.body.id, created.body.versione));
+  expect(deleted.status, deleted.text).toBe(204);
+  expect((await agent.get(`/api/beneficiari/${created.body.id}`)).status).toBe(404);
+});
+
 it.each([false, true])(
   "F02 same real session, ordinary mixed=%s: revoke Area, deny dossier/list/intervention/export/report and no mutation",
   async (mixed) => {

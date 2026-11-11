@@ -376,15 +376,6 @@ export const NAV_ITEMS: NavItem[] = [
   },
 
   {
-    key: "udsAnagrafica",
-    url: "/uds/anagrafica",
-    icon: Footprints,
-    groupKey: "uds",
-    area: "uds",
-    moduloCodice: "UDS",
-    permission: "uds.directory.view",
-  },
-  {
     key: "udsInterventi",
     url: "/uds/interventi",
     icon: HeartHandshake,
@@ -392,6 +383,15 @@ export const NAV_ITEMS: NavItem[] = [
     area: "uds",
     moduloCodice: "UDS",
     permission: "uds.interventi.view",
+  },
+  {
+    key: "udsAnagrafica",
+    url: "/uds/anagrafica",
+    icon: Footprints,
+    groupKey: "uds",
+    area: "uds",
+    moduloCodice: "UDS",
+    permission: "uds.directory.view",
   },
   {
     key: "udsReportGiornaliero",

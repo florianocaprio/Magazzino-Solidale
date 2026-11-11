@@ -15,7 +15,9 @@ import { risolviFasciaEta } from "@workspace/api-zod";
 import { requirePermission } from "../middlewares/auth";
 import { requireModulo } from "../lib/featureFlags";
 import { callerAreaOperativaId } from "../lib/centroScope";
-import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
+import { canAccessBeneficiarioRecord, canAccessBeneficiarioScope } from "../lib/beneficiarioPolicy";
+import { CurrentCommandActorError, requireCurrentCommandActor } from "../lib/currentCommandActor";
+import { serviceAreaCentroScopeFilter } from "../lib/serviceScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   canAccessUdsInterventoTerritory,
@@ -80,10 +82,13 @@ function requireOperationalArea(req: Request): number | null {
 }
 
 function buildUdsDirectoryScope(req: Request, source: Record<string, unknown>) {
+  const includeInactiveUds = source.includiInattiviUds === true || source.includiInattiviUds === "true";
   const conditions: SQL[] = [
     eq(beneficiariTable.uds, true),
     eq(beneficiariTable.attivo, true),
   ];
+  if (!includeInactiveUds)
+    conditions.push(eq(beneficiariTable.udsAttivo, true));
   const callerArea = requireOperationalArea(req);
   let requestedArea: number | null = null;
   if (source.areaOperativaId != null && source.areaOperativaId !== "") {
@@ -121,10 +126,12 @@ function buildUdsDirectoryScope(req: Request, source: Record<string, unknown>) {
   }
   return {
     where: and(...conditions),
+    includeInactiveUds,
     auditFilters: {
       areaOperativaId: effectiveArea,
       zonaUdsId,
       searchApplied: search.length > 0,
+      ...(includeInactiveUds ? { includiInattiviUds: true } : {}),
     },
   };
 }
@@ -186,6 +193,7 @@ async function selectUdsDirectoryRows(
 function formatUdsDirectoryItem(
   row: Awaited<ReturnType<typeof selectUdsDirectoryRows>>[number],
   req: Request,
+  includeInactiveUds: boolean,
 ) {
   const { beneficiario, zonaNome } = row;
   return {
@@ -194,6 +202,7 @@ function formatUdsDirectoryItem(
     nome: beneficiario.nome,
     cognome: beneficiario.cognome,
     soprannome: beneficiario.soprannome ?? null,
+    ...(includeInactiveUds ? { udsAttivo: beneficiario.udsAttivo } : {}),
     fasciaEtaCorrente: risolviFasciaEta(
       beneficiario.dataNascita,
       beneficiario.fasciaEtaPresunta,
@@ -367,7 +376,7 @@ router.get(
           "Paginazione non valida: page >= 1 e limit compreso tra 1 e 100",
         );
       }
-      const { where } = buildUdsDirectoryScope(
+      const { where, includeInactiveUds } = buildUdsDirectoryScope(
         req,
         req.query as Record<string, unknown>,
       );
@@ -382,8 +391,55 @@ router.get(
       res.setHeader("X-Total-Count", String(total));
       res.setHeader("X-Page", String(page));
       res.setHeader("X-Page-Size", String(limit));
-      res.json(rows.map((row) => formatUdsDirectoryItem(row, req)));
+      res.json(rows.map((row) => formatUdsDirectoryItem(row, req, includeInactiveUds)));
     } catch (error) {
+      if (sendUdsError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.patch(
+  "/uds/directory/:id/stato",
+  requirePermission("uds.directory.view"),
+  requirePermission("beneficiari.manage"),
+  async (req, res) => {
+    try {
+      const id = positiveInteger(req.params.id);
+      const { attivo, versione } = req.body ?? {};
+      if (id == null || id > 2147483647 || typeof attivo !== "boolean" ||
+          !Number.isSafeInteger(versione) || versione < 1) {
+        throw new UdsError(400, "Stato o versione UDS non validi");
+      }
+      await db.transaction(async (tx) => {
+        const boundary = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);
+        const [person] = await tx.select().from(beneficiariTable)
+          .where(and(eq(beneficiariTable.id, id), boundary)).for("update");
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.manage");
+        if (!person?.uds || !canAccessBeneficiarioRecord(person, req) ||
+            !canAccessBeneficiarioScope(person, actor) ||
+            (!actor.isAdmin && (!actor.aree.includes("uds") || !actor.permessi.includes("uds.directory.view")))) {
+          throw new UdsError(403, "Persona UDS non accessibile");
+        }
+        if (person.versione !== versione) throw new UdsError(409, "Versione Beneficiario superata.");
+        if (person.udsAttivo === attivo) return;
+        await tx.update(beneficiariTable).set({
+          udsAttivo: attivo, versione: person.versione + 1, dataAggiornamento: new Date(),
+        }).where(eq(beneficiariTable.id, id));
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "uds", chiave: `beneficiario:${id}:uds`,
+          azione: attivo ? "riattivazione" : "disattivazione",
+          valorePrecedente: { udsAttivo: person.udsAttivo },
+          valoreNuovo: { udsAttivo: attivo },
+          utenteId: actor.id, ip: req.ip ?? null,
+        });
+      });
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof CurrentCommandActorError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       if (sendUdsError(error, res)) return;
       throw error;
     }
@@ -450,7 +506,7 @@ router.post(
         req.body && typeof req.body === "object" && !Array.isArray(req.body)
           ? (req.body as Record<string, unknown>)
           : {};
-      const { where, auditFilters } = buildUdsDirectoryScope(req, source);
+      const { where, auditFilters, includeInactiveUds } = buildUdsDirectoryScope(req, source);
       const rows = await selectUdsDirectoryRows(where);
       await db.insert(auditConfigurazioniTable).values({
         area: "uds",
@@ -464,7 +520,7 @@ router.post(
         utenteId: req.user!.id,
         ip: req.ip ?? req.socket.remoteAddress ?? null,
       });
-      res.json(rows.map((row) => formatUdsDirectoryItem(row, req)));
+      res.json(rows.map((row) => formatUdsDirectoryItem(row, req, includeInactiveUds)));
     } catch (error) {
       if (sendUdsError(error, res)) return;
       throw error;
@@ -553,29 +609,7 @@ router.post(
       if (!tipoIntervento) {
         throw new UdsError(400, "Il tipo Intervento è obbligatorio");
       }
-      const [beneficiario] = await db
-        .select()
-        .from(beneficiariTable)
-        .where(eq(beneficiariTable.id, beneficiarioId))
-        .limit(1);
-      if (
-        !beneficiario ||
-        !beneficiario.attivo ||
-        !beneficiario.uds ||
-        beneficiario.areaOperativaId == null
-      ) {
-        throw new UdsError(
-          403,
-          "Persona non accessibile per un Intervento UDS",
-        );
-      }
       const callerArea = requireOperationalArea(req);
-      if (callerArea != null && beneficiario.areaOperativaId !== callerArea) {
-        throw new UdsError(
-          403,
-          "Persona non accessibile per un Intervento UDS",
-        );
-      }
       const now = new Date();
       const nuoviBisogni = normalizeNuoviBisogni(req.body?.bisogniPianificati);
       if (
@@ -589,6 +623,13 @@ router.post(
         );
       }
       const created = await db.transaction(async (tx) => {
+        const [beneficiario] = await tx.select().from(beneficiariTable)
+          .where(eq(beneficiariTable.id, beneficiarioId)).for("share");
+        if (!beneficiario?.attivo || !beneficiario.uds || !beneficiario.udsAttivo ||
+            beneficiario.areaOperativaId == null ||
+            (callerArea != null && beneficiario.areaOperativaId !== callerArea)) {
+          throw new UdsError(403, "Persona non attiva o non accessibile per un Intervento UDS");
+        }
         const [row] = await tx
           .insert(interventiTable)
           .values({

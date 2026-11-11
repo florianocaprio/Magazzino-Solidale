@@ -19112,6 +19112,88 @@ export function useListUdsDirectory<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+export const getUpdateUdsBeneficiarioStatoUrl = (id: number) => {
+  return `/api/uds/directory/${id}/stato`;
+};
+
+export const updateUdsBeneficiarioStato = async (
+  id: number,
+  beneficiarioStatoInput: BeneficiarioStatoInput,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getUpdateUdsBeneficiarioStatoUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(beneficiarioStatoInput),
+  });
+};
+
+export const getUpdateUdsBeneficiarioStatoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>,
+    TError,
+    { id: number; data: BodyType<BeneficiarioStatoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>,
+  TError,
+  { id: number; data: BodyType<BeneficiarioStatoInput> },
+  TContext
+> => {
+  const mutationKey = ["updateUdsBeneficiarioStato"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>,
+    { id: number; data: BodyType<BeneficiarioStatoInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateUdsBeneficiarioStato(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateUdsBeneficiarioStatoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>
+>;
+export type UpdateUdsBeneficiarioStatoMutationBody =
+  BodyType<BeneficiarioStatoInput>;
+export type UpdateUdsBeneficiarioStatoMutationError = ErrorType<void>;
+
+export const useUpdateUdsBeneficiarioStato = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>,
+    TError,
+    { id: number; data: BodyType<BeneficiarioStatoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateUdsBeneficiarioStato>>,
+  TError,
+  { id: number; data: BodyType<BeneficiarioStatoInput> },
+  TContext
+> => {
+  return useMutation(getUpdateUdsBeneficiarioStatoMutationOptions(options));
+};
+
 export const getListUdsLinkCandidatesUrl = (
   params: ListUdsLinkCandidatesParams,
 ) => {

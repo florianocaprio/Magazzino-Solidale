@@ -53,6 +53,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleSaldo: decimal("credito_solidale_saldo", { precision: 10, scale: 2 }).notNull().default("0"),
   creditoSolidaleDataUltimoMovimento: timestamp("credito_solidale_data_ultimo_movimento"),
   uds: boolean("uds").notNull().default(false),
+  udsAttivo: boolean("uds_attivo").notNull().default(true),
   areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
   attivo: boolean("attivo").notNull().default(true),

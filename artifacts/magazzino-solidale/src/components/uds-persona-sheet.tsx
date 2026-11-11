@@ -962,6 +962,21 @@ export function UdsPersonaSheet({
 
                 <FormField
                   control={form.control}
+                  name="soprannome"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t("udsAnagrafica.fSoprannome")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="areaProvenienza"
                   render={({ field }) => (
                     <FormItem>
@@ -1100,20 +1115,6 @@ export function UdsPersonaSheet({
                     {t("udsAnagrafica.optionalDataHint")}
                   </p>
                   <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="soprannome"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            {t("udsAnagrafica.fSoprannome")}
-                          </FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
                 <FormField
                   control={form.control}
                   name="telefono"

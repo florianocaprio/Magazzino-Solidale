@@ -309,6 +309,12 @@ async function runInterventoCommand<T>(
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtext('m63.intervento.catena'), ${beneficiaryId})`,
         );
+      if (newBeneficiarioId != null) {
+        const [person] = await tx.select().from(beneficiariTable)
+          .where(eq(beneficiariTable.id, newBeneficiarioId)).for("share");
+        if (!person?.attivo || !person.udsAttivo || !canAccessInterventoAmbito("uds", person, req))
+          throw new RouteError(403, "Persona non attiva o non accessibile per un Intervento UDS");
+      }
       return command(tx);
     });
   return db.transaction(async (tx) => {
@@ -5082,6 +5088,7 @@ router.post("/interventi/:id/successivi", async (req, res) => {
         });
         return row;
       },
+      precedente.beneficiarioId,
     );
     res.status(201).json(formatIntervento(created, emptySummary()));
   } catch (error) {

@@ -9759,6 +9759,7 @@ export const GetBeneficiarioResponse = zod.object({
     .min(getBeneficiarioResponseVersioneFascicoloMin)
     .optional(),
   id: zod.number(),
+  udsAttivo: zod.boolean().optional(),
   codice: zod.string(),
   codiceFiscale: zod.string().nullish(),
   statoAnagrafica: zod.enum(["provvisoria", "completa"]),
@@ -10178,6 +10179,10 @@ export const DeleteBeneficiarioQueryParams = zod.object({
     .min(1)
     .optional()
     .describe("Versione corrente obbligatoria per l'eliminazione definitiva."),
+  contesto: zod
+    .enum(["uds"])
+    .optional()
+    .describe("Perimetro e autorizzazione UDS per l’eliminazione definitiva."),
 });
 
 /**
@@ -12982,6 +12987,7 @@ export const ListUdsDirectoryQueryParams = zod.object({
     .optional()
     .describe("Disponibile soltanto ai profili amministrativi globali."),
   zonaUdsId: zod.coerce.number().optional(),
+  includiInattiviUds: zod.coerce.boolean().optional(),
 });
 
 export const ListUdsDirectoryResponseItem = zod
@@ -13002,11 +13008,21 @@ export const ListUdsDirectoryResponseItem = zod
     zonaUdsNome: zod.string().nullable(),
     canale: zod.enum(["uds", "uds_centro"]),
     accessoCompleto: zod.boolean(),
+    udsAttivo: zod.boolean().optional(),
   })
   .describe(
     "Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.",
   );
 export const ListUdsDirectoryResponse = zod.array(ListUdsDirectoryResponseItem);
+
+export const UpdateUdsBeneficiarioStatoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateUdsBeneficiarioStatoBody = zod.object({
+  attivo: zod.boolean(),
+  versione: zod.number().min(1),
+});
 
 /**
  * Ricerca anti-duplicazione Area-wide di persone attive non ancora UDS, con risposta anagrafica minimizzata.
@@ -13056,6 +13072,7 @@ export const exportUdsDirectoryBodySearchMin = 2;
 export const exportUdsDirectoryBodySearchMax = 120;
 
 export const ExportUdsDirectoryBody = zod.object({
+  includiInattiviUds: zod.boolean().optional(),
   search: zod
     .string()
     .min(exportUdsDirectoryBodySearchMin)
@@ -13083,6 +13100,7 @@ export const ExportUdsDirectoryResponseItem = zod
     zonaUdsNome: zod.string().nullable(),
     canale: zod.enum(["uds", "uds_centro"]),
     accessoCompleto: zod.boolean(),
+    udsAttivo: zod.boolean().optional(),
   })
   .describe(
     "Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.",

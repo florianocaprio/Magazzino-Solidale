@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useLoginUser } from "@workspace/api-client-react";
-import { useAuth } from "@/lib/auth";
+import { authUserHasArea, authUserHasPermission, useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,9 @@ export default function Login() {
       {
         onSuccess: (user) => {
           setUser(user);
-          navigate("/", { replace: true });
+          const opensUds = authUserHasArea(user, "uds") &&
+            authUserHasPermission(user, "uds.interventi.view");
+          navigate(opensUds ? "/?accesso=uds" : "/", { replace: true });
         },
         onError: () => {
           setError(t("login.errorInvalid"));

@@ -5064,6 +5064,7 @@ export interface BeneficiarioDettaglio {
   /** @minimum 0 */
   versioneFascicolo?: number;
   id: number;
+  udsAttivo?: boolean;
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
@@ -5951,6 +5952,7 @@ export interface ZonaUdsVersioneInput {
 }
 
 export interface UdsDirectoryExportInput {
+  includiInattiviUds?: boolean;
   /**
    * @minLength 2
    * @maxLength 120
@@ -5998,6 +6000,7 @@ export interface UdsDirectoryItem {
   zonaUdsNome: string | null;
   canale: UdsDirectoryItemCanale;
   accessoCompleto: boolean;
+  udsAttivo?: boolean;
 }
 
 export type UdsLinkCandidateItemFasciaEtaCorrente =
@@ -12425,7 +12428,18 @@ export type DeleteBeneficiarioParams = {
    * @minimum 1
    */
   versione?: number;
+  /**
+   * Perimetro e autorizzazione UDS per l’eliminazione definitiva.
+   */
+  contesto?: DeleteBeneficiarioContesto;
 };
+
+export type DeleteBeneficiarioContesto =
+  (typeof DeleteBeneficiarioContesto)[keyof typeof DeleteBeneficiarioContesto];
+
+export const DeleteBeneficiarioContesto = {
+  uds: "uds",
+} as const;
 
 export type AuthorizeBeneficiariExport200 = {
   autorizzato: boolean;
@@ -12732,6 +12746,7 @@ export type ListUdsDirectoryParams = {
    */
   areaOperativaId?: number;
   zonaUdsId?: number;
+  includiInattiviUds?: boolean;
 };
 
 export type ListUdsLinkCandidatesParams = {

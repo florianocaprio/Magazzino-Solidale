@@ -4447,6 +4447,10 @@ paths:
           in: query
           schema: { type: integer, minimum: 1 }
           description: Versione corrente obbligatoria per l'eliminazione definitiva.
+        - name: contesto
+          in: query
+          schema: { type: string, enum: [uds] }
+          description: Perimetro e autorizzazione UDS per l’eliminazione definitiva.
       responses:
         "204":
           description: Operazione completata
@@ -5368,6 +5372,9 @@ paths:
         - name: zonaUdsId
           in: query
           schema: { type: integer }
+        - name: includiInattiviUds
+          in: query
+          schema: { type: boolean }
       responses:
         "200":
           description: Directory UDS minimizzata e paginata nell'Area autorizzata
@@ -5384,6 +5391,25 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/UdsDirectoryItem" }
         "403": { description: Area o permesso UDS non disponibile }
+
+  /uds/directory/{id}/stato:
+    patch:
+      operationId: updateUdsBeneficiarioStato
+      tags: [uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BeneficiarioStatoInput" }
+      responses:
+        "204": { description: Stato UDS aggiornato }
+        "403": { description: Persona o permesso UDS non accessibile }
+        "409": { description: Versione superata }
 
   /uds/directory/link-candidates:
     get:
@@ -17110,6 +17136,7 @@ components:
           minimum: 0
         id:
           type: integer
+        udsAttivo: { type: boolean }
         codice:
           type: string
         codiceFiscale:
@@ -18372,6 +18399,7 @@ components:
       type: object
       additionalProperties: false
       properties:
+        includiInattiviUds: { type: boolean }
         search: { type: string, minLength: 2, maxLength: 120 }
         areaOperativaId: { type: integer, minimum: 1 }
         zonaUdsId: { type: integer, minimum: 1 }
@@ -18392,6 +18420,7 @@ components:
         zonaUdsNome: { type: [string, "null"] }
         canale: { type: string, enum: [uds, uds_centro] }
         accessoCompleto: { type: boolean }
+        udsAttivo: { type: boolean }
       required:
         [
           id,

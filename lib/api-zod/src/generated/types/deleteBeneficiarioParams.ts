@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { DeleteBeneficiarioContesto } from "./deleteBeneficiarioContesto";
 
 export type DeleteBeneficiarioParams = {
   /**
@@ -16,4 +17,8 @@ export type DeleteBeneficiarioParams = {
    * @minimum 1
    */
   versione?: number;
+  /**
+   * Perimetro e autorizzazione UDS per l’eliminazione definitiva.
+   */
+  contesto?: DeleteBeneficiarioContesto;
 };
